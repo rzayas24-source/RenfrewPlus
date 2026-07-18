@@ -11,7 +11,10 @@ import CompletionLabel from "./Screens/completionlabel";
 import IntroScreen from "./Screens/introscreen";
 import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
+import CalendarScreen from "./Screens/calendarscreen";
 import MainScreen from "./Screens/mainscreen";
+import AdminScreen from "./Screens/adminscreen";
+import AdminTableScreen from "./Screens/admintablescreen";
 import NextLoader from "./Screens/nextloader";
 import Queue from "./Screens/queue";
 import RejectList from "./Screens/rejectlist";
@@ -153,6 +156,9 @@ export default function ScreenManager() {
       <Routes>
         <Route path="/" element={<MainScreen />} />
         <Route path="/home" element={<MainScreen />} />
+        <Route path="/admin" element={<AdminScreen />} />
+        <Route path="/admin/tables" element={<AdminTableScreen />} />
+        <Route path="/calendar" element={<CalendarScreen />} />
         <Route path="/approved" element={<ApprovedList />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />
         <Route path="/balance-sheet" element={<BalanceSheetMenu />} />

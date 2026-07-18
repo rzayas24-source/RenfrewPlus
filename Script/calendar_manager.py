@@ -9,7 +9,6 @@ This file contains:
 All business logic lives in:
     system_calendar_core.py
     system_posting_core.py
-    system_EMR_core.py
 """
 
 from system_calendar_core import (
@@ -30,11 +29,6 @@ from system_posting_core import (
     export_posting_to_csv,
 )
 
-from system_EMR_core import (
-    rebuild_edi_matchresults_core,
-)
-
-
 def print_help():
     print("""
 Renfrew Calendar Manager — Commands
@@ -53,9 +47,6 @@ WORK DAY / POSTING
   show-items MM/DD/YYYY     - Show posting screen for paperwork day
   export-posting MM/DD/YYYY - Export posting screen to CSV for paperwork day
 
-EDI / UTIL
-  rebuild-edi               - Rebuild EDI_MatchResults from EDI/Lockbox/EFT
-
 GENERAL
   help                      - Show this help
   quit                      - Exit
@@ -69,7 +60,6 @@ def main():
     current = get_current_work_day()
     if current:
         try:
-            rebuild_edi_matchresults_core()
             show_items_for_workday(current)
         except Exception as e:
             print("Error during startup posting screen:")
@@ -132,9 +122,6 @@ def main():
 
         elif op == "export-posting" and len(parts) == 2:
             export_posting_to_csv(parts[1])
-
-        elif op == "rebuild-edi":
-            rebuild_edi_matchresults_core()
 
         else:
             print("Unknown command. Type 'help' for options.")

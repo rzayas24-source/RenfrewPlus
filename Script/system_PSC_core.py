@@ -3,9 +3,8 @@
 from db import get_conn
 from system_calendar_core import (
     get_current_work_day,
-    normalize_mmddyyyy
+    normalize_mmddyyyy,
 )
-from system_EMR_core import rebuild_edi_matchresults_core
 from system_posting_core import show_items_for_workday
 
 
@@ -24,7 +23,7 @@ def resolve_work_and_bank_day():
 
     row = cur.execute(
         "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
-        (workday,)
+        (workday,),
     ).fetchone()
 
     conn.close()
@@ -38,11 +37,7 @@ def resolve_work_and_bank_day():
 
 
 def run_psc_core():
-    print("\n[PSC] Step 1 — Running EMR Core...")
-    rebuild_edi_matchresults_core()
-    print("[PSC] ✔ EMR Core complete.")
-
-    print("\n[PSC] Step 2 — Resolving work day → bank day...")
+    print("\n[PSC] Resolving work day → bank day...")
     workday, bank_day = resolve_work_and_bank_day()
 
     print(f"[PSC] Work day: {workday}")
@@ -52,10 +47,10 @@ def run_psc_core():
         print("[PSC] Cannot continue — no bank day.")
         return
 
-    print("\n[PSC] Step 3 — Building posting screen (this will auto‑capture PSC)...")
+    print("\n[PSC] Building posting screen...")
     show_items_for_workday(workday)
 
-    print("\n[PSC] ✔ PSC Core complete — PostingScreenCapture updated.")
+    print("\n[PSC] ✔ PSC Core complete.")
 
 
 if __name__ == "__main__":

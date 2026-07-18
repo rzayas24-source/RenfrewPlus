@@ -18,70 +18,59 @@ interface StatCard {
   detail: string;
 }
 
-export default function MainScreen() {
+export default function AdminScreen() {
   const navigate = useNavigate();
-  const openAdminWindow = () => {
-    window.open("/admin", "renfrew-admin", "noopener,noreferrer");
-  };
 
   const widgets: WidgetCard[] = [
     {
-      title: "Site Review",
-      meta: "Open pending batches, review attachments, and keep the queue moving.",
+      title: "Tables",
+      meta: "Browse every table in the live SQLite database.",
       tone: "blue",
-      action: "Open Site",
-      path: "/site",
-      footnote: "Pending queue",
+      action: "Open Table Viewer",
+      path: "/admin/tables",
+      footnote: "Database",
     },
     {
-      title: "Balance Sheet",
-      meta: "Jump into Balsheet tools, entries, and the bulk posting flow.",
+      title: "Users",
+      meta: "Review access, roles, and support contacts.",
       tone: "pink",
-      action: "Open Balance Sheet",
-      path: "/balance-sheet",
-      footnote: "Worksheet hub",
-    },
-    {
-      title: "Calendar",
-      meta: "Open the calendar workspace for scheduling, daily views, and related module links.",
-      tone: "mist",
-      action: "Open Calendar",
-      path: "/calendar",
-      footnote: "Schedule",
-    },
-    {
-      title: "Approved Batches",
-      meta: "Check completed files, confirmations, and review history.",
-      tone: "pearl",
-      action: "Open Approved",
+      action: "Open Users",
       path: "/approved",
-      footnote: "Review complete",
+      footnote: "Access",
     },
     {
-      title: "Image Renfrew",
-      meta: "A preview tile for the restored icon and banner system.",
+      title: "Logs",
+      meta: "Track recent actions and operational notes.",
       tone: "mist",
-      action: "View Preview",
+      action: "Open Logs",
       path: "/site",
-      footnote: "Brand tile",
+      footnote: "Audit",
+    },
+    {
+      title: "Settings",
+      meta: "Adjust workflow defaults and shell preferences.",
+      tone: "pearl",
+      action: "Open Settings",
+      path: "/home",
+      footnote: "Config",
     },
   ];
 
   const stats: StatCard[] = [
     {
+      label: "Mode",
+      value: "Admin console",
+      detail: "Same polished shell, tuned for support and oversight.",
+    },
+    {
       label: "Focus",
-      value: "Pending review",
-      detail: "Keep the attachment queue moving with a calmer workspace.",
+      value: "Controls + review",
+      detail: "Keep the operating tools easy to reach and easy to read.",
     },
     {
-      label: "Flow",
-      value: "Keyproof + Itemization",
-      detail: "One smooth route from review to balance check.",
-    },
-    {
-      label: "Theme",
-      value: "Baby blue / pink / grey",
-      detail: "Soft contrast, airy spacing, and a more premium feel.",
+      label: "Style",
+      value: "Matched main screen",
+      detail: "The new window uses the same airy layout and branding.",
     },
   ];
 
@@ -101,24 +90,20 @@ export default function MainScreen() {
         </div>
 
         <p style={styles.sidebarCopy}>
-          A soft, polished command center for the review flow, balance sheet, and completed batches.
+          A soft admin console for workflow support, visibility, and system oversight.
         </p>
 
-        <nav style={styles.navStack} aria-label="Main navigation">
+        <nav style={styles.navStack} aria-label="Admin navigation">
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
             <span style={styles.navButtonLabel}>Main</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
-            <span style={styles.navButtonLabel}>Admin</span>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin/tables")}>
+            <span style={styles.navButtonLabel}>Tables</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/site")}>
             <span style={styles.navButtonLabel}>Site</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/calendar")}>
-            <span style={styles.navButtonLabel}>Calendar</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/balance-sheet")}>
@@ -133,9 +118,9 @@ export default function MainScreen() {
 
         <div style={styles.sidebarCard}>
           <div style={styles.sidebarCardLabel}>Today</div>
-          <div style={styles.sidebarCardValue}>Gentle, focused, clear</div>
+          <div style={styles.sidebarCardValue}>Admin support ready</div>
           <div style={styles.sidebarCardMeta}>
-            The whole workspace is tuned to feel lighter and more modern without losing the workflow.
+            The window keeps the same calm layout so admin tools feel like part of the same app.
           </div>
         </div>
       </aside>
@@ -143,41 +128,30 @@ export default function MainScreen() {
       <section style={styles.content}>
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
-            <div style={styles.kicker}>Main screen</div>
-            <div style={styles.heroWordmarkWrap}>
-              <img
-                src="/renfrewplus-banner.png"
-                alt="RenfrewPlus wordmark"
-                style={styles.heroWordmark}
-              />
-            </div>
+            <div style={styles.kicker}>Admin screen</div>
             <p style={styles.subtitle}>
-              A calm workspace for review, approvals, and balance-sheet work.
+              A calm workspace for admin tools, support actions, and workflow oversight.
             </p>
 
             <div style={styles.heroActions}>
               <button style={styles.primaryButton} type="button" onClick={() => navigate("/site")}>
-                Continue Review
+                Open Site
               </button>
               <button style={styles.secondaryButton} type="button" onClick={() => navigate("/balance-sheet")}>
-                Balance Sheet
+                Open Balance Sheet
               </button>
             </div>
           </div>
 
           <div style={styles.heroArt}>
-            <div style={styles.heroLogoCard}>
-              <img src="/renfrew-gazebo.png" alt="Renfrew gazebo mark" style={styles.heroLogoImage} />
-            </div>
-
             <div style={styles.heroStatusCard}>
               <div style={styles.heroStatusTop}>
-                <span style={styles.statusPill}>Live workspace</span>
+                <span style={styles.statusPill}>Admin window</span>
                 <span style={styles.statusDot} />
               </div>
-              <div style={styles.heroStatusTitle}>Soft launch look</div>
+              <div style={styles.heroStatusTitle}>Same shell, new role</div>
               <div style={styles.heroStatusText}>
-                Baby blue, pink, and light grey for a calmer first impression.
+                This page is meant to look and feel like the main screen while serving admin tasks.
               </div>
             </div>
           </div>
@@ -196,11 +170,11 @@ export default function MainScreen() {
         <section style={styles.widgetSection}>
           <div style={styles.sectionHeader}>
             <div>
-              <div style={styles.sectionKicker}>Widgets</div>
-              <h2 style={styles.sectionTitle}>Everything feels connected</h2>
+              <div style={styles.sectionKicker}>Admin tools</div>
+              <h2 style={styles.sectionTitle}>Everything stays in the same visual language</h2>
             </div>
             <div style={styles.sectionMeta}>
-              The four main paths are still here, but now they live in a much softer, more premium frame.
+              The left rail and cards follow the same structure so the new window feels native to the workspace.
             </div>
           </div>
 
@@ -411,15 +385,6 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "center",
     minWidth: 0,
   },
-  heroWordmarkWrap: {
-    maxWidth: "540px",
-    padding: "0 0 6px",
-  },
-  heroWordmark: {
-    display: "block",
-    width: "100%",
-    height: "auto",
-  },
   kicker: {
     textTransform: "uppercase",
     letterSpacing: "0.2em",
@@ -437,164 +402,143 @@ const styles: Record<string, CSSProperties> = {
   },
   heroActions: {
     display: "flex",
-    flexWrap: "wrap",
     gap: "12px",
-    marginTop: "22px",
+    flexWrap: "wrap",
+    marginTop: "20px",
   },
   primaryButton: {
-    height: "46px",
+    height: "44px",
     padding: "0 18px",
-    border: 0,
-    borderRadius: "16px",
-    background: "#98d4ff",
-    color: "#0f2238",
+    borderRadius: "14px",
+    border: "1px solid rgba(106, 137, 180, 0.24)",
+    background: "linear-gradient(135deg, #dbeeff 0%, #c6ddfb 100%)",
+    color: "#15304f",
     fontWeight: 800,
-    boxShadow: "0 14px 26px rgba(152, 212, 255, 0.24)",
     cursor: "pointer",
+    boxShadow: "0 14px 24px rgba(119, 151, 198, 0.16)",
   },
   secondaryButton: {
-    height: "46px",
+    height: "44px",
     padding: "0 18px",
-    border: "1px solid rgba(140, 160, 184, 0.24)",
-    borderRadius: "16px",
-    background: "rgba(255,255,255,0.76)",
-    color: "#16304d",
+    borderRadius: "14px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    background: "rgba(255,255,255,0.9)",
+    color: "#35506d",
     fontWeight: 800,
-    boxShadow: "0 12px 24px rgba(52, 84, 120, 0.06)",
     cursor: "pointer",
   },
   heroArt: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "14px",
-  },
-  heroLogoCard: {
-    flex: 1,
-    minHeight: "210px",
-    padding: "18px",
-    borderRadius: "28px",
-    background: "rgba(255,255,255,0.94)",
-    border: "1px solid rgba(140, 160, 184, 0.12)",
     display: "grid",
-    placeItems: "center",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55), 0 18px 34px rgba(52, 84, 120, 0.08)",
-  },
-  heroLogoImage: {
-    width: "100%",
-    maxWidth: "320px",
-    height: "auto",
-    display: "block",
+    gap: "14px",
+    alignContent: "center",
   },
   heroStatusCard: {
-    padding: "16px 18px",
     borderRadius: "24px",
-    background: "linear-gradient(135deg, rgba(226, 243, 255, 0.98) 0%, rgba(255, 235, 244, 0.96) 100%)",
-    border: "1px solid rgba(140, 160, 184, 0.18)",
+    padding: "18px",
+    background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.92) 100%)",
+    border: "1px solid rgba(175, 193, 218, 0.22)",
   },
   heroStatusTop: {
     display: "flex",
-    alignItems: "center",
     justifyContent: "space-between",
-    gap: "10px",
-    marginBottom: "10px",
+    alignItems: "center",
+    marginBottom: "14px",
   },
   statusPill: {
     display: "inline-flex",
     alignItems: "center",
+    height: "30px",
+    padding: "0 12px",
     borderRadius: "999px",
-    padding: "6px 10px",
-    background: "rgba(255,255,255,0.8)",
-    color: "#4f647a",
+    background: "rgba(255,255,255,0.88)",
+    border: "1px solid rgba(158, 176, 204, 0.22)",
     fontSize: "12px",
     fontWeight: 800,
-    letterSpacing: "0.08em",
+    color: "#4a6179",
     textTransform: "uppercase",
+    letterSpacing: "0.08em",
   },
   statusDot: {
-    width: "11px",
-    height: "11px",
+    width: "10px",
+    height: "10px",
     borderRadius: "50%",
-    background: "#95c6ff",
-    boxShadow: "0 0 0 6px rgba(149, 198, 255, 0.20)",
-    flexShrink: 0,
+    background: "#8ec4ff",
+    boxShadow: "0 0 0 6px rgba(142, 196, 255, 0.18)",
   },
   heroStatusTitle: {
-    fontSize: "18px",
+    fontSize: "22px",
     fontWeight: 800,
-    marginBottom: "8px",
     color: "#16304d",
+    marginBottom: "8px",
   },
   heroStatusText: {
     fontSize: "14px",
     lineHeight: 1.6,
-    color: "#5d7187",
+    color: "#5a6c80",
   },
   statsGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "14px",
+    gap: "16px",
   },
   statCard: {
     padding: "18px",
     borderRadius: "24px",
-    background: "rgba(255,255,255,0.78)",
-    border: "1px solid rgba(140, 160, 184, 0.18)",
-    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.06)",
-    minHeight: "142px",
+    background: "rgba(255,255,255,0.84)",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    boxShadow: "0 18px 34px rgba(52, 84, 120, 0.06)",
   },
   statLabel: {
+    fontSize: "12px",
     textTransform: "uppercase",
-    letterSpacing: "0.16em",
-    fontSize: "11px",
-    color: "#74879c",
-    fontWeight: 800,
+    letterSpacing: "0.14em",
+    color: "#72859a",
     marginBottom: "10px",
+    fontWeight: 800,
   },
   statValue: {
     fontSize: "20px",
     fontWeight: 800,
-    color: "#10253d",
+    color: "#17324f",
     marginBottom: "8px",
   },
   statDetail: {
     fontSize: "14px",
     lineHeight: 1.6,
-    color: "#5d7187",
+    color: "#597085",
   },
   widgetSection: {
-    padding: "22px",
+    padding: "20px",
     borderRadius: "30px",
-    border: "1px solid rgba(140, 160, 184, 0.18)",
-    background: "rgba(255,255,255,0.64)",
-    boxShadow: "0 24px 60px rgba(52, 84, 120, 0.06)",
+    background: "rgba(255,255,255,0.74)",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    boxShadow: "0 20px 42px rgba(52, 84, 120, 0.06)",
   },
   sectionHeader: {
     display: "flex",
     justifyContent: "space-between",
-    gap: "14px",
-    alignItems: "end",
+    alignItems: "flex-start",
+    gap: "16px",
     marginBottom: "16px",
   },
   sectionKicker: {
+    fontSize: "12px",
     textTransform: "uppercase",
-    letterSpacing: "0.16em",
-    fontSize: "11px",
+    letterSpacing: "0.14em",
     color: "#74879c",
     fontWeight: 800,
     marginBottom: "8px",
   },
   sectionTitle: {
     margin: 0,
-    fontSize: "28px",
-    lineHeight: 1.08,
-    letterSpacing: "-0.03em",
-    color: "#10253d",
+    fontSize: "24px",
+    color: "#17324f",
   },
   sectionMeta: {
-    maxWidth: "460px",
+    maxWidth: "340px",
     fontSize: "14px",
     lineHeight: 1.6,
-    color: "#5d7187",
+    color: "#5e7186",
   },
   widgetGrid: {
     display: "grid",
@@ -602,77 +546,69 @@ const styles: Record<string, CSSProperties> = {
     gap: "14px",
   },
   widgetCard: {
-    minHeight: "190px",
-    border: "0",
-    borderRadius: "28px",
+    minHeight: "168px",
+    borderRadius: "24px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
     padding: "18px",
     textAlign: "left",
     cursor: "pointer",
-    boxShadow: "0 22px 40px rgba(52, 84, 120, 0.08)",
     display: "flex",
     flexDirection: "column",
     justifyContent: "space-between",
-    transition: "transform 160ms ease, box-shadow 160ms ease",
+    boxShadow: "0 16px 34px rgba(52, 84, 120, 0.06)",
   },
   widgetTop: {
     display: "flex",
-    justifyContent: "space-between",
-    gap: "12px",
+    justifyContent: "flex-start",
   },
   widgetBadge: {
-    alignSelf: "start",
+    display: "inline-flex",
+    alignItems: "center",
+    height: "28px",
+    padding: "0 12px",
     borderRadius: "999px",
-    padding: "7px 12px",
-    fontSize: "11px",
+    background: "rgba(255,255,255,0.7)",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    color: "#50657a",
+    fontSize: "12px",
     fontWeight: 800,
-    letterSpacing: "0.12em",
     textTransform: "uppercase",
-    background: "rgba(255,255,255,0.70)",
-    color: "#16304d",
+    letterSpacing: "0.08em",
   },
   widgetBody: {
-    paddingTop: "18px",
+    display: "grid",
+    gap: "8px",
   },
   widgetTitle: {
-    fontSize: "24px",
+    fontSize: "22px",
     fontWeight: 800,
-    marginBottom: "8px",
-    color: "#10253d",
+    color: "#17324f",
   },
   widgetMeta: {
-    fontSize: "15px",
+    fontSize: "14px",
     lineHeight: 1.6,
-    color: "#526579",
-    maxWidth: "360px",
+    color: "#566a7f",
   },
   widgetAction: {
-    alignSelf: "start",
-    marginTop: "18px",
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: 800,
-    color: "#10253d",
+    color: "#35506d",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
   },
 };
 
 const toneStyles: Record<WidgetTone, CSSProperties> = {
   blue: {
-    background:
-      "linear-gradient(135deg, rgba(220, 239, 255, 0.98) 0%, rgba(246, 251, 255, 0.98) 100%)",
-    border: "1px solid rgba(143, 200, 255, 0.22)",
+    background: "linear-gradient(145deg, rgba(229, 244, 255, 0.96) 0%, rgba(252, 252, 255, 0.92) 100%)",
   },
   pink: {
-    background:
-      "linear-gradient(135deg, rgba(255, 228, 240, 0.98) 0%, rgba(255, 248, 251, 0.98) 100%)",
-    border: "1px solid rgba(255, 184, 214, 0.20)",
+    background: "linear-gradient(145deg, rgba(255, 235, 245, 0.96) 0%, rgba(255, 252, 254, 0.92) 100%)",
   },
   mist: {
-    background:
-      "linear-gradient(135deg, rgba(232, 244, 247, 0.98) 0%, rgba(249, 253, 254, 0.98) 100%)",
-    border: "1px solid rgba(175, 215, 224, 0.18)",
+    background: "linear-gradient(145deg, rgba(240, 245, 250, 0.96) 0%, rgba(252, 253, 255, 0.92) 100%)",
   },
   pearl: {
-    background:
-      "linear-gradient(135deg, rgba(241, 242, 247, 0.98) 0%, rgba(252, 252, 255, 0.98) 100%)",
-    border: "1px solid rgba(176, 194, 218, 0.20)",
+    background: "linear-gradient(145deg, rgba(251, 247, 242, 0.96) 0%, rgba(255, 254, 252, 0.92) 100%)",
   },
 };
