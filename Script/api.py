@@ -17,6 +17,7 @@ from system_calendar_core import (
     set_current_work_day,
     setup,
 )
+from source_table_schema import ensure_source_table_columns, refresh_source_table_mirrors
 
 DB_PATH = r"C:\Renfrew\Workflow\database.db"
 
@@ -28,6 +29,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+def _ensure_source_table_columns_on_startup():
+    conn = get_conn()
+    try:
+        ensure_source_table_columns(conn)
+        refresh_source_table_mirrors(conn)
+    finally:
+        conn.close()
 
 def get_conn():
     return sqlite3.connect(DB_PATH)
@@ -590,37 +601,6 @@ def get_next(attachment_id: int):
 
 
 # ------------------------------------------------------------
-# PREVIOUS PENDING FILE
-# ------------------------------------------------------------
-@app.get("/attachments/{attachment_id}/prev")
-def get_prev(attachment_id: int):
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT id, filename, snapshot_path, review_status
-        FROM imported_files
-        WHERE review_status = 'Pending' AND id < ?
-        ORDER BY id DESC
-        LIMIT 1
-    """, (attachment_id,))
-
-    row = cur.fetchone()
-    conn.close()
-
-    if not row:
-        return {"done": True}
-
-    return {
-        "id": row[0],
-        "filename": row[1],
-        "snapshot": row[2],
-        "status": row[3],
-        "done": False
-    }
-
-
-# ------------------------------------------------------------
 # SNAPSHOT IMAGE
 # ------------------------------------------------------------
 @app.get("/attachments/{attachment_id}/snapshot")
@@ -663,11 +643,6 @@ def approve_attachment(attachment_id: int):
     return {"status": "approved", "id": attachment_id}
 
 
-@app.post("/queue/{attachment_id}/approve")
-def approve_queue_item(attachment_id: int):
-    return approve_attachment(attachment_id)
-
-
 # ------------------------------------------------------------
 # REJECT FILE
 # ------------------------------------------------------------
@@ -688,50 +663,5 @@ def reject_attachment(attachment_id: int):
     return {"status": "rejected", "id": attachment_id}
 
 
-@app.post("/queue/{attachment_id}/reject")
-def reject_queue_item(attachment_id: int):
-    return reject_attachment(attachment_id)
-
-
-# ------------------------------------------------------------
-# RESET ALL TO PENDING
-# ------------------------------------------------------------
-@app.post("/reset")
-def reset_all():
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        UPDATE imported_files
-        SET review_status = 'Pending'
-    """)
-
-    conn.commit()
-    conn.close()
-
-    return {"status": "reset_all"}
-
-
-# ------------------------------------------------------------
-# RESET NEWEST DAY (IF YOU USE DATES)
-# ------------------------------------------------------------
-@app.post("/reset/newest-day")
-def reset_newest_day():
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("SELECT MAX(as_of_date) FROM imported_files")
-    newest = cur.fetchone()[0]
-
-    if newest:
-        cur.execute("""
-            UPDATE imported_files
-            SET review_status = 'Pending'
-            WHERE as_of_date = ?
-        """, (newest,))
-        conn.commit()
-
-    conn.close()
-    return {"status": "reset_newest_day", "date": newest}
 from sites_api import router as sites_router
 app.include_router(sites_router)

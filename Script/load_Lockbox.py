@@ -3,7 +3,9 @@
 from db import get_conn
 import os
 import shutil
+from datetime import datetime
 import pandas as pd
+from source_table_schema import ensure_source_table_columns, refresh_source_table_mirrors
 
 DOWNLOADS = r"\\ren-fs01\users\rzayas\Downloads"
 ARCHIVE = r"C:\Renfrew\Workflow\Archive"
@@ -32,6 +34,8 @@ def main():
     # ---------------------------------------------------------
     conn = get_conn()
     cur = conn.cursor()
+    ensure_source_table_columns(conn)
+    load_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     # ---------------------------------------------------------
     # 3. LOAD EXCEL INTO STAGING (LockboxLoad)
@@ -100,14 +104,16 @@ def main():
         INSERT INTO Lockbox (
             "Transaction Number", "Status", "Note", "Transaction Total",
             "Deposit Date", "Batch Number", "Check Number", "Check Amount",
-            "Site", "Lockbox", "Payor", "Sequence", "Number of Items"
+            "Site", "Lockbox", "Payor", "Sequence", "Number of Items",
+            batchnum, transnum, "timestamp", matchstatus
         )
         SELECT
             "Transaction Number", "Status", "Note", "Transaction Total",
             "Deposit Date", "Batch Number", "Check Number", "Check Amount",
-            "Site", "Lockbox", "Payor", "Sequence", "Number of Items"
+            "Site", "Lockbox", "Payor", "Sequence", "Number of Items",
+            "Batch Number", "Transaction Number", ?, ?
         FROM LockboxLoad;
-    """)
+    """, (load_timestamp, "UNMATCHED"))
 
     inserted = cur.rowcount
     print(f"Rows inserted into Lockbox: {inserted}")
@@ -141,6 +147,7 @@ def main():
     cur.execute("SELECT COUNT(*) FROM LockboxLoad;")
     print(f"LockboxLoad rows (after clear): {cur.fetchone()[0]}")
 
+    refresh_source_table_mirrors(conn)
     print("Status: SUCCESS")
 
     conn.close()

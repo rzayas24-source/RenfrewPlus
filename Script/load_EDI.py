@@ -19,6 +19,7 @@ import os
 import shutil
 from datetime import datetime
 from db import get_conn  # ⭐ dynamic DB connection
+from source_table_schema import ensure_source_table_columns, refresh_source_table_mirrors
 
 # ---------------------------------------------------------
 # CONFIG
@@ -48,9 +49,14 @@ def init_edi_table():
             check_date TEXT,
             check_number TEXT,
             check_amount REAL,
-            filename TEXT
+            filename TEXT,
+            batchnum TEXT,
+            transnum TEXT,
+            timestamp TEXT,
+            matchstatus TEXT
         );
     """)
+    ensure_source_table_columns(conn)
     conn.commit()
     conn.close()
 
@@ -167,6 +173,7 @@ def load_all_trn_files():
 
     conn = get_conn()
     cur = conn.cursor()
+    load_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     print("\n>>> Scanning folder for TXT files...")
     print("--------------------------------------------------")
@@ -226,9 +233,12 @@ def load_all_trn_files():
             check_date, check_number, amount = r
 
             cur.execute("""
-                INSERT INTO EDI (check_date, check_number, check_amount, filename)
-                VALUES (?, ?, ?, ?)
-            """, (check_date, check_number, amount, filename))
+                INSERT INTO EDI (
+                    check_date, check_number, check_amount, filename,
+                    batchnum, transnum, timestamp, matchstatus
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (check_date, check_number, amount, filename, None, None, load_timestamp, "UNMATCHED"))
 
             print(f"    INSERTED: {check_date} {check_number} {amount} {filename}")
             row_count += 1
@@ -270,6 +280,7 @@ def load_all_trn_files():
     print("\n==============================================================")
 
     verify_edi_dates()
+    refresh_source_table_mirrors(conn)
 
     input("Press ENTER to exit...")
 

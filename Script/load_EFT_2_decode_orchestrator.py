@@ -4,8 +4,10 @@ import os
 import glob
 import shutil
 import subprocess
+from datetime import datetime
 import pandas as pd
 from db import get_conn   # ⭐ dynamic DB connection
+from source_table_schema import ensure_source_table_columns, refresh_source_table_mirrors
 
 # ---------------------------------------------------
 # PATHS
@@ -107,6 +109,8 @@ while True:
     # ---------------------------------------------------
     conn = get_conn()
     cur = conn.cursor()
+    ensure_source_table_columns(conn)
+    load_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS EFTload (
@@ -201,10 +205,10 @@ while True:
     print("Appending EFTload into EFT...")
 
     cur.execute("""
-    INSERT INTO EFT (Date, Amount, CheckNumber, Payer)
-    SELECT Date, Amount, CheckNumber, Payer
+    INSERT INTO EFT (Date, Amount, CheckNumber, Payer, batchnum, transnum, "timestamp", matchstatus)
+    SELECT Date, Amount, CheckNumber, Payer, ?, ?, ?, ?
     FROM EFTload;
-    """)
+    """, (None, None, load_timestamp, "UNMATCHED"))
 
     conn.commit()
 
@@ -214,6 +218,8 @@ while True:
     cur.execute("DELETE FROM EFTload;")
     conn.commit()
     conn.close()
+
+    refresh_source_table_mirrors()
 
     print("EFTload successfully merged into EFT and cleared.")
 

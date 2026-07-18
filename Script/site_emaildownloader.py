@@ -19,7 +19,7 @@ def insert_into_db(email_id, filename, saved_path, note):
     cur = conn.cursor()
 
     cur.execute("""
-        INSERT INTO EmailAttachmentHistory
+        INSERT INTO imported_emailattachmenthistorry
         (email_id, original_filename, moved_to, review_status, notes)
         VALUES (?, ?, ?, ?, ?)
     """, (email_id, filename, saved_path, "Pending", note))

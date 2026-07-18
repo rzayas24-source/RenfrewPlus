@@ -26,7 +26,7 @@ interface WidgetCard {
 }
 
 function parseMmddyyyy(value: string) {
-  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value.trim());
+  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim());
   if (!match) return null;
   const month = Number(match[1]);
   const day = Number(match[2]);
@@ -44,7 +44,46 @@ function parseMmddyyyy(value: string) {
 }
 
 function formatMmddyyyy(value: Date) {
-  return value.toLocaleDateString("en-US");
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  const year = value.getFullYear();
+  return `${month}/${day}/${year}`;
+}
+
+function parseDateInput(value: string) {
+  if (!value) return null;
+  const parts = value.split("-").map((part) => Number.parseInt(part, 10));
+  if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) {
+    return null;
+  }
+
+  const [year, month, day] = parts;
+  const parsed = new Date(year, month - 1, day);
+  if (
+    Number.isNaN(parsed.getTime()) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() + 1 !== month ||
+    parsed.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function formatDateInput(value: string) {
+  const parsed = parseMmddyyyy(value);
+  if (!parsed) return "";
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const year = parsed.getFullYear();
+  return `${year}-${month}-${day}`;
+}
+
+function dateInputToMmddyyyy(value: string) {
+  const parsed = parseDateInput(value);
+  if (!parsed) return "";
+  return formatMmddyyyy(parsed);
 }
 
 function shiftMmddyyyy(value: string, days: number) {
@@ -88,7 +127,7 @@ export default function CalendarScreen() {
     () => [
       {
         title: "Setup",
-        meta: "Reset the calendar and anchor the first open bank day.",
+        meta: "Reset the calendar and anchor the first open post day.",
         tone: "blue",
         action: "Prepare Setup",
         onClick: () => runSetup(),
@@ -112,7 +151,7 @@ export default function CalendarScreen() {
       },
       {
         title: "Advance Work Day",
-        meta: "Move the current work day to the next open paperwork day.",
+        meta: "Move the current work day to the next open post day.",
         tone: "pearl",
         action: "Advance",
         onClick: () => runAdvanceWorkDay(),
@@ -291,7 +330,7 @@ export default function CalendarScreen() {
     {
       label: "Today",
       value: status?.today ?? "Loading...",
-      detail: "System date used to compare against paperwork days.",
+      detail: "System date used to compare against post days.",
     },
     {
       label: "Current Work Day",
@@ -301,7 +340,7 @@ export default function CalendarScreen() {
     {
       label: "Next Open Day",
       value: status?.nextOpenWorkDay ?? "None",
-      detail: "Next open paperwork day after the current work day.",
+      detail: "Next open post day after the current work day.",
     },
     {
       label: "Calendar Count",
@@ -437,9 +476,9 @@ export default function CalendarScreen() {
               Start date
               <input
                 style={styles.textInput}
-                value={setupDate}
-                onChange={(event) => setSetupDate(event.target.value)}
-                placeholder="MM/DD/YYYY"
+                type="date"
+                value={formatDateInput(setupDate)}
+                onChange={(event) => setSetupDate(dateInputToMmddyyyy(event.target.value))}
               />
             </label>
             <label style={styles.fieldLabel}>
@@ -485,9 +524,9 @@ export default function CalendarScreen() {
               Current work day
               <input
                 style={styles.textInput}
-                value={workDay}
-                onChange={(event) => setWorkDay(event.target.value)}
-                placeholder="MM/DD/YYYY"
+                type="date"
+                value={formatDateInput(workDay)}
+                onChange={(event) => setWorkDay(dateInputToMmddyyyy(event.target.value))}
               />
             </label>
             <div style={styles.rowActions}>
@@ -509,18 +548,18 @@ export default function CalendarScreen() {
               From
               <input
                 style={styles.textInput}
-                value={deleteStart}
-                onChange={(event) => setDeleteStart(event.target.value)}
-                placeholder="MM/DD/YYYY"
+                type="date"
+                value={formatDateInput(deleteStart)}
+                onChange={(event) => setDeleteStart(dateInputToMmddyyyy(event.target.value))}
               />
             </label>
             <label style={styles.fieldLabel}>
               To
               <input
                 style={styles.textInput}
-                value={deleteEnd}
-                onChange={(event) => setDeleteEnd(event.target.value)}
-                placeholder="MM/DD/YYYY"
+                type="date"
+                value={formatDateInput(deleteEnd)}
+                onChange={(event) => setDeleteEnd(dateInputToMmddyyyy(event.target.value))}
               />
             </label>
             <div style={styles.rowActions}>
@@ -547,18 +586,18 @@ export default function CalendarScreen() {
               Start
               <input
                 style={styles.textInput}
-                value={rangeStart}
-                onChange={(event) => setRangeStart(event.target.value)}
-                placeholder="MM/DD/YYYY"
+                type="date"
+                value={formatDateInput(rangeStart)}
+                onChange={(event) => setRangeStart(dateInputToMmddyyyy(event.target.value))}
               />
             </label>
             <label style={styles.fieldLabel}>
               End
               <input
                 style={styles.textInput}
-                value={rangeEnd}
-                onChange={(event) => setRangeEnd(event.target.value)}
-                placeholder="MM/DD/YYYY"
+                type="date"
+                value={formatDateInput(rangeEnd)}
+                onChange={(event) => setRangeEnd(dateInputToMmddyyyy(event.target.value))}
               />
             </label>
             <button type="button" style={styles.primaryButton} onClick={() => refreshRange()}>
@@ -578,7 +617,7 @@ export default function CalendarScreen() {
                   <th style={styles.headerCell}>Bank Day</th>
                   <th style={styles.headerCell}>WKD</th>
                   <th style={styles.headerCell}>Closed</th>
-                  <th style={styles.headerCell}>Paperwork Day</th>
+                  <th style={styles.headerCell}>Post Day</th>
                   <th style={styles.headerCell}>Reason</th>
                   <th style={styles.headerCell}>Lockbox</th>
                   <th style={styles.headerCell}>EFT</th>
