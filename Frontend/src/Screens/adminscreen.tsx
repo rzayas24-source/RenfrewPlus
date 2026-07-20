@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+﻿import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 
 type WidgetTone = "blue" | "pink" | "mist" | "pearl";
@@ -95,23 +95,11 @@ export default function AdminScreen() {
 
         <nav style={styles.navStack} aria-label="Admin navigation">
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={styles.navButtonLabel}>Main</span>
+            <span style={styles.navButtonLabel}>Home</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin/tables")}>
             <span style={styles.navButtonLabel}>Tables</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/site")}>
-            <span style={styles.navButtonLabel}>Site</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/balance-sheet")}>
-            <span style={styles.navButtonLabel}>Balance Sheet</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/approved")}>
-            <span style={styles.navButtonLabel}>Approved Batches</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -206,7 +194,7 @@ export default function AdminScreen() {
   );
 }
 
-const styles: Record<string, CSSProperties> = {
+export const styles: Record<string, CSSProperties> = {
   shell: {
     minHeight: "100vh",
     padding: "18px",
@@ -612,3 +600,4 @@ const toneStyles: Record<WidgetTone, CSSProperties> = {
     background: "linear-gradient(145deg, rgba(251, 247, 242, 0.96) 0%, rgba(255, 254, 252, 0.92) 100%)",
   },
 };
+

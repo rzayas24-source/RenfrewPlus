@@ -12,6 +12,8 @@ import IntroScreen from "./Screens/introscreen";
 import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
 import CalendarScreen from "./Screens/calendarscreen";
+import CashScreen from "./Screens/cashscreen";
+import SiteReviewScreen from "./Screens/sitereviewscreen";
 import MainScreen from "./Screens/mainscreen";
 import AdminScreen from "./Screens/adminscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
@@ -159,6 +161,8 @@ export default function ScreenManager() {
         <Route path="/admin" element={<AdminScreen />} />
         <Route path="/admin/tables" element={<AdminTableScreen />} />
         <Route path="/calendar" element={<CalendarScreen />} />
+        <Route path="/cash" element={<CashScreen />} />
+        <Route path="/site-review" element={<SiteReviewScreen />} />
         <Route path="/approved" element={<ApprovedList />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />
         <Route path="/balance-sheet" element={<BalanceSheetMenu />} />

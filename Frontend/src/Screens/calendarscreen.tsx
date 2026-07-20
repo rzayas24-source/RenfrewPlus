@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+﻿import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -371,14 +371,6 @@ export default function CalendarScreen() {
         <nav style={styles.navStack} aria-label="Calendar navigation">
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
             <span style={styles.navButtonLabel}>Main</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin")}>
-            <span style={styles.navButtonLabel}>Admin</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/site")}>
-            <span style={styles.navButtonLabel}>Site</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
         </nav>

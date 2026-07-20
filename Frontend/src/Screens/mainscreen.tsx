@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+﻿import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 
 type WidgetTone = "blue" | "pink" | "mist" | "pearl";
@@ -105,28 +105,16 @@ export default function MainScreen() {
         </p>
 
         <nav style={styles.navStack} aria-label="Main navigation">
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={styles.navButtonLabel}>Main</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
-            <span style={styles.navButtonLabel}>Admin</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/site")}>
-            <span style={styles.navButtonLabel}>Site</span>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/cash")}>
+            <span style={styles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/calendar")}>
             <span style={styles.navButtonLabel}>Calendar</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/balance-sheet")}>
-            <span style={styles.navButtonLabel}>Balance Sheet</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/approved")}>
-            <span style={styles.navButtonLabel}>Approved Batches</span>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
+            <span style={styles.navButtonLabel}>Admin</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -676,3 +664,4 @@ const toneStyles: Record<WidgetTone, CSSProperties> = {
     border: "1px solid rgba(176, 194, 218, 0.20)",
   },
 };
+
