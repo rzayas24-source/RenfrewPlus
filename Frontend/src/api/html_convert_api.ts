@@ -6,8 +6,6 @@ export interface HtmlSpreadsheetRow {
   source: "EFT" | "Lockbox";
   bankDay: string;
   checkNumber: string;
-  payer: string;
-  amount: string;
   htmlFile: string;
 }
 

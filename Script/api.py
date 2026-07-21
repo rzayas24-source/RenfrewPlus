@@ -2466,8 +2466,6 @@ def get_html_spreadsheet(work_day: str):
                         "source": group["source"],
                         "bankDay": bank_day,
                         "checkNumber": check_number,
-                        "payer": str(row_data.get("payer") or "").strip(),
-                        "amount": str(row_data.get("amount") or "").strip(),
                         "htmlFile": filename,
                     }
                 )

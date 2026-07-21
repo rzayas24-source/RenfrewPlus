@@ -20,8 +20,6 @@ type HtmlMetric = {
 type FilteredBankRow = {
   source: "EFT" | "Lockbox";
   date: string;
-  amount: string;
-  payer: string;
   checkNumber: string;
   edi: string;
 };
@@ -67,13 +65,6 @@ function mmddyyyyToIso(value: string) {
   return `${year}-${month}-${day}`;
 }
 
-function formatAmount(value: string) {
-  if (!value) return "";
-  const parsed = Number(String(value).replace(/,/g, ""));
-  if (Number.isNaN(parsed)) return value;
-  return parsed.toLocaleString(undefined, { style: "currency", currency: "USD" });
-}
-
 function compareChecks(left: string, right: string) {
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
 }
@@ -87,8 +78,8 @@ export default function HTMLConvertScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingHtml, setLoadingHtml] = useState(false);
   const [converting, setConverting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [convertResult, setConvertResult] = useState<HtmlConvertResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [bankTableCollapsed, setBankTableCollapsed] = useState(false);
   const [htmlTableCollapsed, setHtmlTableCollapsed] = useState(false);
 
@@ -106,13 +97,11 @@ export default function HTMLConvertScreen() {
         setError(null);
       } catch (err) {
         if (!active) return;
-        setError(err instanceof Error ? err.message : "Failed to load HTML converter data");
+        setError(err instanceof Error ? err.message : "Failed to load HTML workspace data");
         setBankingData(null);
         setCalendarStatus(null);
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     };
 
@@ -156,9 +145,7 @@ export default function HTMLConvertScreen() {
         setHtmlData(null);
         setError(err instanceof Error ? err.message : "Failed to load HTML file matches");
       } finally {
-        if (active) {
-          setLoadingHtml(false);
-        }
+        if (active) setLoadingHtml(false);
       }
     };
 
@@ -185,8 +172,6 @@ export default function HTMLConvertScreen() {
         rows.push({
           source: group.source,
           date: row.date,
-          amount: row.amount,
-          payer: row.payer,
           checkNumber: row.checkNumber,
           edi: row.edi,
         });
@@ -200,33 +185,23 @@ export default function HTMLConvertScreen() {
     });
   }, [activeBankDay, bankingData]);
 
-  const bankSubtotal = useMemo(() => {
-    return filteredRows.reduce((total, row) => {
-      const parsed = Number(String(row.amount).replace(/,/g, ""));
-      return total + (Number.isNaN(parsed) ? 0 : parsed);
-    }, 0);
-  }, [filteredRows]);
-
-  const htmlSubtotal = useMemo(() => {
+  const htmlCheckStats = useMemo(() => {
     const rows = htmlData?.rows ?? [];
     const uniqueChecks = new Set<string>();
-    const amount = rows.reduce((total, row) => {
+
+    for (const row of rows) {
       uniqueChecks.add(row.checkNumber);
-      const parsed = Number(String(row.amount).replace(/,/g, ""));
-      return total + (Number.isNaN(parsed) ? 0 : parsed);
-    }, 0);
+    }
 
     return {
-      amount,
       rows: rows.length,
       checks: uniqueChecks.size,
     };
   }, [htmlData]);
 
   const convertStatusTag = converting ? "CONVERTING" : convertResult?.statusTag || "READY";
-
   const convertStatusMessage = converting
-    ? "Renaming HTML files and moving them to 3.HTML/Renamed..."
+    ? "Renaming HTML files and moving them to C:\\Renfrew\\Workflow\\3.HTML\\Renamed..."
     : convertResult?.message || "Ready to rename the current day's HTML files.";
 
   const handleConvert = async () => {
@@ -244,6 +219,7 @@ export default function HTMLConvertScreen() {
     setConverting(true);
     setLoadingHtml(true);
     setError(null);
+
     try {
       const response = await convertHtmlFiles(workDay);
       setConvertResult(response.data);
@@ -270,14 +246,14 @@ export default function HTMLConvertScreen() {
       detail: "The banking day associated with the selected posting day.",
     },
     {
-      label: "EDI Rows",
+      label: "EDI Checks",
       value: String(filteredRows.length),
-      detail: "Only rows with EDI available for that bank day are shown below.",
+      detail: "Only check numbers with EDI available for that bank day are shown below.",
     },
     {
       label: "HTML Hits",
       value: String(htmlData?.matchedFiles ?? 0),
-      detail: "HTML files found in the 3.HTML folder for the selected bank day.",
+      detail: "HTML files found in C:\\Renfrew\\Workflow\\3.HTML for the selected bank day.",
     },
   ];
 
@@ -297,7 +273,7 @@ export default function HTMLConvertScreen() {
         </div>
 
         <p style={adminStyles.sidebarCopy}>
-          A soft HTML conversion console for 835 review, handoff, and follow-up work.
+          A soft HTML workspace focused on check numbers from the 3.HTML folder.
         </p>
 
         <nav style={adminStyles.navStack} aria-label="HTML converter navigation">
@@ -306,6 +282,26 @@ export default function HTMLConvertScreen() {
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
           </button>
         </nav>
+
+        <div style={adminStyles.sidebarCard}>
+          <div style={adminStyles.sidebarCardLabel}>Source</div>
+          <div
+            style={{
+              ...adminStyles.sidebarCardValue,
+              fontSize: "11px",
+              lineHeight: 1.2,
+              whiteSpace: "normal",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+              maxWidth: "100%",
+            }}
+          >
+            C:\Renfrew\Workflow\3.HTML
+          </div>
+          <div style={adminStyles.sidebarCardMeta}>
+            This screen is built around check numbers first. We can add conversion work after the initial tables settle.
+          </div>
+        </div>
 
         <div style={adminStyles.sidebarCard}>
           <div style={adminStyles.sidebarCardLabel}>Posting Day</div>
@@ -329,15 +325,15 @@ export default function HTMLConvertScreen() {
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>HTMLConvert screen</div>
             <p style={adminStyles.subtitle}>
-              A calm workspace for HTML conversion, review, and follow-up.
+              Initial HTML tables built around bank-day check numbers from the 3.HTML folder.
             </p>
 
             <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/835-upload")}>
-                Open 835 Upload
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
+              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/banking")}>
                 Open Banking
+              </button>
+              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/tools")}>
+                Back to Tools
               </button>
             </div>
           </div>
@@ -348,13 +344,23 @@ export default function HTMLConvertScreen() {
                 <span style={adminStyles.statusPill}>HTML window</span>
                 <span style={adminStyles.statusDot} />
               </div>
-              <div style={adminStyles.heroStatusTitle}>EDI by bank day</div>
+              <div style={adminStyles.heroStatusTitle}>Check number first</div>
               <div style={adminStyles.heroStatusText}>
-                This page filters the banking spreadsheet down to rows that have EDI available for the selected posting day,
-                then shows matching files from the 3.HTML folder below.
+                We are keeping this first pass lean: bank-day checks up top, matching HTML files below, and no conversion
+                workflow yet.
               </div>
             </div>
           </div>
+        </section>
+
+        <section style={htmlStyles.metricRow}>
+          {metrics.map((metric) => (
+            <article key={metric.label} style={{ ...adminStyles.statCard, ...htmlStyles.metricCard }}>
+              <div style={htmlStyles.metricLabel}>{metric.label}</div>
+              <div style={htmlStyles.metricValue}>{metric.value}</div>
+              <div style={htmlStyles.metricDetail}>{metric.detail}</div>
+            </article>
+          ))}
         </section>
 
         <section style={htmlStyles.convertCard}>
@@ -366,7 +372,7 @@ export default function HTMLConvertScreen() {
             <div style={htmlStyles.statusChip}>{convertStatusTag}</div>
           </div>
           <div style={adminStyles.sectionMeta}>
-            Rename every matched HTML file using the selected posting day, then move the results to
+            Rename matched HTML files using the selected posting day, then move them to
             <span style={htmlStyles.inlineCode}>3.HTML/Renamed</span>.
           </div>
           <div style={htmlStyles.convertActions}>
@@ -381,16 +387,6 @@ export default function HTMLConvertScreen() {
               <span>{convertResult.bankDay}</span>
             </div>
           )}
-        </section>
-
-        <section style={htmlStyles.metricRow}>
-          {metrics.map((metric) => (
-            <article key={metric.label} style={{ ...adminStyles.statCard, ...htmlStyles.metricCard }}>
-              <div style={htmlStyles.metricLabel}>{metric.label}</div>
-              <div style={htmlStyles.metricValue}>{metric.value}</div>
-              <div style={htmlStyles.metricDetail}>{metric.detail}</div>
-            </article>
-          ))}
         </section>
 
         <section style={htmlStyles.tableSection}>
@@ -418,8 +414,8 @@ export default function HTMLConvertScreen() {
                   <span style={htmlStyles.subtotalValue}>{filteredRows.length}</span>
                 </div>
                 <div style={htmlStyles.subtotalItem}>
-                  <span style={htmlStyles.subtotalLabel}>Subtotal</span>
-                  <span style={htmlStyles.subtotalValue}>{formatAmount(String(bankSubtotal))}</span>
+                  <span style={htmlStyles.subtotalLabel}>Checks</span>
+                  <span style={htmlStyles.subtotalValue}>{filteredRows.length}</span>
                 </div>
               </div>
             </div>
@@ -441,19 +437,15 @@ export default function HTMLConvertScreen() {
                     <th style={htmlStyles.th}>Source</th>
                     <th style={htmlStyles.th}>Bank Day</th>
                     <th style={htmlStyles.th}>Check Number</th>
-                    <th style={htmlStyles.th}>Payer</th>
-                    <th style={htmlStyles.th}>Amount</th>
                     <th style={htmlStyles.thCenter}>EDI</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredRows.map((row) => (
-                    <tr key={`${row.source}-${row.checkNumber}-${row.payer}-${row.amount}`}>
+                    <tr key={`${row.source}-${row.checkNumber}`}>
                       <td style={htmlStyles.td}>{row.source}</td>
                       <td style={htmlStyles.td}>{row.date}</td>
                       <td style={htmlStyles.td}>{row.checkNumber}</td>
-                      <td style={htmlStyles.td}>{row.payer || ""}</td>
-                      <td style={htmlStyles.td}>{formatAmount(row.amount)}</td>
                       <td style={htmlStyles.tdCenter}>{row.edi}</td>
                     </tr>
                   ))}
@@ -477,7 +469,7 @@ export default function HTMLConvertScreen() {
             <div style={htmlStyles.sectionMetaWrap}>
               <div style={adminStyles.sectionMeta}>
                 {loadingHtml
-                  ? "Searching files in 3.HTML..."
+                  ? "Searching files in C:\\Renfrew\\Workflow\\3.HTML..."
                   : htmlData?.bankDay
                     ? `${htmlData.matchedFiles} file hit(s) across ${htmlData.matchedChecks} check number(s).`
                     : "No HTML file matches yet."}
@@ -485,15 +477,11 @@ export default function HTMLConvertScreen() {
               <div style={htmlStyles.subtotalStrip}>
                 <div style={htmlStyles.subtotalItem}>
                   <span style={htmlStyles.subtotalLabel}>Rows</span>
-                  <span style={htmlStyles.subtotalValue}>{htmlSubtotal.rows}</span>
+                  <span style={htmlStyles.subtotalValue}>{htmlCheckStats.rows}</span>
                 </div>
                 <div style={htmlStyles.subtotalItem}>
                   <span style={htmlStyles.subtotalLabel}>Checks</span>
-                  <span style={htmlStyles.subtotalValue}>{htmlSubtotal.checks}</span>
-                </div>
-                <div style={htmlStyles.subtotalItem}>
-                  <span style={htmlStyles.subtotalLabel}>Subtotal</span>
-                  <span style={htmlStyles.subtotalValue}>{formatAmount(String(htmlSubtotal.amount))}</span>
+                  <span style={htmlStyles.subtotalValue}>{htmlCheckStats.checks}</span>
                 </div>
               </div>
             </div>
@@ -501,7 +489,7 @@ export default function HTMLConvertScreen() {
 
           {!error && !loadingHtml && !htmlTableCollapsed && htmlData && htmlData.rows.length === 0 && (
             <div style={htmlStyles.emptyState}>
-              No files in 3.HTML matched the selected bank day.
+              No files in C:\Renfrew\Workflow\3.HTML matched the selected bank day.
             </div>
           )}
 
@@ -513,8 +501,6 @@ export default function HTMLConvertScreen() {
                     <th style={htmlStyles.th}>Source</th>
                     <th style={htmlStyles.th}>Bank Day</th>
                     <th style={htmlStyles.th}>Check Number</th>
-                    <th style={htmlStyles.th}>Payer</th>
-                    <th style={htmlStyles.th}>Amount</th>
                     <th style={htmlStyles.th}>HTML File</th>
                   </tr>
                 </thead>
@@ -524,8 +510,6 @@ export default function HTMLConvertScreen() {
                       <td style={htmlStyles.td}>{row.source}</td>
                       <td style={htmlStyles.td}>{row.bankDay}</td>
                       <td style={htmlStyles.td}>{row.checkNumber}</td>
-                      <td style={htmlStyles.td}>{row.payer || ""}</td>
-                      <td style={htmlStyles.td}>{formatAmount(row.amount)}</td>
                       <td style={htmlStyles.td}>{row.htmlFile}</td>
                     </tr>
                   ))}
@@ -775,7 +759,7 @@ const htmlStyles: Record<string, CSSProperties> = {
     width: "100%",
     borderCollapse: "separate",
     borderSpacing: 0,
-    minWidth: "860px",
+    minWidth: "720px",
   },
   th: {
     textAlign: "left",
