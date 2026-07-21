@@ -79,7 +79,7 @@ export default function SiteReviewScreen() {
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
           </div>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-womenline.png" alt="" style={adminStyles.brandWomenImage} />
+            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
         </div>
 

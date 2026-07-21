@@ -24,6 +24,31 @@ import traceback
 #   DB INITIALIZATION
 # ============================================================
 
+WORK_STATE_COLUMNS = [
+    ("batchnum", "TEXT"),
+    ("transnum", "TEXT"),
+    ("timestamp", "TEXT"),
+    ("matchstatus", "TEXT"),
+]
+
+
+def ensure_work_state_columns(conn):
+    cur = conn.cursor()
+    existing_columns = {
+        row[1].lower()
+        for row in cur.execute("PRAGMA table_info(work_state)").fetchall()
+    }
+
+    if not existing_columns:
+        return
+
+    for column_name, column_type in WORK_STATE_COLUMNS:
+        if column_name.lower() in existing_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE work_state ADD COLUMN "{column_name}" {column_type}'
+        )
+
 def init_db():
     conn = get_conn()
 
@@ -42,13 +67,25 @@ def init_db():
     conn.execute("""
         CREATE TABLE IF NOT EXISTS work_state (
             id INTEGER PRIMARY KEY,
-            current_work_day TEXT
+            current_work_day TEXT,
+            batchnum TEXT,
+            transnum TEXT,
+            timestamp TEXT,
+            matchstatus TEXT
         );
     """)
 
+    ensure_work_state_columns(conn)
+
     row = conn.execute("SELECT id FROM work_state WHERE id = 1").fetchone()
     if not row:
-        conn.execute("INSERT INTO work_state (id, current_work_day) VALUES (1, NULL)")
+        conn.execute(
+            """
+            INSERT INTO work_state (
+                id, current_work_day, batchnum, transnum, timestamp, matchstatus
+            ) VALUES (1, NULL, NULL, NULL, NULL, NULL)
+            """
+        )
 
     conn.commit()
     conn.close()

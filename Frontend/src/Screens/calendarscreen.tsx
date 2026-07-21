@@ -101,6 +101,14 @@ function todayMmddyyyy() {
   return formatMmddyyyy(new Date());
 }
 
+function monthStartMmddyyyy(value: Date) {
+  return formatMmddyyyy(new Date(value.getFullYear(), value.getMonth(), 1));
+}
+
+function monthEndMmddyyyy(value: Date) {
+  return formatMmddyyyy(new Date(value.getFullYear(), value.getMonth() + 1, 0));
+}
+
 function isWeekendWeekday(value: string | null | undefined) {
   return value === "Sat" || value === "Sun";
 }
@@ -112,11 +120,12 @@ export default function CalendarScreen() {
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [setupDate, setSetupDate] = useState("");
-  const [workDay, setWorkDay] = useState("");
+  const [postDay, setPostDay] = useState("");
   const [addDaysCount, setAddDaysCount] = useState("7");
   const [buildDaysCount, setBuildDaysCount] = useState("30");
   const [deleteStart, setDeleteStart] = useState("");
   const [deleteEnd, setDeleteEnd] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
   const [dangerConfirm, setDangerConfirm] = useState("");
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [loadingRange, setLoadingRange] = useState(false);
@@ -134,7 +143,7 @@ export default function CalendarScreen() {
         footnote: "Destructive",
       },
       {
-        title: "Add Days",
+        title: "Add Calendar Days",
         meta: "Extend the calendar by the chosen number of days.",
         tone: "pink",
         action: "Add Days",
@@ -150,15 +159,15 @@ export default function CalendarScreen() {
         footnote: "Destructive",
       },
       {
-        title: "Advance Work Day",
-        meta: "Move the current work day to the next open post day.",
+        title: "Posting Day",
+        meta: "Set or advance the current posting day.",
         tone: "pearl",
-        action: "Advance",
-        onClick: () => runAdvanceWorkDay(),
+        action: "Open Posting Day",
+        onClick: () => runSetPostDay(),
         footnote: "Flow",
       },
     ],
-    [addDaysCount, buildDaysCount, dangerConfirm, deleteEnd, deleteStart, setupDate, workDay, rangeStart, rangeEnd, status]
+    [addDaysCount, buildDaysCount, dangerConfirm, deleteEnd, deleteStart, setupDate, postDay, rangeStart, rangeEnd, status]
   );
 
   useEffect(() => {
@@ -170,13 +179,21 @@ export default function CalendarScreen() {
 
     const defaultStart = status.currentWorkDay || status.today || todayMmddyyyy();
     const defaultEnd = shiftMmddyyyy(defaultStart, 14);
+    const currentDate = parseMmddyyyy(status.today || defaultStart) || new Date();
+    const rangeDefaultStart = monthStartMmddyyyy(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const rangeDefaultEnd = monthEndMmddyyyy(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const shouldAutoLoadRange = !rangeStart && !rangeEnd;
 
     setSetupDate((current) => current || defaultStart);
-    setWorkDay((current) => current || defaultStart);
+    setPostDay((current) => current || defaultStart);
     setDeleteStart((current) => current || defaultStart);
     setDeleteEnd((current) => current || defaultEnd);
-    setRangeStart((current) => current || defaultStart);
-    setRangeEnd((current) => current || defaultEnd);
+    setRangeStart((current) => current || rangeDefaultStart);
+    setRangeEnd((current) => current || rangeDefaultEnd);
+
+    if (shouldAutoLoadRange) {
+      void refreshRange(rangeDefaultStart, rangeDefaultEnd);
+    }
   }, [status]);
 
   async function refreshStatus() {
@@ -278,7 +295,7 @@ export default function CalendarScreen() {
   }
 
   async function runDeleteDays() {
-    if (dangerConfirm !== "confirm") {
+    if (deleteConfirm !== "confirm") {
       setError('Type "confirm" before deleting calendar days.');
       return;
     }
@@ -292,37 +309,37 @@ export default function CalendarScreen() {
       const response = await deleteCalendarDays(deleteStart, deleteEnd);
       setStatus(response.data);
       setMessage(`Deleted calendar days from ${deleteStart} to ${deleteEnd}.`);
-      setDangerConfirm("");
+      setDeleteConfirm("");
       await refreshRange();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete days");
     }
   }
 
-  async function runSetWorkDay() {
-    if (!workDay) {
-      setError("Enter a work day to set.");
+  async function runSetPostDay() {
+    if (!postDay) {
+      setError("Enter a posting day to set.");
       return;
     }
 
     try {
-      const response = await setCalendarWorkDay(workDay);
+      const response = await setCalendarWorkDay(postDay);
       setStatus(response.data);
-      setMessage(`Current work day set to ${workDay}.`);
+      setMessage(`Current posting day set to ${postDay}.`);
       await refreshRange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to set work day");
+      setError(err instanceof Error ? err.message : "Failed to set posting day");
     }
   }
 
-  async function runAdvanceWorkDay() {
+  async function runAdvancePostDay() {
     try {
       const response = await advanceCalendarWorkDay();
       setStatus(response.data);
-      setMessage("Advanced to the next open work day.");
+      setMessage("Advanced to the next open posting day.");
       await refreshRange();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to advance work day");
+      setError(err instanceof Error ? err.message : "Failed to advance posting day");
     }
   }
 
@@ -333,14 +350,14 @@ export default function CalendarScreen() {
       detail: "System date used to compare against post days.",
     },
     {
-      label: "Current Work Day",
+      label: "Current Posting Day",
       value: status?.currentWorkDay ?? "Not set",
       detail: status?.currentBankDay ? `Bank day: ${status.currentBankDay}` : "No bank day mapped yet.",
     },
     {
-      label: "Next Open Day",
+      label: "Next Open Posting Day",
       value: status?.nextOpenWorkDay ?? "None",
-      detail: "Next open post day after the current work day.",
+      detail: "Next open post day after the current posting day.",
     },
     {
       label: "Calendar Count",
@@ -360,24 +377,24 @@ export default function CalendarScreen() {
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
           </div>
           <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-womenline.png" alt="" style={styles.brandWomenImage} />
+            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>
         </div>
 
         <p style={styles.sidebarCopy}>
-          Calendar manager for bank days, current work day, and live source-table totals.
+          Calendar manager for bank days, posting day, and live source-table totals.
         </p>
 
         <nav style={styles.navStack} aria-label="Calendar navigation">
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={styles.navButtonLabel}>Main</span>
+            <span style={styles.navButtonLabel}>Home</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
         </nav>
 
         <div style={styles.sidebarCard}>
           <div style={styles.sidebarCardLabel}>Status</div>
-          <div style={styles.sidebarCardValue}>{status?.currentWorkDay ?? "No work day"}</div>
+          <div style={styles.sidebarCardValue}>{status?.currentWorkDay ?? "No posting day"}</div>
           <div style={styles.sidebarCardMeta}>
             {status?.lastBankDay ? `Last bank day: ${status.lastBankDay}` : "No calendar rows loaded yet."}
           </div>
@@ -502,7 +519,7 @@ export default function CalendarScreen() {
           </article>
 
           <article style={styles.controlCard}>
-            <div style={styles.controlTitle}>Add / Work Day</div>
+            <div style={styles.controlTitle}>Add Calendar Days</div>
             <label style={styles.fieldLabel}>
               Days to add
               <input
@@ -512,24 +529,30 @@ export default function CalendarScreen() {
                 inputMode="numeric"
               />
             </label>
-            <label style={styles.fieldLabel}>
-              Current work day
-              <input
-                style={styles.textInput}
-                type="date"
-                value={formatDateInput(workDay)}
-                onChange={(event) => setWorkDay(dateInputToMmddyyyy(event.target.value))}
-              />
-            </label>
             <div style={styles.rowActions}>
               <button type="button" style={styles.primaryButton} onClick={runAddDays}>
                 Add Days
               </button>
-              <button type="button" style={styles.secondaryButton} onClick={runSetWorkDay}>
-                Set Work Day
+            </div>
+          </article>
+
+          <article style={styles.controlCard}>
+            <div style={styles.controlTitle}>Posting Day</div>
+            <label style={styles.fieldLabel}>
+              Posting day
+              <input
+                style={styles.textInput}
+                type="date"
+                value={formatDateInput(postDay)}
+                onChange={(event) => setPostDay(dateInputToMmddyyyy(event.target.value))}
+              />
+            </label>
+            <div style={styles.rowActions}>
+              <button type="button" style={styles.primaryButton} onClick={runSetPostDay}>
+                Set Post Day
               </button>
-              <button type="button" style={styles.secondaryButton} onClick={runAdvanceWorkDay}>
-                Advance Work Day
+              <button type="button" style={styles.secondaryButton} onClick={runAdvancePostDay}>
+                Advance Post Day
               </button>
             </div>
           </article>
@@ -552,6 +575,16 @@ export default function CalendarScreen() {
                 type="date"
                 value={formatDateInput(deleteEnd)}
                 onChange={(event) => setDeleteEnd(dateInputToMmddyyyy(event.target.value))}
+              />
+            </label>
+            <label style={styles.fieldLabel}>
+              Type confirm to delete
+              <input
+                style={styles.textInput}
+                value={deleteConfirm}
+                onChange={(event) => setDeleteConfirm(event.target.value)}
+                placeholder="confirm"
+                autoComplete="off"
               />
             </label>
             <div style={styles.rowActions}>
@@ -724,8 +757,8 @@ const styles: Record<string, CSSProperties> = {
     objectPosition: "center",
   },
   brandWomenMark: {
-    width: "104px",
-    height: "52px",
+    width: "116px",
+    height: "60px",
     borderRadius: "14px",
     display: "grid",
     placeItems: "center",
@@ -733,12 +766,14 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(140, 160, 184, 0.10)",
     boxShadow: "0 10px 18px rgba(95, 128, 172, 0.06)",
     overflow: "hidden",
+    padding: "4px",
     flexShrink: 0,
   },
   brandWomenImage: {
     width: "100%",
     height: "100%",
     objectFit: "contain",
+    objectPosition: "center",
   },
   sidebarCopy: {
     margin: "0 0 16px",
@@ -1047,45 +1082,46 @@ const styles: Record<string, CSSProperties> = {
   },
   controlsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "14px",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "8px",
   },
   controlCard: {
-    padding: "18px",
-    borderRadius: "24px",
+    padding: "10px 12px",
+    borderRadius: "18px",
     background: "rgba(255,255,255,0.84)",
     border: "1px solid rgba(140, 160, 184, 0.16)",
     boxShadow: "0 18px 34px rgba(52, 84, 120, 0.06)",
     display: "grid",
-    gap: "10px",
+    gap: "6px",
+    minWidth: 0,
   },
   controlTitle: {
-    fontSize: "18px",
+    fontSize: "15px",
     fontWeight: 800,
     color: "#17324f",
   },
   fieldLabel: {
     display: "grid",
-    gap: "6px",
-    fontSize: "13px",
+    gap: "4px",
+    fontSize: "11px",
     fontWeight: 700,
     color: "#496177",
   },
   textInput: {
-    height: "42px",
-    borderRadius: "14px",
+    height: "34px",
+    borderRadius: "10px",
     border: "1px solid rgba(140, 160, 184, 0.20)",
     background: "rgba(255,255,255,0.88)",
-    padding: "0 14px",
-    fontSize: "14px",
+    padding: "0 10px",
+    fontSize: "12px",
     color: "#17324f",
     outline: "none",
   },
   rowActions: {
     display: "flex",
-    gap: "10px",
+    gap: "6px",
     flexWrap: "wrap",
-    marginTop: "4px",
+    marginTop: "2px",
   },
   rangeShell: {
     padding: "20px",
@@ -1135,7 +1171,7 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   highlightRow: {
-    background: "rgba(227, 242, 255, 0.68)",
+    background: "rgba(255, 244, 196, 0.82)",
   },
   weekendRow: {
     background: "rgba(243, 245, 248, 0.94)",

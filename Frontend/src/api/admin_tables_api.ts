@@ -26,5 +26,13 @@ export interface AdminTableDetail {
 
 export const getAdminTables = () => axios.get<AdminTableSummary[]>(`${API}/admin/tables`);
 
-export const getAdminTable = (tableName: string, limit = 100) =>
-  axios.get<AdminTableDetail>(`${API}/admin/tables/${encodeURIComponent(tableName)}?limit=${limit}`);
+export const getAdminTable = (
+  tableName: string,
+  limit = 250,
+  offset = 0,
+  sortBy = "rowid",
+  sortDirection: "asc" | "desc" = "asc"
+) =>
+  axios.get<AdminTableDetail>(
+    `${API}/admin/tables/${encodeURIComponent(tableName)}?limit=${limit}&offset=${offset}&sort_by=${encodeURIComponent(sortBy)}&sort_direction=${sortDirection}`
+  );

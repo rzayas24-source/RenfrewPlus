@@ -13,6 +13,12 @@ import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
 import CalendarScreen from "./Screens/calendarscreen";
 import CashScreen from "./Screens/cashscreen";
+import ImportScreen from "./Screens/importscreen";
+import EFTUploadScreen from "./Screens/eft_uploadscreen";
+import Upload835Screen from "./Screens/835uploadscreen";
+import LockboxImportScreen from "./Screens/lockbox_importscreen";
+import BankingScreen from "./Screens/bankingscreen";
+import Match835Screen from "./Screens/835matchscreen";
 import SiteReviewScreen from "./Screens/sitereviewscreen";
 import MainScreen from "./Screens/mainscreen";
 import AdminScreen from "./Screens/adminscreen";
@@ -162,6 +168,12 @@ export default function ScreenManager() {
         <Route path="/admin/tables" element={<AdminTableScreen />} />
         <Route path="/calendar" element={<CalendarScreen />} />
         <Route path="/cash" element={<CashScreen />} />
+        <Route path="/import" element={<ImportScreen />} />
+        <Route path="/eft-upload" element={<EFTUploadScreen />} />
+        <Route path="/835-upload" element={<Upload835Screen />} />
+        <Route path="/lockbox-import" element={<LockboxImportScreen />} />
+        <Route path="/banking" element={<BankingScreen />} />
+        <Route path="/835-match" element={<Match835Screen />} />
         <Route path="/site-review" element={<SiteReviewScreen />} />
         <Route path="/approved" element={<ApprovedList />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />

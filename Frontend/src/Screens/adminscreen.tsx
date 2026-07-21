@@ -85,7 +85,7 @@ export default function AdminScreen() {
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
           </div>
           <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-womenline.png" alt="" style={styles.brandWomenImage} />
+            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>
         </div>
 
@@ -265,8 +265,8 @@ export const styles: Record<string, CSSProperties> = {
     objectPosition: "center",
   },
   brandWomenMark: {
-    width: "104px",
-    height: "52px",
+    width: "116px",
+    height: "60px",
     borderRadius: "14px",
     display: "grid",
     placeItems: "center",
@@ -274,12 +274,14 @@ export const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(140, 160, 184, 0.10)",
     boxShadow: "0 10px 18px rgba(95, 128, 172, 0.06)",
     overflow: "hidden",
+    padding: "4px",
     flexShrink: 0,
   },
   brandWomenImage: {
     width: "100%",
     height: "100%",
     objectFit: "contain",
+    objectPosition: "center",
   },
   sidebarCopy: {
     margin: "0 0 16px",

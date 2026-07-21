@@ -1,10 +1,10 @@
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getAdminTable, getAdminTables } from "../api/admin_tables_api";
 import type { AdminTableDetail, AdminTableSummary } from "../api/admin_tables_api";
 
-const ROW_LIMIT = 100;
+const ROW_LIMIT = 250;
 
 export default function AdminTableScreen() {
   const navigate = useNavigate();
@@ -12,9 +12,15 @@ export default function AdminTableScreen() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
   const [tableDetail, setTableDetail] = useState<AdminTableDetail | null>(null);
   const [search, setSearch] = useState("");
+  const [sortField, setSortField] = useState<"name" | "rows" | "cols">("name");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [previewSortField, setPreviewSortField] = useState<string>("rowid");
+  const [previewSortDirection, setPreviewSortDirection] = useState<"asc" | "desc">("asc");
+  const [previewPage, setPreviewPage] = useState(0);
   const [loadingTables, setLoadingTables] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const previewRequestIdRef = useRef(0);
 
   useEffect(() => {
     getAdminTables()
@@ -38,21 +44,41 @@ export default function AdminTableScreen() {
       return;
     }
 
-    loadTableDetail(selectedTable, ROW_LIMIT);
+    setPreviewPage(0);
+    setPreviewSortField("rowid");
+    setPreviewSortDirection("asc");
+    loadTableDetail(selectedTable, ROW_LIMIT, 0, "rowid", "asc");
   }, [selectedTable]);
 
-  function loadTableDetail(tableName: string, limit: number) {
+  function loadTableDetail(
+    tableName: string,
+    limit: number,
+    offset: number,
+    sortField = previewSortField,
+    sortDirection = previewSortDirection
+  ) {
+    const requestId = ++previewRequestIdRef.current;
     setLoadingDetail(true);
-    getAdminTable(tableName, limit)
+    getAdminTable(tableName, limit, offset, sortField, sortDirection)
       .then((response) => {
+        if (requestId !== previewRequestIdRef.current) {
+          return;
+        }
         setTableDetail(response.data);
         setError(null);
       })
       .catch((err) => {
+        if (requestId !== previewRequestIdRef.current) {
+          return;
+        }
         setTableDetail(null);
         setError(err instanceof Error ? err.message : "Failed to load table");
       })
-      .finally(() => setLoadingDetail(false));
+      .finally(() => {
+        if (requestId === previewRequestIdRef.current) {
+          setLoadingDetail(false);
+        }
+      });
   }
 
   const filteredTables = useMemo(() => {
@@ -70,13 +96,66 @@ export default function AdminTableScreen() {
     });
   }, [search, tables]);
 
+  const visibleTables = useMemo(() => {
+    const direction = sortDirection === "asc" ? 1 : -1;
+    const sorted = [...filteredTables].sort((left, right) => {
+      let comparison = 0;
+
+      if (sortField === "rows") {
+        comparison = left.rowCount - right.rowCount;
+      } else if (sortField === "cols") {
+        comparison = left.columnCount - right.columnCount;
+      } else {
+        comparison = left.name.localeCompare(right.name);
+      }
+
+      if (comparison === 0 && sortField !== "name") {
+        comparison = left.name.localeCompare(right.name);
+      }
+
+      return comparison * direction;
+    });
+
+    return sorted;
+  }, [filteredTables, sortDirection, sortField]);
+
   const selectedSummary = useMemo(
     () => tables.find((table) => table.name === selectedTable) ?? null,
     [selectedTable, tables]
   );
 
   const columnNames = tableDetail?.columns.map((column) => column.name) ?? [];
-  const visibleRows = tableDetail?.rows ?? [];
+  const visibleRows = useMemo(() => {
+    return tableDetail?.rows ?? [];
+  }, [tableDetail]);
+
+  const previewStart = tableDetail && tableDetail.rows.length > 0 ? previewPage * ROW_LIMIT + 1 : 0;
+  const previewEnd = tableDetail ? previewPage * ROW_LIMIT + tableDetail.rows.length : 0;
+  const hasPreviousPage = previewPage > 0;
+  const hasNextPage = Boolean(tableDetail && tableDetail.rows.length === ROW_LIMIT && previewEnd < tableDetail.rowCount);
+
+  const changePreviewPage = (nextPage: number) => {
+    if (!selectedTable) {
+      return;
+    }
+
+    const safePage = Math.max(0, nextPage);
+    setPreviewPage(safePage);
+    loadTableDetail(selectedTable, ROW_LIMIT, safePage * ROW_LIMIT, previewSortField, previewSortDirection);
+  };
+
+  const togglePreviewSort = (field: string) => {
+    if (!selectedTable) {
+      return;
+    }
+
+    const isActive = previewSortField === field;
+    const nextDirection = isActive && previewSortDirection === "asc" ? "desc" : "asc";
+    setPreviewSortField(field);
+    setPreviewSortDirection(nextDirection);
+    setPreviewPage(0);
+    loadTableDetail(selectedTable, ROW_LIMIT, 0, field, nextDirection);
+  };
 
   return (
     <main style={styles.shell}>
@@ -89,7 +168,7 @@ export default function AdminTableScreen() {
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
           </div>
           <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-womenline.png" alt="" style={styles.brandWomenImage} />
+            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>
         </div>
 
@@ -98,16 +177,12 @@ export default function AdminTableScreen() {
         </p>
 
         <nav style={styles.navStack} aria-label="Admin table navigation">
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
+            <span style={styles.navButtonLabel}>Home</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+          </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin")}>
             <span style={styles.navButtonLabel}>Admin</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={styles.navButtonLabel}>Main</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/site")}>
-            <span style={styles.navButtonLabel}>Site</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -125,13 +200,6 @@ export default function AdminTableScreen() {
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
             <div style={styles.kicker}>Table viewer</div>
-            <div style={styles.heroWordmarkWrap}>
-              <img
-                src="/renfrewplus-banner.png"
-                alt="RenfrewPlus wordmark"
-                style={styles.heroWordmark}
-              />
-            </div>
             <p style={styles.subtitle}>
               A read-only view of every SQLite table in the active workflow database.
             </p>
@@ -143,10 +211,13 @@ export default function AdminTableScreen() {
               <button
                 style={styles.secondaryButton}
                 type="button"
-                onClick={() => selectedTable && loadTableDetail(selectedTable, 500)}
+                onClick={() =>
+                  selectedTable &&
+                  loadTableDetail(selectedTable, ROW_LIMIT, previewPage * ROW_LIMIT, previewSortField, previewSortDirection)
+                }
                 disabled={!selectedTable || loadingDetail}
               >
-                Load 500 Rows
+                Refresh 250
               </button>
             </div>
           </div>
@@ -204,7 +275,61 @@ export default function AdminTableScreen() {
             />
 
             <div style={styles.tableList}>
-              {filteredTables.map((table) => {
+              <div style={styles.tableListHeader}>
+                <button
+                  type="button"
+                  style={styles.tableListHeaderButton}
+                  onClick={() => {
+                    if (sortField === "name") {
+                      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSortField("name");
+                      setSortDirection("asc");
+                    }
+                  }}
+                  >
+                    <span>Table</span>
+                    <span style={styles.tableListHeaderIcon}>
+                    {sortField === "name" ? getSortLabel(sortDirection) : "Sort"}
+                    </span>
+                  </button>
+                <button
+                  type="button"
+                  style={styles.tableListHeaderButton}
+                  onClick={() => {
+                    if (sortField === "rows") {
+                      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSortField("rows");
+                      setSortDirection("desc");
+                    }
+                  }}
+                >
+                  <span>Rows</span>
+                  <span style={styles.tableListHeaderIcon}>
+                    {sortField === "rows" ? getSortLabel(sortDirection) : "Sort"}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  style={styles.tableListHeaderButton}
+                  onClick={() => {
+                    if (sortField === "cols") {
+                      setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
+                    } else {
+                      setSortField("cols");
+                      setSortDirection("desc");
+                    }
+                  }}
+                >
+                  <span>Cols</span>
+                  <span style={styles.tableListHeaderIcon}>
+                    {sortField === "cols" ? getSortLabel(sortDirection) : "Sort"}
+                  </span>
+                </button>
+              </div>
+
+              {visibleTables.map((table) => {
                 const active = table.name === selectedTable;
                 return (
                   <button
@@ -224,11 +349,11 @@ export default function AdminTableScreen() {
                 );
               })}
 
-              {!filteredTables.length && !loadingTables && (
-                <div style={styles.emptyState}>No tables match that search.</div>
-              )}
+                {!visibleTables.length && !loadingTables && (
+                  <div style={styles.emptyState}>No tables match that search.</div>
+                )}
+              </div>
             </div>
-          </div>
 
           <div style={styles.detailPane}>
             <div style={styles.panelHeader}>
@@ -237,7 +362,11 @@ export default function AdminTableScreen() {
                 <h2 style={styles.sectionTitle}>{tableDetail?.name ?? "Select a table"}</h2>
               </div>
               <div style={styles.sectionMeta}>
-                {loadingDetail ? "Loading preview..." : `${tableDetail?.rowCount ?? 0} rows total`}
+                {loadingDetail
+                  ? "Loading preview..."
+                  : tableDetail
+                    ? `${tableDetail.rowCount} rows total`
+                    : "0 rows total"}
               </div>
             </div>
 
@@ -253,14 +382,60 @@ export default function AdminTableScreen() {
                   ))}
                 </div>
 
+                <div style={styles.previewPager}>
+                  <div style={styles.previewPagerMeta}>
+                    {tableDetail.rows.length
+                      ? `Showing rows ${previewStart} - ${previewEnd} of ${tableDetail.rowCount}`
+                      : "No rows to show"}
+                  </div>
+                  <div style={styles.previewPagerButtons}>
+                    <button
+                      type="button"
+                      style={styles.secondaryButton}
+                      onClick={() => changePreviewPage(previewPage - 1)}
+                      disabled={!hasPreviousPage || loadingDetail}
+                    >
+                      Previous 250
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.primaryButton}
+                      onClick={() => changePreviewPage(previewPage + 1)}
+                      disabled={!hasNextPage || loadingDetail}
+                    >
+                      Next 250
+                    </button>
+                  </div>
+                </div>
+
                 <div style={styles.tableWrap}>
                   <table style={styles.dataTable}>
                     <thead>
                       <tr>
-                        <th style={styles.headerCell}>rowid</th>
+                        <th style={styles.headerCell}>
+                          <button
+                            type="button"
+                            style={styles.headerSortButton}
+                            onClick={() => togglePreviewSort("rowid")}
+                          >
+                            <span>rowid</span>
+                            <span style={styles.headerSortIcon}>
+                              {previewSortField === "rowid" ? getSortLabel(previewSortDirection) : "Sort"}
+                            </span>
+                          </button>
+                        </th>
                         {columnNames.map((columnName) => (
                           <th key={columnName} style={styles.headerCell}>
-                            {columnName}
+                            <button
+                              type="button"
+                              style={styles.headerSortButton}
+                              onClick={() => togglePreviewSort(columnName)}
+                            >
+                              <span>{columnName}</span>
+                              <span style={styles.headerSortIcon}>
+                                {previewSortField === columnName ? getSortLabel(previewSortDirection) : "Sort"}
+                              </span>
+                            </button>
                           </th>
                         ))}
                       </tr>
@@ -304,6 +479,10 @@ function formatCell(value: unknown) {
   }
 
   return String(value);
+}
+
+function getSortLabel(direction: "asc" | "desc") {
+  return direction === "asc" ? "Low \u2192 High" : "High \u2192 Low";
 }
 
 const styles: Record<string, CSSProperties> = {
@@ -377,8 +556,8 @@ const styles: Record<string, CSSProperties> = {
     objectPosition: "center",
   },
   brandWomenMark: {
-    width: "104px",
-    height: "52px",
+    width: "116px",
+    height: "60px",
     borderRadius: "14px",
     display: "grid",
     placeItems: "center",
@@ -386,12 +565,14 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(140, 160, 184, 0.10)",
     boxShadow: "0 10px 18px rgba(95, 128, 172, 0.06)",
     overflow: "hidden",
+    padding: "4px",
     flexShrink: 0,
   },
   brandWomenImage: {
     width: "100%",
     height: "100%",
     objectFit: "contain",
+    objectPosition: "center",
   },
   sidebarCopy: {
     margin: "0 0 16px",
@@ -484,15 +665,6 @@ const styles: Record<string, CSSProperties> = {
     flexDirection: "column",
     justifyContent: "center",
     minWidth: 0,
-  },
-  heroWordmarkWrap: {
-    maxWidth: "540px",
-    padding: "0 0 6px",
-  },
-  heroWordmark: {
-    display: "block",
-    width: "100%",
-    height: "auto",
   },
   kicker: {
     textTransform: "uppercase",
@@ -688,6 +860,33 @@ const styles: Record<string, CSSProperties> = {
     overflow: "auto",
     minHeight: 0,
   },
+  tableListHeader: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1fr) 72px 72px",
+    gap: "8px",
+    padding: "0 4px 2px",
+  },
+  tableListHeaderButton: {
+    appearance: "none",
+    border: "none",
+    background: "transparent",
+    padding: "0 4px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    color: "#5a7087",
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+  },
+  tableListHeaderIcon: {
+    fontSize: "11px",
+    lineHeight: 1,
+    color: "#7a8ea4",
+  },
   tableListItem: {
     width: "100%",
     borderRadius: "18px",
@@ -717,6 +916,23 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexWrap: "wrap",
     gap: "8px",
+  },
+  previewPager: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  previewPagerMeta: {
+    fontSize: "13px",
+    color: "#5e7186",
+    fontWeight: 700,
+  },
+  previewPagerButtons: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
   },
   columnChip: {
     display: "inline-flex",
@@ -754,6 +970,26 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     borderBottom: "1px solid rgba(140, 160, 184, 0.2)",
     whiteSpace: "nowrap",
+  },
+  headerSortButton: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    padding: "0",
+    border: "none",
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    cursor: "pointer",
+    textAlign: "left",
+  },
+  headerSortIcon: {
+    fontSize: "11px",
+    color: "#6f8499",
+    lineHeight: 1,
+    flexShrink: 0,
   },
   bodyCell: {
     padding: "10px",

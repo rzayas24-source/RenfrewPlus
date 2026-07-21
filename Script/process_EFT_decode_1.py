@@ -1,42 +1,38 @@
 #!/usr/bin/env python3
 
 import os
+import sys
+
 import pandas as pd
 
-FOLDER = r"C:\Renfrew\Workflow"
-KEYWORD = "dep_1101_tran"
-OUTPUT_FILE = os.path.join(FOLDER, "output1.csv")
+WORKFLOW_ROOT = r"C:\Renfrew\Workflow"
+OUTPUT_FILE = os.path.join(WORKFLOW_ROOT, "output1.csv")
+EXPECTED_PREFIX = "dep_1101_tran"
 
-def process_dep_files():
-    files = [f for f in os.listdir(FOLDER) if f.lower().startswith(KEYWORD)]
 
-    if not files:
-        print("No DEP_1101_TRAN files found.")
-        return
+def process_dep_file(path: str) -> None:
+    filename = os.path.basename(path)
+    if not filename.lower().startswith(EXPECTED_PREFIX):
+        raise SystemExit("Please choose exactly one DEP_1101_TRAN file.")
 
-    for f in files:
-        path = os.path.join(FOLDER, f)
-        print(f"Processing: {f}")
+    print(f"Processing selected file: {filename}")
 
-        # Load Excel or CSV automatically
-        if f.lower().endswith((".xlsx", ".xls")):
-            df = pd.read_excel(path, dtype=str)
-        else:
-            df = pd.read_csv(path, dtype=str)
+    if filename.lower().endswith((".xlsx", ".xls")):
+        df = pd.read_excel(path, dtype=str)
+    else:
+        df = pd.read_csv(path, dtype=str)
 
-        # Ensure column 22 exists
-        if df.shape[1] <= 22:
-            print(f"File {f} does not have 23 columns. Skipping.")
-            continue
+    if df.shape[1] <= 22:
+        raise SystemExit(f"File {filename} does not have 23 columns.")
 
-        col22 = df.columns[22]
+    col22 = df.columns[22]
+    filtered = df[df[col22].astype(str).str.contains(r"TRN\*1\*", na=False)]
+    filtered.to_csv(OUTPUT_FILE, index=False)
+    print(f"Saved filtered results to {OUTPUT_FILE}")
 
-        # Filter rows containing TRN*1*
-        filtered = df[df[col22].str.contains(r"TRN\*1\*", na=True)]
-
-        # Save output
-        filtered.to_csv(OUTPUT_FILE, index=False)
-        print(f"Saved filtered results to {OUTPUT_FILE}")
 
 if __name__ == "__main__":
-    process_dep_files()
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: python process_EFT_decode_1.py <path-to-selected-DEP_1101_TRAN-file>")
+
+    process_dep_file(sys.argv[1])

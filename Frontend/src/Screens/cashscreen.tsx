@@ -67,6 +67,13 @@ export default function CashScreen() {
       path: "/site-review",
     },
     {
+      title: "Banking",
+      meta: "Open the banking screen for bank-side follow-up and review.",
+      tone: "mist",
+      action: "Open Banking",
+      path: "/banking",
+    },
+    {
       title: "Workspace Home",
       meta: "Return to the main dashboard whenever you need the full menu.",
       tone: "pearl",
@@ -86,7 +93,7 @@ export default function CashScreen() {
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
           </div>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-womenline.png" alt="" style={adminStyles.brandWomenImage} />
+            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
         </div>
 
@@ -99,12 +106,24 @@ export default function CashScreen() {
             <span style={adminStyles.navButtonLabel}>Home</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
+            <span style={adminStyles.navButtonLabel}>Import</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+          </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
+            <span style={adminStyles.navButtonLabel}>Banking</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/balance-sheet")}>
             <span style={adminStyles.navButtonLabel}>Balance Sheet</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
             <span style={adminStyles.navButtonLabel}>Site Review</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+          </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-match")}>
+            <span style={adminStyles.navButtonLabel}>835 Match</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -132,6 +151,9 @@ export default function CashScreen() {
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/approved")}>
                 Open Approved
+              </button>
+              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
+                Open Banking
               </button>
             </div>
           </div>
