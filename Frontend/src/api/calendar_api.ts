@@ -35,7 +35,15 @@ export interface CalendarRange {
   rows: CalendarRangeRow[];
 }
 
+export interface CalendarWorkDayLookup {
+  workDay: string;
+  bankDay: string | null;
+}
+
 export const getCalendarStatus = () => axios.get<CalendarStatus>(`${API}/calendar/status`);
+
+export const lookupCalendarBankDay = (work_day: string) =>
+  axios.get<CalendarWorkDayLookup>(`${API}/calendar/work-day/lookup`, { params: { work_day } });
 
 export const getCalendarRange = (start: string, end: string) =>
   axios.get<CalendarRange>(`${API}/calendar/range`, { params: { start, end } });

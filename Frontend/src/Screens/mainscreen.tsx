@@ -113,6 +113,10 @@ export default function MainScreen() {
             <span style={styles.navButtonLabel}>Calendar</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/tools")}>
+            <span style={styles.navButtonLabel}>Tools</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+          </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
             <span style={styles.navButtonLabel}>Admin</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>

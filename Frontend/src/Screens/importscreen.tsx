@@ -60,10 +60,10 @@ export default function ImportScreen() {
       path: "/cash",
     },
     {
-      title: "Lockbox Import",
-      meta: "Open the dedicated lockbox import screen for bank-side staging.",
+      title: "Lockbox Upload",
+      meta: "Open the dedicated lockbox upload screen for bank-side staging.",
       tone: "blue",
-      action: "Open Lockbox Import",
+      action: "Open Lockbox Upload",
       path: "/lockbox-import",
     },
     {
@@ -116,16 +116,12 @@ export default function ImportScreen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="Import navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
+            <span style={adminStyles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/lockbox-import")}>
-            <span style={adminStyles.navButtonLabel}>Lockbox Import</span>
+            <span style={adminStyles.navButtonLabel}>Lockbox Upload</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/eft-upload")}>
@@ -134,14 +130,6 @@ export default function ImportScreen() {
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-upload")}>
             <span style={adminStyles.navButtonLabel}>835 Upload</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/attachments")}>
-            <span style={adminStyles.navButtonLabel}>Pending</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
-            <span style={adminStyles.navButtonLabel}>Banking</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -168,7 +156,7 @@ export default function ImportScreen() {
                 Open Pending
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/lockbox-import")}>
-                Open Lockbox Import
+                Open Lockbox Upload
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/eft-upload")}>
                 Open EFT Upload
@@ -259,3 +247,4 @@ const importToneStyles: Record<ImportShortcut["tone"], CSSProperties> = {
     background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
   },
 };
+

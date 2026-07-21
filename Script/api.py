@@ -22,7 +22,7 @@ from system_calendar_core import (
     setup,
 )
 from source_table_schema import ensure_eft_tables, ensure_eftload_schema, ensure_source_table_columns, refresh_source_table_mirrors
-from source_match_core import build_match_dashboard, build_match_history, commit_all_strong_matches, commit_match, ensure_match_indexes, get_match_detail
+from source_match_core import build_match_dashboard, build_match_history, commit_all_strong_matches, commit_match, ensure_match_indexes, get_match_detail, normalize_checknum
 from banking_core import build_banking_spreadsheet
 import pandas as pd
 
@@ -538,6 +538,26 @@ def get_rejectlist():
 @app.get("/calendar/status")
 def get_calendar_status():
     return _calendar_status_payload()
+
+
+@app.get("/calendar/work-day/lookup")
+def get_calendar_work_day_lookup(work_day: str):
+    normalized = normalize_mmddyyyy(work_day)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="work_day is required")
+
+    conn = get_conn()
+    init_db()
+    row = conn.execute(
+        "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+        (normalized,),
+    ).fetchone()
+    conn.close()
+
+    return {
+        "workDay": normalized,
+        "bankDay": row[0] if row else None,
+    }
 
 
 @app.get("/calendar/range")
@@ -2157,6 +2177,423 @@ async def post_lockbox_approval_stage(request: Request):
 @app.get("/banking/spreadsheet")
 def get_banking_spreadsheet():
     return build_banking_spreadsheet()
+
+
+def _era_check_candidates(check_number: str) -> list[str]:
+    raw = str(check_number or "").strip()
+    normalized = normalize_checknum(raw)
+    candidates = [raw, normalized, raw.lstrip("0"), normalized.lstrip("0")]
+    return [candidate for candidate in dict.fromkeys(candidates) if candidate]
+
+
+@app.get("/era/spreadsheet")
+def get_era_spreadsheet(work_day: str):
+    normalized_work_day = normalize_mmddyyyy(work_day)
+    if not normalized_work_day:
+        raise HTTPException(status_code=400, detail="work_day is required")
+
+    conn = get_conn()
+    init_db()
+    row = conn.execute(
+        "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+        (normalized_work_day,),
+    ).fetchone()
+    conn.close()
+
+    bank_day = normalize_mmddyyyy(row[0]) if row and row[0] else None
+    if not bank_day:
+        return {
+            "workDay": normalized_work_day,
+            "bankDay": None,
+            "rows": [],
+            "matchedChecks": 0,
+            "matchedFiles": 0,
+        }
+
+    spreadsheet = build_banking_spreadsheet()
+    if not os.path.exists(ZIP_835_ERA_FOLDER):
+        raise HTTPException(status_code=404, detail="ERA folder does not exist")
+
+    era_files = [
+        filename
+        for filename in sorted(os.listdir(ZIP_835_ERA_FOLDER))
+        if filename.lower().endswith(".era")
+        and os.path.isfile(os.path.join(ZIP_835_ERA_FOLDER, filename))
+    ]
+
+    file_contents: dict[str, str] = {}
+    for filename in era_files:
+        full_path = os.path.join(ZIP_835_ERA_FOLDER, filename)
+        try:
+            with open(full_path, "r", errors="ignore") as handle:
+                file_contents[filename] = handle.read()
+        except Exception:
+            file_contents[filename] = ""
+
+    rows = []
+    matched_checks = set()
+
+    for group in spreadsheet["groups"]:
+        for row_data in group["rows"]:
+            if row_data.get("edi") != "Y":
+                continue
+            if normalize_mmddyyyy(row_data.get("date")) != bank_day:
+                continue
+
+            check_number = str(row_data.get("checkNumber") or "").strip()
+            if not check_number:
+                continue
+
+            candidates = _era_check_candidates(check_number)
+            matched_files = [
+                filename
+                for filename, content in file_contents.items()
+                if any(candidate in content for candidate in candidates)
+            ]
+
+            if not matched_files:
+                continue
+
+            matched_checks.add(check_number)
+            for filename in matched_files:
+                rows.append(
+                    {
+                        "source": group["source"],
+                        "bankDay": bank_day,
+                        "checkNumber": check_number,
+                        "payer": str(row_data.get("payer") or "").strip(),
+                        "amount": str(row_data.get("amount") or "").strip(),
+                        "eraFile": filename,
+                    }
+                )
+
+    rows.sort(key=lambda item: (item["source"], item["checkNumber"], item["eraFile"]))
+
+    return {
+        "workDay": normalized_work_day,
+        "bankDay": bank_day,
+        "rows": rows,
+        "matchedChecks": len(matched_checks),
+        "matchedFiles": len(rows),
+    }
+
+
+@app.post("/era/convert")
+def post_era_convert(payload: dict):
+    work_day = normalize_mmddyyyy(payload.get("work_day"))
+    if not work_day:
+        raise HTTPException(status_code=400, detail="work_day is required")
+
+    conn = get_conn()
+    init_db()
+    row = conn.execute(
+        "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+        (work_day,),
+    ).fetchone()
+    conn.close()
+
+    bank_day = normalize_mmddyyyy(row[0]) if row and row[0] else None
+    if not bank_day:
+        raise HTTPException(status_code=400, detail="No bank day is mapped to the selected posting day")
+
+    if not os.path.exists(ZIP_835_ERA_FOLDER):
+        raise HTTPException(status_code=404, detail="ERA folder does not exist")
+
+    os.makedirs(os.path.join(ZIP_835_ERA_FOLDER, "Renamed"), exist_ok=True)
+
+    spreadsheet = build_banking_spreadsheet()
+    target_rows = []
+    for group in spreadsheet["groups"]:
+        for row_data in group["rows"]:
+            if row_data.get("edi") != "Y":
+                continue
+            if normalize_mmddyyyy(row_data.get("date")) != bank_day:
+                continue
+
+            check_number = str(row_data.get("checkNumber") or "").strip()
+            if not check_number:
+                continue
+
+            target_rows.append(
+                {
+                    "source": group["source"],
+                    "checkNumber": check_number,
+                    "payer": str(row_data.get("payer") or "").strip(),
+                    "amount": str(row_data.get("amount") or "").strip(),
+                }
+            )
+
+    target_rows.sort(key=lambda item: (item["source"], item["checkNumber"]))
+    check_candidates = [row["checkNumber"] for row in target_rows]
+
+    era_files = [
+        filename
+        for filename in sorted(os.listdir(ZIP_835_ERA_FOLDER))
+        if filename.lower().endswith(".era")
+        and os.path.isfile(os.path.join(ZIP_835_ERA_FOLDER, filename))
+    ]
+
+    renamed = []
+    sequence = 1
+    date_prefix = datetime.strptime(work_day, "%m/%d/%Y").strftime("%m.%d.%y")
+    renamed_folder = os.path.join(ZIP_835_ERA_FOLDER, "Renamed")
+
+    for filename in era_files:
+        full_path = os.path.join(ZIP_835_ERA_FOLDER, filename)
+        orig_ext = os.path.splitext(filename)[1]
+        try:
+            with open(full_path, "r", errors="ignore") as handle:
+                content = handle.read()
+        except Exception:
+            continue
+
+        matched_check = ""
+        for check_number in check_candidates:
+            for candidate in _era_check_candidates(check_number):
+                if candidate and candidate in content:
+                    matched_check = check_number
+                    break
+            if matched_check:
+                break
+
+        if not matched_check:
+            continue
+
+        new_name = f"{date_prefix}-835-{sequence}-{matched_check}{orig_ext}"
+        destination = os.path.join(renamed_folder, new_name)
+
+        if os.path.exists(destination):
+            raise HTTPException(status_code=409, detail=f"Destination already exists: {new_name}")
+
+        shutil.move(full_path, destination)
+        renamed.append(
+            {
+                "sourceFile": filename,
+                "renamedFile": new_name,
+                "checkNumber": matched_check,
+            }
+        )
+        sequence += 1
+
+    return {
+        "status": "converted" if renamed else "noop",
+        "statusTag": "CONVERTED" if renamed else "NO FILES",
+        "message": (
+            f"Renamed {len(renamed)} ERA file(s) and moved them to 2.ERA/Renamed."
+            if renamed
+            else "No ERA files matched the selected day."
+        ),
+        "workDay": work_day,
+        "bankDay": bank_day,
+        "renamedCount": len(renamed),
+        "outputFolder": renamed_folder,
+        "renamedFiles": renamed,
+    }
+
+
+@app.get("/html/spreadsheet")
+def get_html_spreadsheet(work_day: str):
+    normalized_work_day = normalize_mmddyyyy(work_day)
+    if not normalized_work_day:
+        raise HTTPException(status_code=400, detail="work_day is required")
+
+    conn = get_conn()
+    init_db()
+    row = conn.execute(
+        "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+        (normalized_work_day,),
+    ).fetchone()
+    conn.close()
+
+    bank_day = normalize_mmddyyyy(row[0]) if row and row[0] else None
+    if not bank_day:
+        return {
+            "workDay": normalized_work_day,
+            "bankDay": None,
+            "rows": [],
+            "matchedChecks": 0,
+            "matchedFiles": 0,
+        }
+
+    spreadsheet = build_banking_spreadsheet()
+    if not os.path.exists(ZIP_835_HTML_FOLDER):
+        raise HTTPException(status_code=404, detail="HTML folder does not exist")
+
+    html_files = [
+        filename
+        for filename in sorted(os.listdir(ZIP_835_HTML_FOLDER))
+        if filename.lower().endswith((".html", ".htm"))
+        and os.path.isfile(os.path.join(ZIP_835_HTML_FOLDER, filename))
+    ]
+
+    file_contents: dict[str, str] = {}
+    for filename in html_files:
+        full_path = os.path.join(ZIP_835_HTML_FOLDER, filename)
+        try:
+            with open(full_path, "r", errors="ignore") as handle:
+                file_contents[filename] = handle.read()
+        except Exception:
+            file_contents[filename] = ""
+
+    rows = []
+    matched_checks = set()
+
+    for group in spreadsheet["groups"]:
+        for row_data in group["rows"]:
+            if row_data.get("edi") != "Y":
+                continue
+            if normalize_mmddyyyy(row_data.get("date")) != bank_day:
+                continue
+
+            check_number = str(row_data.get("checkNumber") or "").strip()
+            if not check_number:
+                continue
+
+            candidates = _era_check_candidates(check_number)
+            matched_files = [
+                filename
+                for filename, content in file_contents.items()
+                if any(candidate in content for candidate in candidates)
+            ]
+
+            if not matched_files:
+                continue
+
+            matched_checks.add(check_number)
+            for filename in matched_files:
+                rows.append(
+                    {
+                        "source": group["source"],
+                        "bankDay": bank_day,
+                        "checkNumber": check_number,
+                        "payer": str(row_data.get("payer") or "").strip(),
+                        "amount": str(row_data.get("amount") or "").strip(),
+                        "htmlFile": filename,
+                    }
+                )
+
+    rows.sort(key=lambda item: (item["source"], item["checkNumber"], item["htmlFile"]))
+
+    return {
+        "workDay": normalized_work_day,
+        "bankDay": bank_day,
+        "rows": rows,
+        "matchedChecks": len(matched_checks),
+        "matchedFiles": len(rows),
+    }
+
+
+@app.post("/html/convert")
+def post_html_convert(payload: dict):
+    work_day = normalize_mmddyyyy(payload.get("work_day"))
+    if not work_day:
+        raise HTTPException(status_code=400, detail="work_day is required")
+
+    conn = get_conn()
+    init_db()
+    row = conn.execute(
+        "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+        (work_day,),
+    ).fetchone()
+    conn.close()
+
+    bank_day = normalize_mmddyyyy(row[0]) if row and row[0] else None
+    if not bank_day:
+        raise HTTPException(status_code=400, detail="No bank day is mapped to the selected posting day")
+
+    if not os.path.exists(ZIP_835_HTML_FOLDER):
+        raise HTTPException(status_code=404, detail="HTML folder does not exist")
+
+    os.makedirs(os.path.join(ZIP_835_HTML_FOLDER, "Renamed"), exist_ok=True)
+
+    spreadsheet = build_banking_spreadsheet()
+    target_rows = []
+    for group in spreadsheet["groups"]:
+        for row_data in group["rows"]:
+            if row_data.get("edi") != "Y":
+                continue
+            if normalize_mmddyyyy(row_data.get("date")) != bank_day:
+                continue
+
+            check_number = str(row_data.get("checkNumber") or "").strip()
+            if not check_number:
+                continue
+
+            target_rows.append(
+                {
+                    "source": group["source"],
+                    "checkNumber": check_number,
+                    "payer": str(row_data.get("payer") or "").strip(),
+                    "amount": str(row_data.get("amount") or "").strip(),
+                }
+            )
+
+    target_rows.sort(key=lambda item: (item["source"], item["checkNumber"]))
+    check_candidates = [row["checkNumber"] for row in target_rows]
+
+    html_files = [
+        filename
+        for filename in sorted(os.listdir(ZIP_835_HTML_FOLDER))
+        if filename.lower().endswith((".html", ".htm"))
+        and os.path.isfile(os.path.join(ZIP_835_HTML_FOLDER, filename))
+    ]
+
+    renamed = []
+    sequence = 1
+    date_prefix = datetime.strptime(work_day, "%m/%d/%Y").strftime("%m.%d.%y")
+    renamed_folder = os.path.join(ZIP_835_HTML_FOLDER, "Renamed")
+
+    for filename in html_files:
+        full_path = os.path.join(ZIP_835_HTML_FOLDER, filename)
+        orig_ext = os.path.splitext(filename)[1]
+        try:
+            with open(full_path, "r", errors="ignore") as handle:
+                content = handle.read()
+        except Exception:
+            continue
+
+        matched_check = ""
+        for check_number in check_candidates:
+            for candidate in _era_check_candidates(check_number):
+                if candidate and candidate in content:
+                    matched_check = check_number
+                    break
+            if matched_check:
+                break
+
+        if not matched_check:
+            continue
+
+        new_name = f"{date_prefix}-835-{sequence}-{matched_check}{orig_ext}"
+        destination = os.path.join(renamed_folder, new_name)
+
+        if os.path.exists(destination):
+            raise HTTPException(status_code=409, detail=f"Destination already exists: {new_name}")
+
+        shutil.move(full_path, destination)
+        renamed.append(
+            {
+                "sourceFile": filename,
+                "renamedFile": new_name,
+                "checkNumber": matched_check,
+            }
+        )
+        sequence += 1
+
+    return {
+        "status": "converted" if renamed else "noop",
+        "statusTag": "CONVERTED" if renamed else "NO FILES",
+        "message": (
+            f"Renamed {len(renamed)} HTML file(s) and moved them to 3.HTML/Renamed."
+            if renamed
+            else "No HTML files matched the selected day."
+        ),
+        "workDay": work_day,
+        "bankDay": bank_day,
+        "renamedCount": len(renamed),
+        "outputFolder": renamed_folder,
+        "renamedFiles": renamed,
+    }
 
 
 # ------------------------------------------------------------

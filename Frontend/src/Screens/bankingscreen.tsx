@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
 import { getBankingSpreadsheet, type BankingSpreadsheetGroup, type BankingSpreadsheetResponse } from "../api/banking_api";
+import { getCalendarStatus, type CalendarStatus } from "../api/calendar_api";
 
 type BankingMetric = {
   label: string;
@@ -101,6 +102,7 @@ const formatDisplayDate = (value: string) => value || "No date";
 export default function BankingScreen() {
   const navigate = useNavigate();
   const [data, setData] = useState<BankingSpreadsheetResponse | null>(null);
+  const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,8 +131,18 @@ export default function BankingScreen() {
     }
   };
 
+  const loadCalendarStatus = async () => {
+    try {
+      const response = await getCalendarStatus();
+      setCalendarStatus(response.data);
+    } catch {
+      setCalendarStatus(null);
+    }
+  };
+
   useEffect(() => {
     void loadSpreadsheet();
+    void loadCalendarStatus();
   }, []);
 
   const allRows = useMemo(() => (data?.groups ?? []).flatMap((group) => group.rows), [data]);
@@ -318,6 +330,14 @@ export default function BankingScreen() {
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
+
+        <div style={adminStyles.sidebarCard}>
+          <div style={adminStyles.sidebarCardLabel}>Current Post Day</div>
+          <div style={adminStyles.sidebarCardValue}>{calendarStatus?.currentWorkDay ?? "Loading..."}</div>
+          <div style={adminStyles.sidebarCardMeta}>
+            {calendarStatus?.currentBankDay ? `Bank day: ${calendarStatus.currentBankDay}` : "No bank day mapped yet."}
+          </div>
+        </div>
 
         <div style={adminStyles.sidebarCard}>
           <div style={adminStyles.sidebarCardLabel}>Today</div>

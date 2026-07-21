@@ -13,10 +13,13 @@ import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
 import CalendarScreen from "./Screens/calendarscreen";
 import CashScreen from "./Screens/cashscreen";
+import ERAConvertScreen from "./Screens/eraconvertscreen";
+import HTMLConvertScreen from "./Screens/htmlconvertscreen";
 import ImportScreen from "./Screens/importscreen";
 import EFTUploadScreen from "./Screens/eft_uploadscreen";
 import Upload835Screen from "./Screens/835uploadscreen";
 import LockboxImportScreen from "./Screens/lockbox_importscreen";
+import ToolsScreen from "./Screens/toolsscreen";
 import BankingScreen from "./Screens/bankingscreen";
 import Match835Screen from "./Screens/835matchscreen";
 import SiteReviewScreen from "./Screens/sitereviewscreen";
@@ -168,6 +171,9 @@ export default function ScreenManager() {
         <Route path="/admin/tables" element={<AdminTableScreen />} />
         <Route path="/calendar" element={<CalendarScreen />} />
         <Route path="/cash" element={<CashScreen />} />
+        <Route path="/era-convert" element={<ERAConvertScreen />} />
+        <Route path="/html-convert" element={<HTMLConvertScreen />} />
+        <Route path="/tools" element={<ToolsScreen />} />
         <Route path="/import" element={<ImportScreen />} />
         <Route path="/eft-upload" element={<EFTUploadScreen />} />
         <Route path="/835-upload" element={<Upload835Screen />} />

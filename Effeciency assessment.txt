@@ -1,0 +1,65 @@
+standards
+
+
+
+
+
+
+8:26 AM
+
+
+
+
+
+
+Fair assessment: the system is functional and reasonably organized, but it is not yet at a “fully smooth, standards-tight, and as efficient as possible” level. The biggest gaps are consistency, incremental refresh coverage, and legacy maintenance.
+Add incremental match refresh after EFT approval.[Script/api.py (line 1717)](/C:/Renfrew/Workflow/Script/api.py#L1717) does not call commit_all_strong_matches() after /eft/approval-stage.
+Result: EFT rows may sit unrefreshed until a later manual or unrelated refresh.
+Why it matters: this makes the matching flow less automatic than 835.
+
+Add incremental match refresh after Lockbox approval.[Script/api.py (line 2071)](/C:/Renfrew/Workflow/Script/api.py#L2071) does not call commit_all_strong_matches() after /lockbox/approval-stage.
+Result: lockbox changes also depend on a later refresh.
+Why it matters: the three pipelines should behave the same way if you want a consistent standard.
+
+Consider making the refresh delta-based instead of scanning all unmatched rows each time.[Script/source_match_core.py (line 514)](/C:/Renfrew/Workflow/Script/source_match_core.py#L514) currently walks all unmatched EDI, EFT, and Lockbox rows.
+Result: this is fine for moderate size, but it is not the most efficient possible approach as data grows.
+Why it matters: a true delta refresh would only inspect newly changed rows.
+
+Normalize refresh behavior across all ingest pipelines.835 already auto-refreshes in [Script/api.py (line 1219)](/C:/Renfrew/Workflow/Script/api.py#L1219).
+EFT and Lockbox do not, in [Script/api.py (line 1717)](/C:/Renfrew/Workflow/Script/api.py#L1717) and [Script/api.py (line 2071)](/C:/Renfrew/Workflow/Script/api.py#L2071).
+Result: users get different behavior depending on which pipeline they use.
+Why it matters: consistency is a big part of “to standards.”
+
+Clean up or archive legacy utility scripts that are no longer part of the live app path.system_PSC_core.py, system_PSC_EDI_only_core.py, system_EMR_core.py, and older orchestrators are still present in [`Script/`](/C:/Renfrew/Workflow/Script/) even though the live backend now runs through [`Script/api.py`](/C:/Renfrew/Workflow/Script/api.py).
+Result: extra maintenance surface and confusion about what is active.
+Why it matters: reducing dead paths makes the codebase easier to support and safer to modify.
+
+Remove or rewrite old standalone loaders that duplicate backend responsibility.Files like [`Script/load_EDI.py`](/C:/Renfrew/Workflow/Script/load_EDI.py), [`Script/load_EFT_1_import.py`](/C:/Renfrew/Workflow/Script/load_EFT_1_import.py), and [`Script/load_Lockbox.py`](/C:/Renfrew/Workflow/Script/load_Lockbox.py) are not part of the current frontend/backend route flow.
+Result: duplicate entry points and higher risk of someone using the wrong path.
+Why it matters: a single authoritative pipeline is cleaner and more standard.
+
+Review match-state naming and transitions for clarity.matchstatus is doing real work, but the lifecycle is spread across several handlers in [`Script/api.py`](/C:/Renfrew/Workflow/Script/api.py) and matching logic in [`Script/source_match_core.py`](/C:/Renfrew/Workflow/Script/source_match_core.py).
+Result: the state machine is effective, but not especially self-documenting.
+Why it matters: clean state transitions make ETL systems easier to trust and maintain.
+
+Add explicit tests around approval and refresh outcomes.There is no obvious test coverage shown for the “approve then refresh” behavior in the active pipeline.
+Result: regressions could slip in if one approval flow changes and the others do not.
+Why it matters: ETL and matching systems benefit a lot from regression tests.
+
+Keep the database and generated artifacts out of the normal commit path unless they are intentionally versioned.[`database.db`](/C:/Renfrew/Workflow/database.db) and generated folders like [`1.TRN/`](/C:/Renfrew/Workflow/1.TRN/), [`2.ERA/`](/C:/Renfrew/Workflow/2.ERA/), and [`3.HTML/`](/C:/Renfrew/Workflow/3.HTML/) are operationally useful, but they are noisy from a source-control perspective.
+Result: they can make it harder to see real code changes.
+Why it matters: cleaner repos are easier to audit and safer to deploy.
+
+Ignore the Vite chunk-size warning for now, but note it as a future optimization.The frontend build passes, but it warns about a large chunk.
+Result: not a functional issue today.
+Why it matters: if the app grows more, code splitting may become worthwhile.
+Relevant area: [`Frontend/src/ScreenManager.tsx`](/C:/Renfrew/Workflow/Frontend/src/ScreenManager.tsx)
+
+Bottom line:
+Good foundation: yes.
+Smooth and efficient enough for current usage: mostly yes.
+Fully standards-tight and optimized: not yet.
+If you want, I can turn this into a shorter “archive later” checklist or a prioritized “fix first / fix later” list.
+
+
+8:26 AM
