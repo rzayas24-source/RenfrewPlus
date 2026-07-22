@@ -121,6 +121,10 @@ export function updateBalsheetEntry(entryId: string, entry: BalsheetEntry) {
   return axios.put<BalsheetEntry>(`${API}/balsheet/${entryId}`, entry);
 }
 
+export function createBalsheetEntry(entry: BalsheetEntry) {
+  return axios.post<BalsheetEntry>(`${API}/balsheet`, entry);
+}
+
 export function deleteBalsheetEntry(entryId: string) {
   return axios.delete<{ status: string; entry_id: string }>(`${API}/balsheet/${entryId}`);
 }

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   clearBalsheet,
+  createBalsheetEntry,
   deleteBalsheetEntry,
   getBalsheet,
   getBalsheetNotes,
@@ -487,6 +488,76 @@ export default function Balsheet() {
     await loadRows(nextPostingDate);
   }
 
+  function getVisibleRowsFor(rowsList: BalsheetEntry[]) {
+    const groupMap = new Map<string, BalsheetEntry[]>();
+
+    for (const row of rowsList) {
+      const groupKey = String(row.type ?? "").trim() || "Ungrouped";
+      const groupRows = groupMap.get(groupKey) ?? [];
+      groupRows.push(row);
+      groupMap.set(groupKey, groupRows);
+    }
+
+    const groupEntries = Array.from(groupMap.entries()).sort(([leftKey], [rightKey]) => {
+      const direction = sortField === "type" ? sortDirection : "asc";
+      const comparison = leftKey.localeCompare(rightKey, undefined, { sensitivity: "base" });
+      return direction === "asc" ? comparison : -comparison;
+    });
+
+    return groupEntries.flatMap(([groupKey, groupRows]) =>
+      collapsedGroups.has(groupKey) ? [] : [...groupRows].sort((left, right) => compareSheetRows(left, right, sortField, sortDirection))
+    );
+  }
+
+  async function addBalsheetRow() {
+    const targetPostingDay = postingDate || normalizeDisplayDate(day) || "";
+    if (!targetPostingDay) {
+      setError("No posting day is available for adding a Balsheet row.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    try {
+      const response = await createBalsheetEntry({
+        posting_date: targetPostingDay,
+        type: "",
+        amount: 0,
+        payer: "",
+        check_number: "",
+        edi: "",
+        poster: "",
+        eob: "",
+        unposted: 0,
+        misc: 0,
+        misc_type: "",
+        notes: "",
+        nick: 0,
+        raul: 0,
+        needs: "",
+        from_date: "",
+        to_date: "",
+      });
+
+      const refreshedRows = await loadRows(targetPostingDay);
+      const createdRowId = response.data.entry_id ?? "";
+      const visibleRowsAfterRefresh = getVisibleRowsFor(refreshedRows);
+      const createdRowIndex = visibleRowsAfterRefresh.findIndex((row) => row.entry_id === createdRowId);
+      if (createdRowIndex >= 0) {
+        setSheetLocked(false);
+        setActiveCell({ rowIndex: createdRowIndex, columnIndex: 2 });
+        setSelectionDraft(String(visibleRowsAfterRefresh[createdRowIndex]?.type ?? ""));
+        setIsEditingSelection(true);
+      }
+      setError(null);
+      setMessage("Added new row.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add Balsheet row");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function toggleSort(columnKey: "entry_id" | keyof BalsheetEntry) {
     const nextDirection =
       sortField === columnKey
@@ -590,11 +661,13 @@ export default function Balsheet() {
   }
 
   async function loadRows(date = postingDate) {
+    let loadedRows: BalsheetEntry[] = [];
     setLoading(true);
     setMessage(null);
     try {
       const [rowsResponse, notesResponse] = await Promise.all([getBalsheet(date), getBalsheetNotes(date)]);
-      setRows(rowsResponse.data);
+      loadedRows = rowsResponse.data;
+      setRows(loadedRows);
       const savedNote = String(notesResponse.data[0]?.notes ?? "").trim();
       const savedMessage = String(notesResponse.data[0]?.message ?? "").trim();
       setHeroNote(savedNote);
@@ -613,6 +686,8 @@ export default function Balsheet() {
     } finally {
       setLoading(false);
     }
+
+    return loadedRows;
   }
 
   async function importBankingRows() {
@@ -889,6 +964,15 @@ export default function Balsheet() {
               title="Next day"
             >
               &gt;
+            </button>
+            <button
+              type="button"
+              style={styles.selectionAddButton}
+              onClick={() => void addBalsheetRow()}
+              aria-label="Add row"
+              title="Add row"
+            >
+              +
             </button>
           </div>
           <button
@@ -1406,19 +1490,19 @@ const styles: Record<string, CSSProperties> = {
   },
   selectionBar: {
     display: "grid",
-    gridTemplateColumns: "80px 40px minmax(0, 1fr)",
+    gridTemplateColumns: "110px 40px minmax(0, 1fr)",
     gap: "10px",
     alignItems: "stretch",
   },
   selectionNavCluster: {
     display: "grid",
-    gridTemplateColumns: "36px 36px",
-    gap: "6px",
+    gridTemplateColumns: "34px 34px 34px",
+    gap: "4px",
     alignItems: "stretch",
   },
   selectionNavButton: {
     minHeight: "40px",
-    minWidth: "36px",
+    minWidth: "34px",
     display: "grid",
     placeItems: "center",
     padding: 0,
@@ -1427,6 +1511,21 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(255,255,255,0.92)",
     color: "#36526f",
     fontSize: "18px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
+  },
+  selectionAddButton: {
+    minHeight: "40px",
+    minWidth: "34px",
+    display: "grid",
+    placeItems: "center",
+    padding: 0,
+    borderRadius: "12px",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#2f6fb5",
+    fontSize: "20px",
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
