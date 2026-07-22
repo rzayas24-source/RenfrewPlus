@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { WorklistBrandButton } from "../worklist/worklist";
 import { getAdminTable, getAdminTables } from "../api/admin_tables_api";
 import type { AdminTableDetail, AdminTableSummary } from "../api/admin_tables_api";
 
@@ -164,9 +165,9 @@ export default function AdminTableScreen() {
 
       <aside style={styles.sidebar}>
         <div style={styles.brandWrap}>
-          <div style={styles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={styles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>
@@ -1011,4 +1012,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "14px",
   },
 };
+
+
 

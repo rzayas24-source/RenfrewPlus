@@ -1,6 +1,7 @@
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { WorklistBrandButton } from "../worklist/worklist";
 import {
   clearBalsheet,
   createBalsheetEntry,
@@ -9,6 +10,7 @@ import {
   getBalsheetNotes,
   getBalsheetWorkday,
   importBalsheetFromBanking,
+  saveBalsheetEntries,
   updateBalsheetEntry,
   upsertBalsheetNoteText,
   upsertBalsheetNoteMessage,
@@ -474,7 +476,17 @@ export default function Balsheet() {
   }
 
   function toggleSheetLock() {
+    if (sheetLocked) {
+      const response = window.prompt('Type "confirm" to unlock the sheet.');
+      if (response?.trim().toLowerCase() !== "confirm") {
+        setError(null);
+        setMessage("Unlock cancelled.");
+        return;
+      }
+    }
+
     setSheetLocked((current) => !current);
+    setError(null);
     setMessage(null);
   }
 
@@ -745,6 +757,29 @@ export default function Balsheet() {
     }
   }
 
+  async function saveCurrentBalsheet() {
+    const selectedPostingDay = postingDate || normalizeDisplayDate(day) || "";
+    if (!selectedPostingDay) {
+      setError("No posting day is available for saving Balsheet rows.");
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    try {
+      const response = await saveBalsheetEntries(rows);
+      await loadRows(selectedPostingDay);
+      setError(null);
+      setMessage(
+        `Saved ${response.data.rowsImported} Balsheet row${response.data.rowsImported === 1 ? "" : "s"} to the table.`
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save Balsheet rows");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function editHeroMessage() {
     const currentValue = heroMessage;
     const nextValue = window.prompt("Enter message", currentValue);
@@ -812,9 +847,9 @@ export default function Balsheet() {
 
       <aside style={styles.sidebar}>
         <div style={styles.brandWrap}>
-          <div style={styles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={styles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>
@@ -904,7 +939,10 @@ export default function Balsheet() {
               <h1 style={styles.title}>Balsheet</h1>
               <p style={styles.subtitle}>{heroMessage || "\u00A0"}</p>
               <div style={styles.heroActions}>
-                <button style={styles.primaryButton} type="button" onClick={() => loadRows()}>
+                <button style={styles.primaryButton} type="button" onClick={() => void saveCurrentBalsheet()}>
+                  Save Balsheet
+                </button>
+                <button style={styles.secondaryButton} type="button" onClick={() => loadRows()}>
                   Refresh
                 </button>
                 <button style={styles.secondaryButton} type="button" onClick={() => importBankingRows()}>
@@ -1363,42 +1401,55 @@ const styles: Record<string, CSSProperties> = {
   },
   heroActions: {
     display: "flex",
-    gap: "12px",
-    flexWrap: "wrap",
+    gap: "8px",
+    flexWrap: "nowrap",
     marginTop: "14px",
+    alignItems: "stretch",
   },
   primaryButton: {
-    height: "44px",
-    padding: "0 18px",
+    height: "38px",
+    padding: "0 12px",
     border: "1px solid rgba(188, 193, 203, 0.55)",
-    borderRadius: "14px",
+    borderRadius: "12px",
     background: "rgba(255,255,255,0.95)",
     color: "#3f4a57",
+    fontSize: "12px",
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 12px 22px rgba(52, 84, 120, 0.08)",
+    flex: "1 1 0",
+    minWidth: 0,
+    whiteSpace: "nowrap",
   },
   secondaryButton: {
-    height: "44px",
-    padding: "0 18px",
+    height: "38px",
+    padding: "0 12px",
     border: "1px solid rgba(188, 193, 203, 0.55)",
-    borderRadius: "14px",
+    borderRadius: "12px",
     background: "rgba(255,255,255,0.95)",
     color: "#3f4a57",
+    fontSize: "12px",
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 12px 22px rgba(52, 84, 120, 0.08)",
+    flex: "1 1 0",
+    minWidth: 0,
+    whiteSpace: "nowrap",
   },
   dangerButton: {
-    height: "44px",
-    padding: "0 18px",
+    height: "38px",
+    padding: "0 12px",
     border: "1px solid rgba(188, 193, 203, 0.55)",
-    borderRadius: "14px",
+    borderRadius: "12px",
     background: "rgba(255,255,255,0.95)",
     color: "#3f4a57",
+    fontSize: "12px",
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 12px 22px rgba(52, 84, 120, 0.08)",
+    flex: "1 1 0",
+    minWidth: 0,
+    whiteSpace: "nowrap",
   },
   heroArt: {
     display: "grid",
@@ -1522,9 +1573,9 @@ const styles: Record<string, CSSProperties> = {
     placeItems: "center",
     padding: 0,
     borderRadius: "12px",
-    border: "1px solid rgba(140, 160, 184, 0.22)",
-    background: "rgba(255,255,255,0.92)",
-    color: "#2f6fb5",
+    border: "1px solid rgba(145, 197, 160, 0.35)",
+    background: "linear-gradient(135deg, rgba(236, 250, 239, 0.98) 0%, rgba(214, 242, 220, 0.98) 100%)",
+    color: "#4e8f63",
     fontSize: "20px",
     fontWeight: 800,
     cursor: "pointer",
@@ -1832,3 +1883,5 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
 };
+
+

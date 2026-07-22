@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 type ImportMetric = {
   label: string;
@@ -103,9 +104,9 @@ export default function ImportScreen() {
 
       <aside style={adminStyles.sidebar}>
         <div style={adminStyles.brandWrap}>
-          <div style={adminStyles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
@@ -247,4 +248,6 @@ const importToneStyles: Record<ImportShortcut["tone"], CSSProperties> = {
     background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
   },
 };
+
+
 

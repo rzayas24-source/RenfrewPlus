@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 import { getDuplicateCheckSpreadsheet, type DuplicateCheckSpreadsheetResponse, type DuplicateCheckRow } from "../api/duplicatecheck_api";
 
 type DuplicateMetric = {
@@ -82,9 +83,9 @@ export default function DuplicateCheckScreen() {
 
       <aside style={adminStyles.sidebar}>
         <div style={adminStyles.brandWrap}>
-          <div style={adminStyles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
@@ -419,4 +420,6 @@ const duplicateStyles: Record<string, CSSProperties> = {
     wordBreak: "break-word",
   },
 };
+
+
 

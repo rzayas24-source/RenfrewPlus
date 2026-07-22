@@ -1,5 +1,6 @@
-﻿import type { CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 type WidgetTone = "blue" | "pink" | "mist" | "pearl";
 
@@ -81,9 +82,9 @@ export default function AdminScreen() {
 
       <aside style={styles.sidebar}>
         <div style={styles.brandWrap}>
-          <div style={styles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={styles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>
@@ -96,11 +97,11 @@ export default function AdminScreen() {
         <nav style={styles.navStack} aria-label="Admin navigation">
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
             <span style={styles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin/tables")}>
             <span style={styles.navButtonLabel}>Tables</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>?</span>
           </button>
         </nav>
 
@@ -602,4 +603,5 @@ const toneStyles: Record<WidgetTone, CSSProperties> = {
     background: "linear-gradient(145deg, rgba(251, 247, 242, 0.96) 0%, rgba(255, 254, 252, 0.92) 100%)",
   },
 };
+
 

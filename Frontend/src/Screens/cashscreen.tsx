@@ -1,6 +1,7 @@
-﻿import type { CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 type CashMetric = {
   label: string;
@@ -89,9 +90,9 @@ export default function CashScreen() {
 
       <aside style={adminStyles.sidebar}>
         <div style={adminStyles.brandWrap}>
-          <div style={adminStyles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
@@ -104,27 +105,27 @@ export default function CashScreen() {
         <nav style={adminStyles.navStack} aria-label="Cash navigation">
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
             <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/balsheet/view")}>
             <span style={adminStyles.navButtonLabel}>Balance Sheet</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
             <span style={adminStyles.navButtonLabel}>Import</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
             <span style={adminStyles.navButtonLabel}>Banking</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
             <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-match")}>
             <span style={adminStyles.navButtonLabel}>835 Match</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
         </nav>
 
@@ -235,3 +236,5 @@ const cashToneStyles: Record<CashShortcut["tone"], CSSProperties> = {
     background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
   },
 };
+
+

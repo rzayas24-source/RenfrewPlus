@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 import {
   approve835EdiStage,
   load835TrnFiles,
@@ -338,9 +339,9 @@ export default function Upload835Screen() {
 
       <aside style={adminStyles.sidebar}>
         <div style={adminStyles.brandWrap}>
-          <div style={adminStyles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
@@ -882,4 +883,6 @@ export default function Upload835Screen() {
     </main>
   );
 }
+
+
 

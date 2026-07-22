@@ -1,5 +1,6 @@
 ﻿import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 type WidgetTone = "blue" | "pink" | "mist" | "pearl";
 
@@ -92,9 +93,9 @@ export default function MainScreen() {
 
       <aside style={styles.sidebar}>
         <div style={styles.brandWrap}>
-          <div style={styles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={styles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
           </div>

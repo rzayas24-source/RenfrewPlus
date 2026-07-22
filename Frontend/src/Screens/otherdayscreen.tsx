@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 import { getOtherDaySpreadsheet, type OtherDaySpreadsheetResponse, type OtherDayRow } from "../api/otherday_api";
 
 type OtherDayMetric = {
@@ -85,9 +86,9 @@ export default function OtherDayScreen() {
 
       <aside style={adminStyles.sidebar}>
         <div style={adminStyles.brandWrap}>
-          <div style={adminStyles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
@@ -442,4 +443,6 @@ const otherDayStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
 };
+
+
 

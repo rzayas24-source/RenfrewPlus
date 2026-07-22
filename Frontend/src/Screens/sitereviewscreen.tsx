@@ -1,6 +1,7 @@
-﻿import type { CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 type SiteReviewMetric = {
   label: string;
@@ -75,9 +76,9 @@ export default function SiteReviewScreen() {
 
       <aside style={adminStyles.sidebar}>
         <div style={adminStyles.brandWrap}>
-          <div style={adminStyles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={adminStyles.brandWomenMark} aria-hidden="true">
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
           </div>
@@ -90,19 +91,19 @@ export default function SiteReviewScreen() {
         <nav style={adminStyles.navStack} aria-label="Site review navigation">
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
             <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
             <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site")}>
             <span style={adminStyles.navButtonLabel}>Site</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/approved")}>
             <span style={adminStyles.navButtonLabel}>Approved Batches</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
         </nav>
 
@@ -210,3 +211,5 @@ const siteReviewToneStyles: Record<SiteReviewShortcut["tone"], CSSProperties> = 
     background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
   },
 };
+
+

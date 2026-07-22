@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 interface Props {
   keyproofTotal: number;
@@ -24,9 +25,9 @@ export default function BalanceCheck({
 
       <aside style={styles.sidebar}>
         <div style={styles.brandWrap}>
-          <div style={styles.brandMark} aria-hidden="true">
+          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </div>
+          </WorklistBrandButton>
           <div style={styles.brandTitleBlock}>
             <div style={styles.brandKicker}>Balance Check</div>
             <div style={styles.brandTitle}>Workflow step</div>
@@ -347,3 +348,5 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
 };
+
+

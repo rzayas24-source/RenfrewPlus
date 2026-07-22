@@ -117,6 +117,12 @@ export function clearBalsheet(postingDate: string) {
   });
 }
 
+export function saveBalsheetEntries(entries: BalsheetEntry[]) {
+  return axios.post<{ status: string; rowsImported: number; sourceAttachmentId?: string }>(`${API}/balsheet/bulk`, {
+    entries,
+  });
+}
+
 export function updateBalsheetEntry(entryId: string, entry: BalsheetEntry) {
   return axios.put<BalsheetEntry>(`${API}/balsheet/${entryId}`, entry);
 }
