@@ -125,7 +125,7 @@ export default function AdminScreen() {
               <button style={styles.primaryButton} type="button" onClick={() => navigate("/site")}>
                 Open Site
               </button>
-              <button style={styles.secondaryButton} type="button" onClick={() => navigate("/balance-sheet")}>
+              <button style={styles.secondaryButton} type="button" onClick={() => navigate("/balsheet/view")}>
                 Open Balance Sheet
               </button>
             </div>

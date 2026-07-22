@@ -5,7 +5,7 @@ from datetime import datetime
 import sqlite3
 
 from db import get_conn
-from source_match_core import normalize_checknum
+from system_source_match_core import normalize_checknum
 from system_calendar_core import normalize_mmddyyyy
 
 

@@ -235,20 +235,8 @@ export default function LockboxImportScreen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="Lockbox import navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
-            <span style={adminStyles.navButtonLabel}>Import</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
-            <span style={adminStyles.navButtonLabel}>Banking</span>
+            <span style={adminStyles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -785,3 +773,4 @@ const lockboxImportStyles: Record<string, CSSProperties> = {
     outline: "none",
   },
 };
+

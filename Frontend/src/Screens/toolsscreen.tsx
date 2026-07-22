@@ -122,7 +122,25 @@ export default function ToolsScreen() {
             onClick={() => navigate("/html-convert")}
           >
             <span style={adminStyles.navButtonLabel}>HTML Converter</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+          </button>
+          <button
+            className="sidebar-nav-button"
+            style={adminStyles.navButton}
+            type="button"
+            onClick={() => navigate("/otherday")}
+          >
+            <span style={adminStyles.navButtonLabel}>Other Day Check</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+          </button>
+          <button
+            className="sidebar-nav-button"
+            style={adminStyles.navButton}
+            type="button"
+            onClick={() => navigate("/duplicatecheck")}
+          >
+            <span style={adminStyles.navButtonLabel}>Duplicate Check</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
 
@@ -236,3 +254,4 @@ const toolsToneStyles: Record<ToolsShortcut["tone"], CSSProperties> = {
     background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
   },
 };
+

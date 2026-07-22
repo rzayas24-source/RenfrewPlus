@@ -351,29 +351,9 @@ export default function Upload835Screen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="835 upload navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
-          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
-            <span style={adminStyles.navButtonLabel}>Import</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/eft-upload")}>
-            <span style={adminStyles.navButtonLabel}>EFT Upload</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/lockbox-import")}>
-            <span style={adminStyles.navButtonLabel}>Lockbox Import</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-upload")}>
-            <span style={adminStyles.navButtonLabel}>835 Upload</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
-            <span style={adminStyles.navButtonLabel}>Banking</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
+            <span style={adminStyles.navButtonLabel}>Back</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
 
@@ -902,3 +882,4 @@ export default function Upload835Screen() {
     </main>
   );
 }
+

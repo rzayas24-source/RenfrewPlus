@@ -301,11 +301,31 @@ export default function ERAConvertScreen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="ERA converter navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
+            <span style={adminStyles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
+
+        <div style={adminStyles.sidebarCard}>
+          <div style={adminStyles.sidebarCardLabel}>Source</div>
+          <div
+            style={{
+              ...adminStyles.sidebarCardValue,
+              fontSize: "11px",
+              lineHeight: 1.2,
+              whiteSpace: "normal",
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
+              maxWidth: "100%",
+            }}
+          >
+            C:\Renfrew\Workflow\2.ERA
+          </div>
+          <div style={adminStyles.sidebarCardMeta}>
+            ERA files are read from the 2.ERA folder, then renamed and moved into the completed folder for the selected posting day.
+          </div>
+        </div>
 
         <div style={adminStyles.sidebarCard}>
           <div style={adminStyles.sidebarCardLabel}>Posting Day</div>
@@ -814,3 +834,4 @@ const eraStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
 };
+

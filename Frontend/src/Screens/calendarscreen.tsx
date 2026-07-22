@@ -393,10 +393,10 @@ export default function CalendarScreen() {
         </nav>
 
         <div style={styles.sidebarCard}>
-          <div style={styles.sidebarCardLabel}>Status</div>
+          <div style={styles.sidebarCardLabel}>Current Posting Day</div>
           <div style={styles.sidebarCardValue}>{status?.currentWorkDay ?? "No posting day"}</div>
           <div style={styles.sidebarCardMeta}>
-            {status?.lastBankDay ? `Last bank day: ${status.lastBankDay}` : "No calendar rows loaded yet."}
+            {status?.currentBankDay ? `Bank day: ${status.currentBankDay}` : "No bank day mapped yet."}
           </div>
         </div>
       </aside>

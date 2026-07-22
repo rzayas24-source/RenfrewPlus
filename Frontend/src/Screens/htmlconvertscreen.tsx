@@ -277,9 +277,9 @@ export default function HTMLConvertScreen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="HTML converter navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
+            <span style={adminStyles.navButtonLabel}>Back</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
 
@@ -798,3 +798,4 @@ const htmlStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
 };
+

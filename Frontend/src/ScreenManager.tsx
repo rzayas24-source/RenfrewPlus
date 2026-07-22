@@ -6,7 +6,6 @@ import ApprovedList from "./Screens/approvedlist";
 import AttachmentReviewScreen from "./Screens/attachmentreview";
 import BalanceCheck from "./Screens/balancecheck";
 import Balsheet from "./Screens/balsheet";
-import BalanceSheetMenu from "./Screens/balancesheetmenu";
 import CompletionLabel from "./Screens/completionlabel";
 import IntroScreen from "./Screens/introscreen";
 import Itemization from "./Screens/itemization";
@@ -20,6 +19,8 @@ import EFTUploadScreen from "./Screens/eft_uploadscreen";
 import Upload835Screen from "./Screens/835uploadscreen";
 import LockboxImportScreen from "./Screens/lockbox_importscreen";
 import ToolsScreen from "./Screens/toolsscreen";
+import OtherDayScreen from "./Screens/otherdayscreen";
+import DuplicateCheckScreen from "./Screens/duplicatecheckscreen";
 import BankingScreen from "./Screens/bankingscreen";
 import Match835Screen from "./Screens/835matchscreen";
 import SiteReviewScreen from "./Screens/sitereviewscreen";
@@ -173,6 +174,8 @@ export default function ScreenManager() {
         <Route path="/cash" element={<CashScreen />} />
         <Route path="/era-convert" element={<ERAConvertScreen />} />
         <Route path="/html-convert" element={<HTMLConvertScreen />} />
+        <Route path="/otherday" element={<OtherDayScreen />} />
+        <Route path="/duplicatecheck" element={<DuplicateCheckScreen />} />
         <Route path="/tools" element={<ToolsScreen />} />
         <Route path="/import" element={<ImportScreen />} />
         <Route path="/eft-upload" element={<EFTUploadScreen />} />
@@ -183,12 +186,9 @@ export default function ScreenManager() {
         <Route path="/site-review" element={<SiteReviewScreen />} />
         <Route path="/approved" element={<ApprovedList />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />
-        <Route path="/balance-sheet" element={<BalanceSheetMenu />} />
         <Route path="/balancecheck" element={<BalanceCheckScreen />} />
-        <Route path="/balsheet" element={<Balsheet mode="view" />} />
-        <Route path="/balsheet/view" element={<Balsheet mode="view" />} />
-        <Route path="/balsheet/entry" element={<Balsheet mode="entry" />} />
-        <Route path="/balsheet/bulk" element={<Balsheet mode="bulk" />} />
+        <Route path="/balsheet" element={<Balsheet />} />
+        <Route path="/balsheet/view" element={<Balsheet />} />
         <Route path="/completionlabel" element={<CompletionLabelScreen />} />
         <Route path="/keyproof" element={<Keyproof />} />
         <Route path="/itemization" element={<Itemization />} />

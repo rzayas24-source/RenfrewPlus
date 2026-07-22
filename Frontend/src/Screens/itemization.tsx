@@ -237,7 +237,7 @@ export default function Itemization() {
       params.set("site", site);
     }
 
-    navigate(`/balsheet/bulk${params.toString() ? `?${params.toString()}` : ""}`);
+    navigate(`/balsheet/view${params.toString() ? `?${params.toString()}` : ""}`);
   };
 
   return (
@@ -384,7 +384,7 @@ export default function Itemization() {
         onClick={goToBalsheet}
         style={{ padding: "10px 20px", marginTop: "20px", marginLeft: "10px" }}
       >
-        Go to Balsheet
+        Go to Balsheet View
       </button>
     </div>
   );

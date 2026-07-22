@@ -38,7 +38,7 @@ export default function MainScreen() {
       meta: "Jump into Balsheet tools, entries, and the bulk posting flow.",
       tone: "pink",
       action: "Open Balance Sheet",
-      path: "/balance-sheet",
+      path: "/balsheet/view",
       footnote: "Worksheet hub",
     },
     {
@@ -151,8 +151,8 @@ export default function MainScreen() {
               <button style={styles.primaryButton} type="button" onClick={() => navigate("/site")}>
                 Continue Review
               </button>
-              <button style={styles.secondaryButton} type="button" onClick={() => navigate("/balance-sheet")}>
-                Balance Sheet
+              <button style={styles.secondaryButton} type="button" onClick={() => navigate("/balsheet/view")}>
+                Balsheet View
               </button>
             </div>
           </div>

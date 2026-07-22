@@ -244,25 +244,9 @@ export default function EFTUploadScreen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="EFT upload navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
-            <span style={adminStyles.navButtonLabel}>Import</span>
+            <span style={adminStyles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/lockbox-import")}>
-            <span style={adminStyles.navButtonLabel}>Lockbox Import</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
-            <span style={adminStyles.navButtonLabel}>Banking</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-upload")}>
-            <span style={adminStyles.navButtonLabel}>835 Upload</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
           </button>
         </nav>
 
@@ -286,9 +270,10 @@ export default function EFTUploadScreen() {
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>Phase 3 - Stage</div>
+            <div style={adminStyles.kicker}>EFT upload workspace</div>
             <p style={adminStyles.subtitle}>
-              Bring the selected EFT fields into staging, parse the remittance text, and map the key columns for the next step.
+              Load DEP_1101_TRAN.xlsx into EFTLoad, review the imported workbook, and keep the staging controls below for the
+              next step.
             </p>
 
             <div style={adminStyles.heroActions}>
@@ -304,12 +289,13 @@ export default function EFTUploadScreen() {
           <div style={adminStyles.heroArt}>
             <div style={adminStyles.heroStatusCard}>
               <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>{stageStatus.kind === "idle" ? "Phase 3 - Stage" : stageStatus.kind.toUpperCase()}</span>
+                <span style={adminStyles.statusPill}>{stageStatus.kind === "idle" ? "Upload ready" : stageStatus.kind.toUpperCase()}</span>
                 <span style={adminStyles.statusDot} />
               </div>
-              <div style={adminStyles.heroStatusTitle}>EFTLoad to EFTStage</div>
+              <div style={adminStyles.heroStatusTitle}>Upload workbook to EFTLoad</div>
               <div style={adminStyles.heroStatusText}>
-                As-Of Date becomes Date, Credit Amt becomes Amount, and Descriptive Text 1 is parsed into payer and check number.
+                Choose the DEP_1101_TRAN workbook, load it into EFTLoad, and use the staging section below when you are ready
+                to move those rows forward.
               </div>
             </div>
           </div>
@@ -840,3 +826,4 @@ const styles: Record<string, CSSProperties> = {
     color: "#31455d",
   },
 };
+

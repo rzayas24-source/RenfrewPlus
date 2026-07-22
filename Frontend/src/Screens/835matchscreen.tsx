@@ -22,6 +22,14 @@ type MatchAction = {
   onClick: () => void;
 };
 
+type StatusTone = "blue" | "pink" | "mist" | "pearl" | "success" | "warning";
+
+type StatusChip = {
+  label: string;
+  detail: string;
+  tone: StatusTone;
+};
+
 const moneyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
@@ -41,6 +49,81 @@ const formatAmount = (value: string | number | null | undefined) => {
 
 const formatDate = (value: string | null | undefined) => value ?? "";
 
+const defaultStatusChip: StatusChip = {
+  label: "Idle",
+  detail: "Pick an action or a candidate row to get visible feedback here.",
+  tone: "mist",
+};
+
+const statusToneStyles: Record<StatusTone, { pill: CSSProperties; dot: CSSProperties }> = {
+  blue: {
+    pill: {
+      background: "rgba(235, 245, 255, 0.92)",
+      borderColor: "rgba(151, 181, 219, 0.28)",
+      color: "#35506d",
+    },
+    dot: {
+      background: "#8ec4ff",
+      boxShadow: "0 0 0 6px rgba(142, 196, 255, 0.18)",
+    },
+  },
+  pink: {
+    pill: {
+      background: "rgba(255, 236, 244, 0.94)",
+      borderColor: "rgba(220, 168, 196, 0.3)",
+      color: "#6b4a5d",
+    },
+    dot: {
+      background: "#ff9fc5",
+      boxShadow: "0 0 0 6px rgba(255, 159, 197, 0.18)",
+    },
+  },
+  mist: {
+    pill: {
+      background: "rgba(239, 245, 250, 0.96)",
+      borderColor: "rgba(171, 186, 207, 0.24)",
+      color: "#4b6178",
+    },
+    dot: {
+      background: "#a7bdd5",
+      boxShadow: "0 0 0 6px rgba(167, 189, 213, 0.16)",
+    },
+  },
+  pearl: {
+    pill: {
+      background: "rgba(249, 245, 239, 0.96)",
+      borderColor: "rgba(207, 193, 174, 0.28)",
+      color: "#66584a",
+    },
+    dot: {
+      background: "#d8b88d",
+      boxShadow: "0 0 0 6px rgba(216, 184, 141, 0.18)",
+    },
+  },
+  success: {
+    pill: {
+      background: "rgba(224, 245, 229, 0.96)",
+      borderColor: "rgba(143, 198, 156, 0.3)",
+      color: "#24563a",
+    },
+    dot: {
+      background: "#7fca90",
+      boxShadow: "0 0 0 6px rgba(127, 202, 144, 0.18)",
+    },
+  },
+  warning: {
+    pill: {
+      background: "rgba(255, 236, 224, 0.96)",
+      borderColor: "rgba(219, 169, 130, 0.3)",
+      color: "#7a4a24",
+    },
+    dot: {
+      background: "#f0a46a",
+      boxShadow: "0 0 0 6px rgba(240, 164, 106, 0.18)",
+    },
+  },
+};
+
 export default function Match835Screen() {
   const navigate = useNavigate();
   const [summary, setSummary] = useState<SourceMatchWorklistSummary | null>(null);
@@ -57,9 +140,15 @@ export default function Match835Screen() {
   const [showMatches, setShowMatches] = useState(false);
   const [matchHistory, setMatchHistory] = useState<SourceMatchHistoryRow[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [statusChip, setStatusChip] = useState<StatusChip>(defaultStatusChip);
 
   const loadWorklist = async (preferredId?: number | null) => {
     setError(null);
+    setStatusChip({
+      label: "Refreshing queue",
+      detail: "Rebuilding the unmatched 835 worklist from the source tables.",
+      tone: "blue",
+    });
 
     try {
       const response = await getSourceMatchWorklist(75, queueRevision);
@@ -68,6 +157,11 @@ export default function Match835Screen() {
 
       if (response.data.changed === false) {
         setMessage("Queue already current.");
+        setStatusChip({
+          label: "Queue current",
+          detail: "No incremental changes were returned for the worklist.",
+          tone: "mist",
+        });
         setLoading(false);
         return;
       }
@@ -83,6 +177,14 @@ export default function Match835Screen() {
       setSummary(nextSummary);
       setWorklist(nextWorklist);
       setMessage("Queue refreshed with incremental updates.");
+      setStatusChip({
+        label: "Queue refreshed",
+        detail:
+          nextSelectedId !== null
+            ? `Loaded ${nextWorklist.length} queue row(s) and focused EDI #${nextSelectedId}.`
+            : `Loaded ${nextWorklist.length} queue row(s).`,
+        tone: "success",
+      });
 
       if (nextSelectedId !== null) {
         await loadDetail(nextSelectedId);
@@ -96,6 +198,11 @@ export default function Match835Screen() {
       setSummary(null);
       setSelectedEdiId(null);
       setDetail(null);
+      setStatusChip({
+        label: "Queue error",
+        detail: "The match queue could not be refreshed.",
+        tone: "warning",
+      });
     } finally {
       setLoading(false);
     }
@@ -108,11 +215,21 @@ export default function Match835Screen() {
     setSelectedEdiId(ediId);
     setSelectedEftIds([]);
     setSelectedLockboxIds([]);
+    setStatusChip({
+      label: `Loading EDI #${ediId}`,
+      detail: "Fetching candidate EFT and Lockbox rows for the selected source record.",
+      tone: "blue",
+    });
 
     try {
       const response = await getSourceMatchDetail(ediId);
       const nextDetail = response.data;
       setDetail(nextDetail);
+      setStatusChip({
+        label: `EDI #${ediId} loaded`,
+        detail: `${nextDetail.eftCandidates.length} EFT and ${nextDetail.lockboxCandidates.length} Lockbox candidate(s) available.`,
+        tone: "pearl",
+      });
 
       if (!selectedEdiId) {
         setSelectedEdiId(ediId);
@@ -120,6 +237,11 @@ export default function Match835Screen() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load match detail");
       setDetail(null);
+      setStatusChip({
+        label: "Detail error",
+        detail: `Failed to load EDI #${ediId}.`,
+        tone: "warning",
+      });
     }
   };
 
@@ -127,17 +249,42 @@ export default function Match835Screen() {
     setError(null);
     setMessage(null);
     setLoadingHistory(true);
+    setStatusChip({
+      label: "Loading archive",
+      detail: "Opening the committed 835 match history.",
+      tone: "mist",
+    });
 
     try {
       const response = await getSourceMatchHistory(100);
       setMatchHistory(response.data.rows ?? []);
       setShowMatches(true);
       setMessage(`Loaded ${response.data.count} committed 835 match(es).`);
+      setStatusChip({
+        label: "Archive loaded",
+        detail: `${response.data.count} committed match(es) are visible in the archive.`,
+        tone: "success",
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load match history");
+      setStatusChip({
+        label: "Archive error",
+        detail: "The committed match archive could not be loaded.",
+        tone: "warning",
+      });
     } finally {
       setLoadingHistory(false);
     }
+  };
+
+  const setSelectionStatus = (kind: "eft" | "lockbox", rowId: number, selected: boolean) => {
+    setStatusChip({
+      label: `${kind === "eft" ? "EFT" : "Lockbox"} #${rowId} ${selected ? "selected" : "cleared"}`,
+      detail: selected
+        ? "That candidate is now part of the current match set."
+        : "That candidate was removed from the current selection.",
+      tone: selected ? "success" : "mist",
+    });
   };
 
   useEffect(() => {
@@ -147,15 +294,19 @@ export default function Match835Screen() {
 
   const toggleSelection = (kind: "eft" | "lockbox", row: SourceMatchCandidate) => {
     if (kind === "eft") {
-      setSelectedEftIds((current) =>
-        current.includes(row.id) ? current.filter((value) => value !== row.id) : [...current, row.id]
-      );
+      setSelectedEftIds((current) => {
+        const selected = current.includes(row.id);
+        setSelectionStatus("eft", row.id, !selected);
+        return selected ? current.filter((value) => value !== row.id) : [...current, row.id];
+      });
       return;
     }
 
-    setSelectedLockboxIds((current) =>
-      current.includes(row.id) ? current.filter((value) => value !== row.id) : [...current, row.id]
-    );
+    setSelectedLockboxIds((current) => {
+      const selected = current.includes(row.id);
+      setSelectionStatus("lockbox", row.id, !selected);
+      return selected ? current.filter((value) => value !== row.id) : [...current, row.id];
+    });
   };
 
   const commitSelectedMatch = async () => {
@@ -180,6 +331,11 @@ export default function Match835Screen() {
     setCommitting(true);
     setError(null);
     setMessage(null);
+    setStatusChip({
+      label: `Committing EDI #${selectedEdiId}`,
+      detail: "Sending the selected EFT and Lockbox rows to the commit endpoint.",
+      tone: "blue",
+    });
 
     try {
       const response = await commitSourceMatch({
@@ -193,9 +349,19 @@ export default function Match835Screen() {
       setMessage(
         `Done: committed EDI ${selectedEdiId}. ${matchedEft} EFT row(s) and ${matchedLockbox} Lockbox row(s) were marked matched.`
       );
+      setStatusChip({
+        label: "Commit complete",
+        detail: `EDI ${selectedEdiId} matched ${matchedEft} EFT and ${matchedLockbox} Lockbox row(s).`,
+        tone: "success",
+      });
       await loadWorklist(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to commit match");
+      setStatusChip({
+        label: "Commit error",
+        detail: "The selected match could not be committed.",
+        tone: "warning",
+      });
     } finally {
       setCommitting(false);
     }
@@ -218,6 +384,11 @@ export default function Match835Screen() {
         setSelectedEftIds([]);
         setSelectedLockboxIds([]);
         setMessage("Candidate selections cleared.");
+        setStatusChip({
+          label: "Picks cleared",
+          detail: "The current EFT and Lockbox selections were reset.",
+          tone: "mist",
+        });
       },
     },
     {
@@ -232,14 +403,28 @@ export default function Match835Screen() {
       meta: "Jump back to the cash shell if you need the broader flow.",
       tone: "pink",
       action: "Open Cash",
-      onClick: () => navigate("/cash"),
+      onClick: () => {
+        setStatusChip({
+          label: "Opening cash",
+          detail: "Switching to the cash workspace.",
+          tone: "pink",
+        });
+        navigate("/cash");
+      },
     },
     {
       title: "Site Review",
       meta: "Use the matching side bar to move into site follow-up.",
       tone: "pearl",
       action: "Open Site Review",
-      onClick: () => navigate("/site-review"),
+      onClick: () => {
+        setStatusChip({
+          label: "Opening site review",
+          detail: "Switching to the site review workspace.",
+          tone: "pearl",
+        });
+        navigate("/site-review");
+      },
     },
   ];
 
@@ -269,20 +454,8 @@ export default function Match835Screen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="835 match navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
-            <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-match")}>
-            <span style={adminStyles.navButtonLabel}>835 Match</span>
+            <span style={adminStyles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -293,7 +466,7 @@ export default function Match835Screen() {
             {summary ? `${summary.ediUnmatched} EDI rows` : "Loading queue"}
           </div>
           <div style={adminStyles.sidebarCardMeta}>
-            Match the source of truth directly, then mark the source rows as matched so later searches stay smaller.
+            Strong hits can be committed. Close matches stay in the queue for manual review.
           </div>
         </div>
       </aside>
@@ -303,8 +476,8 @@ export default function Match835Screen() {
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>835 Match screen</div>
             <p style={adminStyles.subtitle}>
-              A source-first workspace for matching EDI against Lockbox and EFT. Exact normalized check numbers lead the search,
-              with amount and date as tie-breakers.
+              A source-first workspace for matching EDI against Lockbox and EFT. Strong hits can be committed, while close
+              matches stay in the queue for review.
             </p>
 
             <div style={adminStyles.heroActions}>
@@ -325,14 +498,23 @@ export default function Match835Screen() {
           <div style={adminStyles.heroArt}>
             <div style={adminStyles.heroStatusCard}>
               <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>Incremental search</span>
-                <span style={adminStyles.statusDot} />
+                <span
+                  style={{
+                    ...adminStyles.statusPill,
+                    ...statusToneStyles[statusChip.tone].pill,
+                  }}
+                >
+                  {statusChip.label}
+                </span>
+                <span
+                  style={{
+                    ...adminStyles.statusDot,
+                    ...statusToneStyles[statusChip.tone].dot,
+                  }}
+                />
               </div>
               <div style={adminStyles.heroStatusTitle}>Match what is known first</div>
-              <div style={adminStyles.heroStatusText}>
-                We narrow the search using normalized check numbers and only keep unmatched rows in the worklist. That makes
-                the queue smaller after every positive hit.
-              </div>
+              <div style={adminStyles.heroStatusText}>{statusChip.detail}</div>
             </div>
           </div>
         </section>
@@ -362,7 +544,9 @@ export default function Match835Screen() {
               <h2 style={adminStyles.sectionTitle}>Fast actions for queue control and source-driven matching</h2>
             </div>
             <div style={adminStyles.sectionMeta}>
-              {detail ? `${strongCount} strong candidate(s) found for the selected EDI row.` : "Pick an EDI row to inspect candidates."}
+              {detail
+                ? `${strongCount} strong candidate(s) found. Close matches stay visible for manual review.`
+                : "Pick an EDI row to inspect strong and close candidates."}
             </div>
           </div>
 
@@ -489,7 +673,7 @@ export default function Match835Screen() {
 
                 {!loading && !worklist.length && (
                   <div style={matchStyles.emptyState}>
-                    No unmatched EDI rows are waiting. Once new ETL lands, they will appear here.
+                    No unmatched EDI rows with candidates are waiting. Once new ETL lands, they will appear here.
                   </div>
                 )}
               </div>
@@ -1185,3 +1369,5 @@ const matchStyles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
 };
+
+

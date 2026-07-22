@@ -177,12 +177,8 @@ export default function AdminTableScreen() {
         </p>
 
         <nav style={styles.navStack} aria-label="Admin table navigation">
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={styles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin")}>
-            <span style={styles.navButtonLabel}>Admin</span>
+            <span style={styles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -1015,3 +1011,4 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "14px",
   },
 };
+

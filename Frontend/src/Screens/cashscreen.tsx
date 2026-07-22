@@ -43,7 +43,7 @@ export default function CashScreen() {
       meta: "Review cash lines and keep the posting queue moving.",
       tone: "blue",
       action: "Open Cash Entries",
-      path: "/balance-sheet",
+      path: "/balsheet/view",
     },
     {
       title: "Deposit Review",
@@ -106,16 +106,16 @@ export default function CashScreen() {
             <span style={adminStyles.navButtonLabel}>Home</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/balsheet/view")}>
+            <span style={adminStyles.navButtonLabel}>Balance Sheet</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
+          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
             <span style={adminStyles.navButtonLabel}>Import</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
             <span style={adminStyles.navButtonLabel}>Banking</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/balance-sheet")}>
-            <span style={adminStyles.navButtonLabel}>Balance Sheet</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
@@ -146,7 +146,7 @@ export default function CashScreen() {
             </p>
 
             <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/balance-sheet")}>
+              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/balsheet/view")}>
                 Open Balance Sheet
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/approved")}>

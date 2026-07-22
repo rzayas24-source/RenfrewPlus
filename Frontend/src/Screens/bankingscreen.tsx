@@ -99,6 +99,18 @@ const compareText = (left: string, right: string) => left.localeCompare(right, u
 
 const formatDisplayDate = (value: string) => value || "No date";
 
+const mmddyyyyPreferenceToIso = (preferredDays: Array<string | null | undefined>, availableDays: string[]) => {
+  for (const day of preferredDays) {
+    const trimmed = (day ?? "").trim();
+    if (!trimmed) continue;
+    if (availableDays.includes(trimmed)) {
+      return mmddyyyyToIso(trimmed);
+    }
+  }
+
+  return availableDays[0] ? mmddyyyyToIso(availableDays[0]) : "";
+};
+
 export default function BankingScreen() {
   const navigate = useNavigate();
   const [data, setData] = useState<BankingSpreadsheetResponse | null>(null);
@@ -152,11 +164,20 @@ export default function BankingScreen() {
   );
 
   useEffect(() => {
-    if (!initialDayApplied.current && selectedDayIso === "" && availableDays.length > 0) {
+    if (!initialDayApplied.current && selectedDayIso === "" && availableDays.length > 0 && calendarStatus) {
+      const nextSelectedDayIso = mmddyyyyPreferenceToIso(
+        [calendarStatus.currentBankDay, calendarStatus.todayBankDay, calendarStatus.currentWorkDay, calendarStatus.today],
+        availableDays,
+      );
+
+      if (!nextSelectedDayIso) {
+        return;
+      }
+
       initialDayApplied.current = true;
-      setSelectedDayIso(mmddyyyyToIso(availableDays[0]));
+      setSelectedDayIso(nextSelectedDayIso);
     }
-  }, [availableDays, selectedDayIso]);
+  }, [availableDays, calendarStatus, selectedDayIso]);
 
   const visibleGroups = useMemo(() => {
     const groups = data?.groups ?? [];
@@ -312,30 +333,21 @@ export default function BankingScreen() {
           A soft banking console for bank-side review, reconciliation, and match follow-up.
         </p>
 
-        <nav style={adminStyles.navStack} aria-label="Banking navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/835-match")}>
-            <span style={adminStyles.navButtonLabel}>835 Match</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/banking")}>
-            <span style={adminStyles.navButtonLabel}>Banking</span>
+        <nav style={adminStyles.navStack} aria-label="Banking navigation">          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
+            <span style={adminStyles.navButtonLabel}>Back</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
 
         <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Current Post Day</div>
-          <div style={adminStyles.sidebarCardValue}>{calendarStatus?.currentWorkDay ?? "Loading..."}</div>
+          <div style={adminStyles.sidebarCardLabel}>Current Bank Day</div>
+          <div style={adminStyles.sidebarCardValue}>
+            {calendarStatus?.currentBankDay ?? calendarStatus?.todayBankDay ?? "Loading..."}
+          </div>
           <div style={adminStyles.sidebarCardMeta}>
-            {calendarStatus?.currentBankDay ? `Bank day: ${calendarStatus.currentBankDay}` : "No bank day mapped yet."}
+            {calendarStatus?.currentWorkDay
+              ? `Posting day: ${calendarStatus.currentWorkDay}`
+              : "No posting day mapped yet."}
           </div>
         </div>
 
@@ -756,3 +768,4 @@ const bankingStyles: Record<string, CSSProperties> = {
     outline: "none",
   },
 };
+

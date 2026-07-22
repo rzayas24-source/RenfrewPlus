@@ -15,6 +15,7 @@ from system_calendar_core import (
     advance_current_work_day,
     build_from,
     delete_days,
+    get_current_bank_day,
     get_current_work_day,
     init_db,
     normalize_mmddyyyy,
@@ -22,8 +23,8 @@ from system_calendar_core import (
     setup,
 )
 from source_table_schema import ensure_eft_tables, ensure_eftload_schema, ensure_source_table_columns, refresh_source_table_mirrors
-from source_match_core import build_match_dashboard, build_match_history, commit_all_strong_matches, commit_match, ensure_match_indexes, get_match_detail, normalize_checknum
-from banking_core import build_banking_spreadsheet
+from system_source_match_core import build_match_dashboard, build_match_history, commit_all_strong_matches, commit_match, ensure_match_indexes, get_match_detail, normalize_checknum
+from system_banking_core import build_banking_spreadsheet
 import pandas as pd
 
 DB_PATH = r"C:\Renfrew\Workflow\database.db"
@@ -50,6 +51,7 @@ def _ensure_source_table_columns_on_startup():
         ensure_source_table_columns(conn)
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
+        ensure_balsheet_notes_table(conn)
         refresh_source_table_mirrors(conn)
     finally:
         conn.close()
@@ -60,6 +62,202 @@ def get_conn():
 
 def _quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
+
+
+BALSHEET_TABLE_COLUMNS = [
+    ("EntryID", "TEXT PRIMARY KEY"),
+    ("PostingDate", "TEXT"),
+    ("Type", "TEXT"),
+    ("Amount", "REAL"),
+    ("Payer", "TEXT"),
+    ("Check Number", "TEXT"),
+    ("EDI", "TEXT"),
+    ("Poster", "TEXT"),
+    ("EOB", "TEXT"),
+    ("UnPosted", "REAL"),
+    ("Misc", "REAL"),
+    ("Misc-Type", "TEXT"),
+    ("Notes", "TEXT"),
+    ("Nick", "REAL"),
+    ("Raul", "REAL"),
+    ("Needs", "TEXT"),
+    ("From", "TEXT"),
+    ("To", "TEXT"),
+]
+
+
+def ensure_balsheet_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in BALSHEET_TABLE_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Balsheet")} ({column_defs})')
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def ensure_balsheet_notes_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {_quote_identifier("Balsheet_notes")} (
+            {_quote_identifier("post_date")} TEXT,
+            {_quote_identifier("notes")} TEXT,
+            {_quote_identifier("message")} TEXT
+        )
+        """
+    )
+    existing_columns = [row[1] for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Balsheet_notes")})').fetchall()]
+    if "pk" in {column.lower() for column in existing_columns}:
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("Balsheet_notes")} RENAME TO {_quote_identifier("Balsheet_notes_legacy")}'
+        )
+        cur.execute(
+            f"""
+            CREATE TABLE {_quote_identifier("Balsheet_notes")} (
+                {_quote_identifier("post_date")} TEXT,
+                {_quote_identifier("notes")} TEXT,
+                {_quote_identifier("message")} TEXT
+            )
+            """
+        )
+        cur.execute(
+            f'INSERT INTO {_quote_identifier("Balsheet_notes")} ({_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")}) '
+            f'SELECT {_quote_identifier("post_date")}, {_quote_identifier("notes")}, COALESCE({_quote_identifier("message")}, \'\') FROM {_quote_identifier("Balsheet_notes_legacy")}'
+        )
+        cur.execute(f'DROP TABLE {_quote_identifier("Balsheet_notes_legacy")}')
+    elif "message" not in {column.lower() for column in existing_columns}:
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("Balsheet_notes")} ADD COLUMN {_quote_identifier("message")} TEXT'
+        )
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def _balsheet_order_clause() -> str:
+    entry_id = _quote_identifier("EntryID")
+    posting_date = _quote_identifier("PostingDate")
+    return (
+        f"ORDER BY {posting_date} ASC, "
+        f"CASE WHEN instr({entry_id}, '-') > 0 THEN CAST(substr({entry_id}, instr({entry_id}, '-') + 1) AS INTEGER) ELSE 0 END ASC, "
+        f"{entry_id} ASC"
+    )
+
+
+def _normalize_balsheet_amount(value):
+    try:
+        return float(str(value).replace("$", "").replace(",", "").strip() or 0)
+    except Exception:
+        return 0.0
+
+
+def _generate_balsheet_entry_id() -> str:
+    return f"BS-{datetime.now().strftime('%m%d%Y-%H%M%S%f')}"
+
+
+def _balsheet_row_to_payload(row):
+    return {
+        "entry_id": row["EntryID"],
+        "posting_date": normalize_mmddyyyy(row["PostingDate"]) or str(row["PostingDate"] or ""),
+        "type": str(row["Type"] or ""),
+        "amount": row["Amount"],
+        "payer": str(row["Payer"] or ""),
+        "check_number": str(row["Check Number"] or ""),
+        "edi": str(row["EDI"] or ""),
+        "poster": str(row["Poster"] or ""),
+        "eob": str(row["EOB"] or ""),
+        "unposted": row["UnPosted"],
+        "misc": row["Misc"],
+        "misc_type": str(row["Misc-Type"] or ""),
+        "notes": str(row["Notes"] or ""),
+        "nick": row["Nick"],
+        "raul": row["Raul"],
+        "needs": str(row["Needs"] or ""),
+        "from_date": str(row["From"] or ""),
+        "to_date": str(row["To"] or ""),
+    }
+
+
+def _balsheet_note_row_to_payload(row):
+    return {
+        "rowid": row["rowid"],
+        "post_date": normalize_mmddyyyy(row["post_date"]) or str(row["post_date"] or ""),
+        "notes": str(row["notes"] or ""),
+        "message": str(row["message"] or ""),
+    }
+
+
+def _normalize_balsheet_payload(entry: dict, entry_id: str | None = None):
+    posting_date = normalize_mmddyyyy(entry.get("posting_date")) or ""
+    if not posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    amount = _normalize_balsheet_amount(entry.get("amount"))
+    unposted = _normalize_balsheet_amount(entry.get("unposted"))
+    misc = _normalize_balsheet_amount(entry.get("misc"))
+    poster = str(entry.get("poster") or "").strip()
+    poster_key = poster.lower() or "nick"
+    poster_amount = amount - unposted - misc
+    nick = poster_amount if poster_key == "nick" else 0.0
+    raul = poster_amount if poster_key == "raul" else 0.0
+
+    return {
+        "EntryID": entry_id or str(entry.get("entry_id") or "").strip() or _generate_balsheet_entry_id(),
+        "PostingDate": posting_date,
+        "Type": str(entry.get("type") or "").strip(),
+        "Amount": amount,
+        "Payer": str(entry.get("payer") or "").strip(),
+        "Check Number": str(entry.get("check_number") or "").strip(),
+        "EDI": str(entry.get("edi") or "").strip(),
+        "Poster": poster,
+        "EOB": str(entry.get("eob") or "").strip(),
+        "UnPosted": unposted,
+        "Misc": misc,
+        "Misc-Type": str(entry.get("misc_type") or "").strip(),
+        "Notes": str(entry.get("notes") or "").strip(),
+        "Nick": nick,
+        "Raul": raul,
+        "Needs": str(entry.get("needs") or "").strip(),
+        "From": str(entry.get("from_date") or "").strip(),
+        "To": str(entry.get("to_date") or "").strip(),
+    }
+
+
+def _normalize_balsheet_note_payload(note: dict, rowid: int | None = None):
+    post_date = normalize_mmddyyyy(note.get("post_date")) or ""
+    if not post_date:
+        raise HTTPException(status_code=400, detail="post_date is required")
+
+    return {
+        "rowid": rowid,
+        "post_date": post_date,
+        "notes": str(note.get("notes") or "").strip(),
+        "message": str(note.get("message") or "").strip(),
+    }
+
+
+def _balsheet_insert_or_replace(conn, entry: dict):
+    normalized = _normalize_balsheet_payload(entry)
+    columns = [name for name, _ in BALSHEET_TABLE_COLUMNS]
+    quoted_columns = ", ".join(_quote_identifier(name) for name in columns)
+    placeholders = ", ".join(["?"] * len(columns))
+    conn.execute(
+        f'INSERT OR REPLACE INTO {_quote_identifier("Balsheet")} ({quoted_columns}) VALUES ({placeholders})',
+        tuple(normalized[column] for column in columns),
+    )
+    return normalized["EntryID"]
 
 
 def _list_user_tables(conn):
@@ -280,6 +478,7 @@ def _calendar_status_payload():
     init_db()
 
     current_work_day = get_current_work_day()
+    current_bank_day = get_current_bank_day()
     today = datetime.today().strftime("%m/%d/%Y")
     rows = _load_calendar_rows(conn)
 
@@ -293,13 +492,10 @@ def _calendar_status_payload():
             today_bank_day = row["bankDay"]
             break
 
-    current_bank_day = None
     current_sort = _parse_calendar_date(current_work_day) if current_work_day else None
     next_open_work_day = None
 
     for row in rows:
-        if current_work_day and row["paperworkDay"] == current_work_day:
-            current_bank_day = row["bankDay"]
         if current_sort and row["_paperSort"] and row["_paperSort"] > current_sort and not row["isClosed"]:
             next_open_work_day = row["paperworkDay"]
             break
@@ -2594,6 +2790,594 @@ def post_html_convert(payload: dict):
     }
 
 
+@app.get("/otherday/spreadsheet")
+def get_otherday_spreadsheet():
+    current_work_day = normalize_mmddyyyy(get_current_work_day() or "")
+    if not current_work_day:
+        raise HTTPException(status_code=400, detail="No current work day is set")
+
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+            (current_work_day,),
+        ).fetchone()
+        bank_day = normalize_mmddyyyy(row[0]) if row and row[0] else None
+        if not bank_day:
+            return {
+                "currentWorkDay": current_work_day,
+                "bankDay": None,
+                "rows": [],
+                "missingRows": [],
+                "rowCount": 0,
+                "missingCount": 0,
+                "filenamesWithMissing": 0,
+            }
+
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT
+                check_date,
+                check_number,
+                check_amount,
+                filename,
+                matchstatus
+            FROM EDI
+            ORDER BY check_date ASC, check_number ASC, filename ASC
+            """
+        ).fetchall()
+
+        def _clean_filename(value: str | None) -> str:
+            return str(value or "").strip()
+
+        def _clean_check_number(value: str | None) -> str:
+            return str(value or "").strip()
+
+        def _format_amount(value):
+            if value in (None, ""):
+                return ""
+            try:
+                return f"{float(value):,.2f}"
+            except Exception:
+                return str(value)
+
+        count_all: dict[str, int] = {}
+        for row_data in rows:
+            filename = _clean_filename(row_data["filename"])
+            if filename:
+                count_all[filename] = count_all.get(filename, 0) + 1
+
+        today_rows = []
+        for row_data in rows:
+            if normalize_mmddyyyy(row_data["check_date"]) != bank_day:
+                continue
+
+            filename = _clean_filename(row_data["filename"])
+            if not filename:
+                continue
+
+            today_rows.append(
+                {
+                    "filename": filename,
+                    "checkNumber": _clean_check_number(row_data["check_number"]),
+                    "ediAmount": _format_amount(row_data["check_amount"]),
+                    "bankDay": normalize_mmddyyyy(row_data["check_date"]) or "",
+                    "matchstatus": str(row_data["matchstatus"] or "").strip(),
+                    "counts": "",
+                }
+            )
+
+        count_today: dict[str, int] = {}
+        for row_data in today_rows:
+            filename = row_data["filename"]
+            count_today[filename] = count_today.get(filename, 0) + 1
+
+        for row_data in today_rows:
+            filename = row_data["filename"]
+            row_data["counts"] = f"{count_all.get(filename, 0)} {count_today.get(filename, 0)}"
+
+        filenames_with_missing = [
+            filename
+            for filename in dict.fromkeys(row_data["filename"] for row_data in today_rows if row_data["filename"])
+            if count_all.get(filename, 0) > count_today.get(filename, 0)
+        ]
+
+        missing_rows = []
+        for row_data in rows:
+            filename = _clean_filename(row_data["filename"])
+            if not filename or filename not in filenames_with_missing:
+                continue
+
+            missing_rows.append(
+                {
+                    "filename": filename,
+                    "checkNumber": _clean_check_number(row_data["check_number"]),
+                    "ediAmount": _format_amount(row_data["check_amount"]),
+                    "bankDay": normalize_mmddyyyy(row_data["check_date"]) or "",
+                    "matchstatus": str(row_data["matchstatus"] or "").strip(),
+                    "counts": f"{count_all.get(filename, 0)} {count_today.get(filename, 0)}",
+                }
+            )
+
+        today_rows.sort(key=lambda item: (item["filename"], item["checkNumber"]))
+        missing_rows.sort(key=lambda item: (item["filename"], item["checkNumber"], item["bankDay"]))
+
+        return {
+            "currentWorkDay": current_work_day,
+            "bankDay": bank_day,
+            "rows": today_rows,
+            "missingRows": missing_rows,
+            "rowCount": len(today_rows),
+            "missingCount": len(missing_rows),
+            "filenamesWithMissing": len(filenames_with_missing),
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/duplicatecheck/spreadsheet")
+def get_duplicatecheck_spreadsheet():
+    current_work_day = normalize_mmddyyyy(get_current_work_day() or "")
+    if not current_work_day:
+        raise HTTPException(status_code=400, detail="No current work day is set")
+
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+            (current_work_day,),
+        ).fetchone()
+        bank_day = normalize_mmddyyyy(row[0]) if row and row[0] else None
+        if not bank_day:
+            return {
+                "currentWorkDay": current_work_day,
+                "bankDay": None,
+                "rows": [],
+                "duplicateCount": 0,
+                "duplicateFilenames": 0,
+                "duplicateFilenameList": [],
+            }
+
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT
+                e.filename AS filename,
+                e.check_number AS edi_check,
+                e.check_amount AS edi_amount,
+                lb.[Transaction Total] AS lockbox_amount,
+                eft.Amount AS eft_amount,
+                COALESCE(eft.Date, lb.[Deposit Date]) AS match_date
+            FROM EDI e
+            LEFT JOIN Lockbox lb
+                ON TRIM(e.check_number) = TRIM(lb.[Check Number])
+            LEFT JOIN EFT eft
+                ON TRIM(e.check_number) = TRIM(eft.CheckNumber)
+            WHERE COALESCE(eft.Date, lb.[Deposit Date]) IS NOT NULL
+            ORDER BY e.filename, e.check_number
+            """
+        ).fetchall()
+
+        filtered = [
+            row_data
+            for row_data in rows
+            if normalize_mmddyyyy(row_data["match_date"]) == bank_day
+        ]
+
+        filename_counts: dict[str, int] = {}
+        for row_data in filtered:
+            filename = str(row_data["filename"] or "").strip()
+            if filename:
+                filename_counts[filename] = filename_counts.get(filename, 0) + 1
+
+        duplicate_filenames = {filename for filename, count in filename_counts.items() if count > 1}
+
+        table_rows = []
+        for row_data in filtered:
+            filename = str(row_data["filename"] or "").strip()
+            if not filename or filename not in duplicate_filenames:
+                continue
+
+            table_rows.append(
+                {
+                    "filename": filename,
+                    "ediCheck": str(row_data["edi_check"] or "").strip(),
+                    "lockboxAmount": str(row_data["lockbox_amount"] or "").strip(),
+                    "eftAmount": str(row_data["eft_amount"] or "").strip(),
+                    "date": normalize_mmddyyyy(row_data["match_date"]) or "",
+                    "count": filename_counts.get(filename, 0),
+                }
+            )
+
+        table_rows.sort(key=lambda item: (item["filename"], item["ediCheck"], item["date"]))
+
+        return {
+            "currentWorkDay": current_work_day,
+            "bankDay": bank_day,
+            "rows": table_rows,
+            "duplicateCount": len(table_rows),
+            "duplicateFilenames": len(duplicate_filenames),
+            "duplicateFilenameList": sorted(duplicate_filenames),
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/balsheet/workday")
+def get_balsheet_workday():
+    init_db()
+    conn = get_conn()
+    try:
+        row = conn.execute(
+            "SELECT current_bank_day, current_work_day, message FROM work_state WHERE id = 1"
+        ).fetchone()
+    finally:
+        conn.close()
+
+    current_bank_day = normalize_mmddyyyy(row[0] if row else None) if row else None
+    current_work_day = normalize_mmddyyyy(row[1] if row else None) if row else None
+    message = str(row[2] or "") if row else ""
+    posting_date = current_work_day or current_bank_day
+    if not posting_date:
+        posting_date = datetime.today().strftime("%m/%d/%Y")
+
+    return {
+        "posting_date": posting_date,
+        "current_bank_day": current_bank_day,
+        "current_work_day": current_work_day,
+        "message": message,
+    }
+
+
+@app.put("/balsheet/workday/message")
+def set_balsheet_workday_message(payload: dict | None = None):
+    init_db()
+    conn = get_conn()
+    try:
+        payload = payload or {}
+        message = str(payload.get("message") or "").strip()
+        conn.execute(
+            "UPDATE work_state SET message = ? WHERE id = 1",
+            (message,),
+        )
+        conn.commit()
+        return {
+            "status": "ok",
+            "message": message,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/balsheet")
+def get_balsheet(posting_date: str | None = None):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        normalized_posting_date = normalize_mmddyyyy(posting_date) if posting_date else None
+        if normalized_posting_date:
+            rows = conn.execute(
+                f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("PostingDate")} = ? {_balsheet_order_clause()}',
+                (normalized_posting_date,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f'SELECT * FROM {_quote_identifier("Balsheet")} {_balsheet_order_clause()}'
+            ).fetchall()
+
+        return [_balsheet_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/balsheet/import-banking")
+def import_balsheet_from_banking(payload: dict | None = None):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    payload = payload or {}
+    posting_date = normalize_mmddyyyy(payload.get("posting_date")) or normalize_mmddyyyy(get_current_work_day() or "") or normalize_mmddyyyy(get_current_bank_day() or "") or datetime.today().strftime("%m/%d/%Y")
+    bank_day = normalize_mmddyyyy(payload.get("bank_day")) or normalize_mmddyyyy(get_current_bank_day() or "")
+    if not bank_day:
+        raise HTTPException(status_code=400, detail="bank_day is required")
+
+    imported_rows = 0
+    removed_rows = 0
+
+    try:
+        spreadsheet = build_banking_spreadsheet()
+
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("PostingDate")} = ? AND {_quote_identifier("EntryID")} LIKE ?',
+            (posting_date, "BANK-%"),
+        )
+        removed_rows = cur.rowcount if cur.rowcount is not None else 0
+
+        for group in spreadsheet.get("groups", []):
+            source = str(group.get("source") or "")
+            type_value = "EFT" if source == "EFT" else "Lockbox"
+            rows = group.get("rows", [])
+            if not isinstance(rows, list):
+                continue
+
+            for row in rows:
+                if not isinstance(row, dict):
+                    continue
+
+                row_date = normalize_mmddyyyy(row.get("date")) or ""
+                if row_date != bank_day:
+                    continue
+
+                edi_value = str(row.get("edi", "") or "").strip().upper()
+                poster_value = "Raul" if edi_value == "Y" else "Nick"
+
+                entry = {
+                    "entry_id": f'BANK-{source}-{row.get("id")}',
+                    "posting_date": posting_date,
+                    "type": type_value,
+                    "amount": row.get("amount", 0),
+                    "payer": row.get("payer", ""),
+                    "check_number": row.get("checkNumber", ""),
+                    "edi": row.get("edi", ""),
+                    "poster": poster_value,
+                    "eob": "",
+                    "unposted": 0,
+                    "misc": 0,
+                    "misc_type": "",
+                    "notes": "",
+                    "nick": 0,
+                    "raul": 0,
+                    "needs": "",
+                    "from_date": "",
+                    "to_date": "",
+                }
+                _balsheet_insert_or_replace(conn, entry)
+                imported_rows += 1
+
+        conn.commit()
+        return {
+            "status": "ok",
+            "postingDate": posting_date,
+            "rowsImported": imported_rows,
+            "rowsRemoved": removed_rows,
+        }
+    finally:
+        conn.close()
+
+
+@app.delete("/balsheet")
+def clear_balsheet(posting_date: str | None = None):
+    init_db()
+    normalized_posting_date = normalize_mmddyyyy(posting_date or "")
+    if not normalized_posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("PostingDate")} = ?',
+            (normalized_posting_date,),
+        )
+        deleted_rows = cur.rowcount if cur.rowcount is not None else 0
+        conn.commit()
+        return {
+            "status": "ok",
+            "postingDate": normalized_posting_date,
+            "rowsDeleted": deleted_rows,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/balsheet/notes")
+def get_balsheet_notes(post_date: str | None = None):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_notes_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        normalized_post_date = normalize_mmddyyyy(post_date) if post_date else None
+        if normalized_post_date:
+            rows = conn.execute(
+                f'SELECT rowid, {_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")} FROM {_quote_identifier("Balsheet_notes")} WHERE {_quote_identifier("post_date")} = ? ORDER BY rowid ASC',
+                (normalized_post_date,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f'SELECT rowid, {_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")} FROM {_quote_identifier("Balsheet_notes")} ORDER BY {_quote_identifier("post_date")} ASC, rowid ASC'
+            ).fetchall()
+
+        return [_balsheet_note_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/balsheet/notes")
+def post_balsheet_note(note: dict):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_notes_table(conn)
+
+    try:
+        normalized = _normalize_balsheet_note_payload(note)
+        cur = conn.cursor()
+        cur.execute(
+            f'INSERT INTO {_quote_identifier("Balsheet_notes")} ({_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")}) VALUES (?, ?, ?)',
+            (normalized["post_date"], normalized["notes"], normalized["message"]),
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f'SELECT rowid, {_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")} FROM {_quote_identifier("Balsheet_notes")} WHERE rowid = ?',
+            (cur.lastrowid,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to save Balsheet note")
+        return _balsheet_note_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.put("/balsheet/notes/{rowid}")
+def put_balsheet_note(rowid: int, note: dict):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_notes_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute(
+            f'SELECT rowid, {_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")} FROM {_quote_identifier("Balsheet_notes")} WHERE rowid = ?',
+            (rowid,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Balsheet note not found")
+
+        normalized = _normalize_balsheet_note_payload(note, rowid=rowid)
+        conn.execute(
+            f'UPDATE {_quote_identifier("Balsheet_notes")} SET {_quote_identifier("post_date")} = ?, {_quote_identifier("notes")} = ?, {_quote_identifier("message")} = ? WHERE rowid = ?',
+            (normalized["post_date"], normalized["notes"], normalized["message"], rowid),
+        )
+        conn.commit()
+
+        row = conn.execute(
+            f'SELECT rowid, {_quote_identifier("post_date")}, {_quote_identifier("notes")}, {_quote_identifier("message")} FROM {_quote_identifier("Balsheet_notes")} WHERE rowid = ?',
+            (rowid,),
+        ).fetchone()
+        return _balsheet_note_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.delete("/balsheet/notes/{rowid}")
+def delete_balsheet_note(rowid: int):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_notes_table(conn)
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Balsheet_notes")} WHERE rowid = ?',
+            (rowid,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Balsheet note not found")
+        conn.commit()
+        return {"status": "ok", "rowid": rowid}
+    finally:
+        conn.close()
+
+
+@app.post("/balsheet")
+def post_balsheet(entry: dict):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    try:
+        entry_id = _balsheet_insert_or_replace(conn, entry)
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to save Balsheet entry")
+        return _balsheet_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.post("/balsheet/bulk")
+def post_balsheet_bulk(payload: dict):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    entries = payload.get("entries", [])
+    source_attachment_id = payload.get("source_attachment_id")
+    if not isinstance(entries, list):
+        raise HTTPException(status_code=400, detail="entries must be a list")
+
+    inserted = 0
+    try:
+        for entry in entries:
+            _balsheet_insert_or_replace(conn, entry if isinstance(entry, dict) else {})
+            inserted += 1
+        conn.commit()
+        return {
+            "status": "ok",
+            "rowsImported": inserted,
+            "sourceAttachmentId": source_attachment_id,
+        }
+    finally:
+        conn.close()
+
+
+@app.put("/balsheet/{entry_id}")
+def put_balsheet_entry(entry_id: str, entry: dict):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Balsheet entry not found")
+
+        normalized = _normalize_balsheet_payload(entry, entry_id=entry_id)
+        set_clause = ", ".join(f'{_quote_identifier(name)} = ?' for name, _ in BALSHEET_TABLE_COLUMNS[1:])
+        conn.execute(
+            f'UPDATE {_quote_identifier("Balsheet")} SET {set_clause} WHERE {_quote_identifier("EntryID")} = ?',
+            tuple(normalized[name] for name, _ in BALSHEET_TABLE_COLUMNS[1:]) + (entry_id,),
+        )
+        conn.commit()
+
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        ).fetchone()
+        return _balsheet_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.delete("/balsheet/{entry_id}")
+def delete_balsheet_entry(entry_id: str):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_table(conn)
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Balsheet entry not found")
+        conn.commit()
+        return {"status": "ok", "entry_id": entry_id}
+    finally:
+        conn.close()
+
+
 # ------------------------------------------------------------
 # NEXT PENDING FILE
 # ------------------------------------------------------------
@@ -2688,5 +3472,89 @@ def reject_attachment(attachment_id: int):
     return {"status": "rejected", "id": attachment_id}
 
 
-from sites_api import router as sites_router
-app.include_router(sites_router)
+@app.get("/sites")
+def get_sites():
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id, name, description, active FROM sites ORDER BY name;")
+    rows = cur.fetchall()
+
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "name": row[1],
+            "description": row[2],
+            "active": row[3],
+        }
+        for row in rows
+    ]
+
+
+@app.post("/sites")
+def add_site(site: dict):
+    name = site.get("name")
+    description = site.get("description", "")
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Site name is required")
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    try:
+        cur.execute(
+            "INSERT INTO sites (name, description, active) VALUES (?, ?, 1);",
+            (name, description),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Site already exists")
+
+    conn.close()
+    return {"status": "ok", "message": "Site added"}
+
+
+@app.put("/sites/{site_id}")
+def update_site(site_id: int, site: dict):
+    name = site.get("name")
+    description = site.get("description")
+    active = site.get("active")
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM sites WHERE id = ?;", (site_id,))
+    if not cur.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    cur.execute(
+        "UPDATE sites SET name = ?, description = ?, active = ? WHERE id = ?;",
+        (name, description, active, site_id),
+    )
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "ok", "message": "Site updated"}
+
+
+@app.delete("/sites/{site_id}")
+def delete_site(site_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT id FROM sites WHERE id = ?;", (site_id,))
+    if not cur.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Site not found")
+
+    cur.execute("DELETE FROM sites WHERE id = ?;", (site_id,))
+    conn.commit()
+    conn.close()
+
+    return {"status": "ok", "message": "Site deleted"}

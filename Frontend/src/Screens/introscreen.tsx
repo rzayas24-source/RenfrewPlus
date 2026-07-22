@@ -93,7 +93,7 @@ export default function IntroScreen() {
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
-                  navigate("/balance-sheet");
+                  navigate("/balsheet/view");
                 }}
               >
                 Balsheet

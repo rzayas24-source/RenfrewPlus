@@ -25,6 +25,8 @@ import traceback
 # ============================================================
 
 WORK_STATE_COLUMNS = [
+    ("current_bank_day", "TEXT"),
+    ("message", "TEXT"),
     ("batchnum", "TEXT"),
     ("transnum", "TEXT"),
     ("timestamp", "TEXT"),
@@ -68,6 +70,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS work_state (
             id INTEGER PRIMARY KEY,
             current_work_day TEXT,
+            current_bank_day TEXT,
             batchnum TEXT,
             transnum TEXT,
             timestamp TEXT,
@@ -82,10 +85,23 @@ def init_db():
         conn.execute(
             """
             INSERT INTO work_state (
-                id, current_work_day, batchnum, transnum, timestamp, matchstatus
-            ) VALUES (1, NULL, NULL, NULL, NULL, NULL)
+                id, current_work_day, current_bank_day, batchnum, transnum, timestamp, matchstatus
+            ) VALUES (1, NULL, NULL, NULL, NULL, NULL, NULL)
             """
         )
+    else:
+        state_row = conn.execute(
+            "SELECT current_work_day, current_bank_day FROM work_state WHERE id = 1"
+        ).fetchone()
+        current_work_day = state_row[0] if state_row else None
+        current_bank_day = state_row[1] if state_row else None
+        if current_work_day and not current_bank_day:
+            bank_day = _lookup_bank_day_for_work_day(conn, current_work_day)
+            if bank_day:
+                conn.execute(
+                    "UPDATE work_state SET current_bank_day = ? WHERE id = 1",
+                    (bank_day,),
+                )
 
     conn.commit()
     conn.close()
@@ -190,6 +206,18 @@ def next_open_paperwork_day(conn, start_date):
         d = next_weekday(d)
 
 
+def _lookup_bank_day_for_work_day(conn, work_day):
+    normalized = normalize_mmddyyyy(work_day)
+    if not normalized:
+        return None
+
+    row = conn.execute(
+        "SELECT bank_day FROM calendar WHERE paperwork_day = ?",
+        (normalized,),
+    ).fetchone()
+    return normalize_mmddyyyy(row[0]) if row and row[0] else None
+
+
 # ============================================================
 #   CURRENT WORK DAY
 # ============================================================
@@ -207,16 +235,58 @@ def get_current_work_day():
     return None
 
 
-def set_current_work_day(date_str):
+def get_current_bank_day():
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT current_bank_day, current_work_day FROM work_state WHERE id = 1"
+    ).fetchone()
+
+    if row:
+        current_bank_day = row[0]
+        current_work_day = row[1]
+        if current_bank_day:
+            conn.close()
+            return current_bank_day
+
+        bank_day = _lookup_bank_day_for_work_day(conn, current_work_day)
+        if bank_day:
+            conn.execute(
+                "UPDATE work_state SET current_bank_day = ? WHERE id = 1",
+                (bank_day,),
+            )
+            conn.commit()
+            conn.close()
+            return bank_day
+
+    conn.close()
+    return None
+
+
+def set_current_bank_day(date_str):
     conn = get_conn()
     init_db()
+    normalized = normalize_mmddyyyy(date_str)
     conn.execute(
-        "UPDATE work_state SET current_work_day = ? WHERE id = 1",
-        (date_str,)
+        "UPDATE work_state SET current_bank_day = ? WHERE id = 1",
+        (normalized,),
     )
     conn.commit()
     conn.close()
-    print(f"Current work day set to: {date_str}")
+    print(f"Current bank day set to: {normalized}")
+
+
+def set_current_work_day(date_str):
+    conn = get_conn()
+    init_db()
+    normalized = normalize_mmddyyyy(date_str)
+    bank_day = _lookup_bank_day_for_work_day(conn, normalized)
+    conn.execute(
+        "UPDATE work_state SET current_work_day = ?, current_bank_day = ? WHERE id = 1",
+        (normalized, bank_day)
+    )
+    conn.commit()
+    conn.close()
+    print(f"Current work day set to: {normalized}")
 
 
 def advance_current_work_day():
@@ -246,9 +316,10 @@ def advance_current_work_day():
         conn.close()
         return
 
+    bank_day = _lookup_bank_day_for_work_day(conn, next_day)
     conn.execute(
-        "UPDATE work_state SET current_work_day = ? WHERE id = 1",
-        (next_day,)
+        "UPDATE work_state SET current_work_day = ?, current_bank_day = ? WHERE id = 1",
+        (next_day, bank_day)
     )
     conn.commit()
     conn.close()
