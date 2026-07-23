@@ -1565,8 +1565,26 @@ def get_admin_table_rows(table_name: str, limit: int = 250, offset: int = 0, sor
 # SOURCE-DRIVEN 835 MATCH
 # ------------------------------------------------------------
 @app.get("/match/worklist")
-def get_match_worklist(limit: int = 50, revision: str | None = None):
-    return build_match_dashboard(limit=limit, revision=revision)
+def get_match_worklist(
+    limit: int = 250,
+    revision: str | None = None,
+    page: int = 1,
+    sort_by: str = "edi",
+    sort_dir: str = "asc",
+    show_matched: bool = True,
+    show_unmatched: bool = True,
+    latest_year_only: bool = False,
+):
+    return build_match_dashboard(
+        limit=limit,
+        revision=revision,
+        page=page,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        show_matched=show_matched,
+        show_unmatched=show_unmatched,
+        latest_year_only=latest_year_only,
+    )
 
 
 @app.get("/match/matches")
@@ -1602,7 +1620,12 @@ def post_match_commit(payload: dict):
 
 @app.post("/match/commit-strong-hits")
 def post_match_commit_strong_hits():
-    return commit_all_strong_matches()
+    return commit_all_strong_matches(match_source="MANUAL")
+
+
+@app.post("/match/commit-exact-hits")
+def post_match_commit_exact_hits():
+    return commit_all_strong_matches(match_source="MANUAL")
 
 
 # ------------------------------------------------------------

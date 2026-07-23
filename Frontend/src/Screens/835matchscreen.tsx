@@ -5,23 +5,13 @@ import { styles as adminStyles } from "./adminscreen";
 import { WorklistBrandButton } from "../worklist/worklist";
 import {
   commitSourceMatch,
+  commitAllExactMatches,
   getSourceMatchDetail,
-  getSourceMatchHistory,
   getSourceMatchWorklist,
-  type SourceMatchCandidate,
   type SourceMatchDetail,
-  type SourceMatchHistoryRow,
   type SourceMatchWorklistRow,
   type SourceMatchWorklistSummary,
 } from "../api/match_api";
-
-type MatchAction = {
-  title: string;
-  meta: string;
-  tone: "blue" | "pink" | "mist" | "pearl";
-  action: string;
-  onClick: () => void;
-};
 
 type StatusTone = "blue" | "pink" | "mist" | "pearl" | "success" | "warning";
 
@@ -31,15 +21,15 @@ type StatusChip = {
   tone: StatusTone;
 };
 
+type CommitState = StatusChip;
+
+type WorklistSortKey = "edi" | "match" | "lockbox" | "eft" | "possible";
+type WorklistSortDir = "asc" | "desc";
+
 const moneyFmt = new Intl.NumberFormat("en-US", {
   style: "currency",
   currency: "USD",
 });
-
-const unmatchedText = (value: string | null | undefined) => {
-  const text = (value ?? "").trim();
-  return text === "" ? "UNMATCHED" : text;
-};
 
 const formatAmount = (value: string | number | null | undefined) => {
   if (value === null || value === undefined || value === "") return "";
@@ -50,11 +40,29 @@ const formatAmount = (value: string | number | null | undefined) => {
 
 const formatDate = (value: string | null | undefined) => value ?? "";
 
+const isMatchedStatus = (value: string | null | undefined) => !!value && value.trim().toUpperCase().startsWith("MATCHED");
+
+const formatMatchStatus = (value: string | null | undefined) => {
+  const text = (value || "").trim();
+  if (!text) return "UNMATCHED";
+  if (!text.toUpperCase().startsWith("MATCHED")) return text;
+  const [, provenance] = text.split("|");
+  return provenance ? `MATCHED (${provenance})` : "MATCHED";
+};
+
 const defaultStatusChip: StatusChip = {
   label: "Idle",
   detail: "Pick an action or a candidate row to get visible feedback here.",
   tone: "mist",
 };
+
+const defaultCommitState: CommitState = {
+  label: "Ready",
+  detail: "Commit the best candidates for the selected row.",
+  tone: "mist",
+};
+
+const WORKLIST_PAGE_SIZE = 250;
 
 const statusToneStyles: Record<StatusTone, { pill: CSSProperties; dot: CSSProperties }> = {
   blue: {
@@ -129,21 +137,44 @@ export default function Match835Screen() {
   const navigate = useNavigate();
   const [summary, setSummary] = useState<SourceMatchWorklistSummary | null>(null);
   const [worklist, setWorklist] = useState<SourceMatchWorklistRow[]>([]);
+  const [worklistPage, setWorklistPage] = useState(1);
+  const [worklistTotalPages, setWorklistTotalPages] = useState(1);
+  const [worklistTotalRows, setWorklistTotalRows] = useState(0);
+  const [worklistHasPreviousPage, setWorklistHasPreviousPage] = useState(false);
+  const [worklistHasNextPage, setWorklistHasNextPage] = useState(false);
+  const [worklistSortBy, setWorklistSortBy] = useState<WorklistSortKey>("edi");
+  const [worklistSortDir, setWorklistSortDir] = useState<WorklistSortDir>("asc");
+  const [showMatchedRows, setShowMatchedRows] = useState(true);
+  const [showUnmatchedRows, setShowUnmatchedRows] = useState(true);
+  const [latestYearOnly, setLatestYearOnly] = useState(false);
+  const [latestYear, setLatestYear] = useState<number | null>(null);
   const [selectedEdiId, setSelectedEdiId] = useState<number | null>(null);
   const [detail, setDetail] = useState<SourceMatchDetail | null>(null);
-  const [selectedEftIds, setSelectedEftIds] = useState<number[]>([]);
-  const [selectedLockboxIds, setSelectedLockboxIds] = useState<number[]>([]);
+  const [selectedEftCandidateId, setSelectedEftCandidateId] = useState<number | null>(null);
+  const [selectedLockboxCandidateId, setSelectedLockboxCandidateId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [committing, setCommitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [queueRevision, setQueueRevision] = useState<string | null>(null);
-  const [showMatches, setShowMatches] = useState(false);
-  const [matchHistory, setMatchHistory] = useState<SourceMatchHistoryRow[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [statusChip, setStatusChip] = useState<StatusChip>(defaultStatusChip);
+  const [commitState, setCommitState] = useState<CommitState>(defaultCommitState);
+  const [committing, setCommitting] = useState(false);
+  const [bulkCommitState, setBulkCommitState] = useState<CommitState>({
+    label: "Bulk ready",
+    detail: "Commit all exact matches without review.",
+    tone: "mist",
+  });
+  const [bulkCommitting, setBulkCommitting] = useState(false);
 
-  const loadWorklist = async (preferredId?: number | null) => {
+  const loadWorklist = async (
+    preferredId?: number | null,
+    nextPage: number = worklistPage,
+    nextSortBy: WorklistSortKey = worklistSortBy,
+    nextSortDir: WorklistSortDir = worklistSortDir,
+    nextShowMatchedRows: boolean = showMatchedRows,
+    nextShowUnmatchedRows: boolean = showUnmatchedRows,
+    nextLatestYearOnly: boolean = latestYearOnly,
+  ) => {
     setError(null);
     setStatusChip({
       label: "Refreshing queue",
@@ -152,38 +183,51 @@ export default function Match835Screen() {
     });
 
     try {
-      const response = await getSourceMatchWorklist(75, queueRevision);
+      const response = await getSourceMatchWorklist(
+        WORKLIST_PAGE_SIZE,
+        queueRevision,
+        nextPage,
+        nextSortBy,
+        nextSortDir,
+        nextShowMatchedRows,
+        nextShowUnmatchedRows,
+        nextLatestYearOnly,
+      );
       const nextRevision = response.data.revision ?? null;
       setQueueRevision(nextRevision);
-
-      if (response.data.changed === false) {
-        setMessage("Queue already current.");
-        setStatusChip({
-          label: "Queue current",
-          detail: "No incremental changes were returned for the worklist.",
-          tone: "mist",
-        });
-        setLoading(false);
-        return;
-      }
+      setLatestYear(response.data.latestYear ?? null);
 
       const nextWorklist = response.data.rows ?? [];
       const nextSummary = response.data.summary ?? null;
+      const nextPageNumber = response.data.page ?? nextPage;
+      const nextTotalPages = response.data.totalPages ?? 1;
+      const nextTotalRows = response.data.totalRows ?? nextWorklist.length;
+      const nextHasPreviousPage = response.data.hasPreviousPage ?? nextPageNumber > 1;
+      const nextHasNextPage = response.data.hasNextPage ?? nextPageNumber < nextTotalPages;
+      const resolvedSortBy = (response.data.sortBy as WorklistSortKey | undefined) ?? nextSortBy;
+      const resolvedSortDir = (response.data.sortDir as WorklistSortDir | undefined) ?? nextSortDir;
       const nextSelectedId =
-        preferredId ??
-        selectedEdiId ??
+        (preferredId && nextWorklist.some((row) => row.edi.id === preferredId) ? preferredId : null) ??
+        (selectedEdiId && nextWorklist.some((row) => row.edi.id === selectedEdiId) ? selectedEdiId : null) ??
         nextWorklist[0]?.edi.id ??
         null;
 
       setSummary(nextSummary);
       setWorklist(nextWorklist);
-      setMessage("Queue refreshed with incremental updates.");
+      setWorklistPage(nextPageNumber);
+      setWorklistTotalPages(nextTotalPages);
+      setWorklistTotalRows(nextTotalRows);
+      setWorklistHasPreviousPage(nextHasPreviousPage);
+      setWorklistHasNextPage(nextHasNextPage);
+      setWorklistSortBy(resolvedSortBy);
+      setWorklistSortDir(resolvedSortDir);
+      setMessage(response.data.changed === false ? "Queue already current." : "Queue refreshed with incremental updates.");
       setStatusChip({
         label: "Queue refreshed",
         detail:
           nextSelectedId !== null
-            ? `Loaded ${nextWorklist.length} queue row(s) and focused EDI #${nextSelectedId}.`
-            : `Loaded ${nextWorklist.length} queue row(s).`,
+            ? `Loaded page ${nextPageNumber} of ${nextTotalPages} with ${nextWorklist.length} row(s) and focused EDI #${nextSelectedId}.`
+            : `Loaded page ${nextPageNumber} of ${nextTotalPages} with ${nextWorklist.length} row(s).`,
         tone: "success",
       });
 
@@ -212,10 +256,9 @@ export default function Match835Screen() {
   const loadDetail = async (ediId: number) => {
     setError(null);
     setMessage(null);
-    setShowMatches(false);
     setSelectedEdiId(ediId);
-    setSelectedEftIds([]);
-    setSelectedLockboxIds([]);
+    setSelectedEftCandidateId(null);
+    setSelectedLockboxCandidateId(null);
     setStatusChip({
       label: `Loading EDI #${ediId}`,
       detail: "Fetching candidate EFT and Lockbox rows for the selected source record.",
@@ -226,6 +269,10 @@ export default function Match835Screen() {
       const response = await getSourceMatchDetail(ediId);
       const nextDetail = response.data;
       setDetail(nextDetail);
+      setSelectedEftCandidateId(nextDetail.eftCandidates.find((candidate) => candidate.exactMatch)?.id ?? nextDetail.eftCandidates[0]?.id ?? null);
+      setSelectedLockboxCandidateId(
+        nextDetail.lockboxCandidates.find((candidate) => candidate.exactMatch)?.id ?? nextDetail.lockboxCandidates[0]?.id ?? null,
+      );
       setStatusChip({
         label: `EDI #${ediId} loaded`,
         detail: `${nextDetail.eftCandidates.length} EFT and ${nextDetail.lockboxCandidates.length} Lockbox candidate(s) available.`,
@@ -246,121 +293,68 @@ export default function Match835Screen() {
     }
   };
 
-  const loadMatchHistory = async () => {
-    setError(null);
-    setMessage(null);
-    setLoadingHistory(true);
-    setStatusChip({
-      label: "Loading archive",
-      detail: "Opening the committed 835 match history.",
-      tone: "mist",
-    });
-
-    try {
-      const response = await getSourceMatchHistory(100);
-      setMatchHistory(response.data.rows ?? []);
-      setShowMatches(true);
-      setMessage(`Loaded ${response.data.count} committed 835 match(es).`);
-      setStatusChip({
-        label: "Archive loaded",
-        detail: `${response.data.count} committed match(es) are visible in the archive.`,
-        tone: "success",
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load match history");
-      setStatusChip({
-        label: "Archive error",
-        detail: "The committed match archive could not be loaded.",
+  const commitBestMatch = async () => {
+    if (!detail) {
+      setCommitState({
+        label: "No row",
+        detail: "Select a row before committing.",
         tone: "warning",
       });
-    } finally {
-      setLoadingHistory(false);
+      return;
     }
-  };
 
-  const setSelectionStatus = (kind: "eft" | "lockbox", rowId: number, selected: boolean) => {
-    setStatusChip({
-      label: `${kind === "eft" ? "EFT" : "Lockbox"} #${rowId} ${selected ? "selected" : "cleared"}`,
-      detail: selected
-        ? "That candidate is now part of the current match set."
-        : "That candidate was removed from the current selection.",
-      tone: selected ? "success" : "mist",
-    });
-  };
+    const eftCandidate =
+      detail.eftCandidates.find((candidate) => candidate.id === selectedEftCandidateId) ??
+      detail.eftCandidates.find((candidate) => candidate.exactMatch) ??
+      detail.eftCandidates[0] ??
+      null;
+    const lockboxCandidate =
+      detail.lockboxCandidates.find((candidate) => candidate.id === selectedLockboxCandidateId) ??
+      detail.lockboxCandidates.find((candidate) => candidate.exactMatch) ??
+      detail.lockboxCandidates[0] ??
+      null;
+    const eftId = eftCandidate?.id;
+    const lockboxId = lockboxCandidate?.id;
 
-  useEffect(() => {
-    void loadWorklist();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const toggleSelection = (kind: "eft" | "lockbox", row: SourceMatchCandidate) => {
-    if (kind === "eft") {
-      setSelectedEftIds((current) => {
-        const selected = current.includes(row.id);
-        setSelectionStatus("eft", row.id, !selected);
-        return selected ? current.filter((value) => value !== row.id) : [...current, row.id];
+    if (!eftId && !lockboxId) {
+      setCommitState({
+        label: "Not exact",
+        detail: "Select an EFT or Lockbox candidate first.",
+        tone: "warning",
       });
-      return;
-    }
-
-    setSelectedLockboxIds((current) => {
-      const selected = current.includes(row.id);
-      setSelectionStatus("lockbox", row.id, !selected);
-      return selected ? current.filter((value) => value !== row.id) : [...current, row.id];
-    });
-  };
-
-  const commitSelectedMatch = async () => {
-    if (selectedEdiId === null || !detail) {
-      return;
-    }
-
-    const eftIds =
-      selectedEftIds.length > 0
-        ? selectedEftIds
-        : detail.eftCandidates.filter((row) => row.strongMatch).map((row) => row.id);
-    const lockboxIds =
-      selectedLockboxIds.length > 0
-        ? selectedLockboxIds
-        : detail.lockboxCandidates.filter((row) => row.strongMatch).map((row) => row.id);
-
-    if (eftIds.length === 0 && lockboxIds.length === 0) {
-      setError("No strong or selected candidates are available for this EDI row.");
       return;
     }
 
     setCommitting(true);
-    setError(null);
-    setMessage(null);
-    setStatusChip({
-      label: `Committing EDI #${selectedEdiId}`,
-      detail: "Sending the selected EFT and Lockbox rows to the commit endpoint.",
-      tone: "blue",
-    });
+      setCommitState({
+        label: "Committing",
+        detail: `Submitting EDI #${detail.edi.id} with the selected candidate(s).`,
+        tone: "blue",
+      });
 
     try {
       const response = await commitSourceMatch({
-        edi_id: selectedEdiId,
-        eft_ids: eftIds,
-        lockbox_ids: lockboxIds,
+        edi_id: detail.edi.id,
+        eft_ids: eftId ? [eftId] : [],
+        lockbox_ids: lockboxId ? [lockboxId] : [],
       });
 
-      const matchedEft = response.data.eftMatched ?? 0;
-      const matchedLockbox = response.data.lockboxMatched ?? 0;
-      setMessage(
-        `Done: committed EDI ${selectedEdiId}. ${matchedEft} EFT row(s) and ${matchedLockbox} Lockbox row(s) were marked matched.`
-      );
-      setStatusChip({
-        label: "Commit complete",
-        detail: `EDI ${selectedEdiId} matched ${matchedEft} EFT and ${matchedLockbox} Lockbox row(s).`,
+      setCommitState({
+        label: "Committed",
+        detail: `EDI #${response.data.edi_id} updated: ${response.data.eftMatched} EFT, ${response.data.lockboxMatched} Lockbox.`,
         tone: "success",
       });
-      await loadWorklist(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to commit match");
       setStatusChip({
-        label: "Commit error",
-        detail: "The selected match could not be committed.",
+        label: "Commit complete",
+        detail: `EDI #${response.data.edi_id} was committed and the worklist will refresh.`,
+        tone: "success",
+      });
+      setMessage(`Committed EDI #${response.data.edi_id}.`);
+      await loadWorklist(detail.edi.id, worklistPage, worklistSortBy, worklistSortDir);
+    } catch (err) {
+      setCommitState({
+        label: "Commit failed",
+        detail: err instanceof Error ? err.message : "The commit request could not be completed.",
         tone: "warning",
       });
     } finally {
@@ -368,75 +362,68 @@ export default function Match835Screen() {
     }
   };
 
-  const actions: MatchAction[] = [
-    {
-      title: "Refresh Queue",
-      meta: "Rebuild the unmatched EDI queue from the source tables.",
+  const commitAllExact = async () => {
+    setBulkCommitting(true);
+    setBulkCommitState({
+      label: "Bulk committing",
+      detail: "Submitting every exact match on file.",
       tone: "blue",
-      action: "Reload",
-      onClick: () => void loadWorklist(selectedEdiId),
-    },
-    {
-      title: "Clear Picks",
-      meta: "Drop the currently selected EFT and Lockbox candidates.",
-      tone: "mist",
-      action: "Clear",
-      onClick: () => {
-        setSelectedEftIds([]);
-        setSelectedLockboxIds([]);
-        setMessage("Candidate selections cleared.");
-        setStatusChip({
-          label: "Picks cleared",
-          detail: "The current EFT and Lockbox selections were reset.",
-          tone: "mist",
-        });
-      },
-    },
-    {
-      title: "View Matches",
-      meta: "Open the committed 835 match archive and review what has already been matched.",
-      tone: "pearl",
-      action: showMatches ? "Viewing" : "Open",
-      onClick: () => void loadMatchHistory(),
-    },
-    {
-      title: "Cash Workspace",
-      meta: "Jump back to the cash shell if you need the broader flow.",
-      tone: "pink",
-      action: "Open Cash",
-      onClick: () => {
-        setStatusChip({
-          label: "Opening cash",
-          detail: "Switching to the cash workspace.",
-          tone: "pink",
-        });
-        navigate("/cash");
-      },
-    },
-    {
-      title: "Site Review",
-      meta: "Use the matching side bar to move into site follow-up.",
-      tone: "pearl",
-      action: "Open Site Review",
-      onClick: () => {
-        setStatusChip({
-          label: "Opening site review",
-          detail: "Switching to the site review workspace.",
-          tone: "pearl",
-        });
-        navigate("/site-review");
-      },
-    },
-  ];
+    });
 
-  const strongCount = detail
-    ? detail.eftCandidates.filter((row) => row.strongMatch).length +
-      detail.lockboxCandidates.filter((row) => row.strongMatch).length
-    : 0;
-  const matchedCount = detail ? detail.matchedEft.length + detail.matchedLockbox.length : 0;
+    try {
+      const response = await commitAllExactMatches();
+      const exactCount = response.data.exactMatched ?? response.data.strongMatched ?? response.data.ediMatched;
+
+      setBulkCommitState({
+        label: "Bulk committed",
+        detail: `${exactCount} exact match${exactCount === 1 ? "" : "es"} committed.`,
+        tone: "success",
+      });
+      setStatusChip({
+        label: "Bulk commit complete",
+        detail: `${exactCount} exact match${exactCount === 1 ? "" : "es"} were committed from the records.`,
+        tone: "success",
+      });
+      setMessage(`Committed ${exactCount} exact match${exactCount === 1 ? "" : "es"}.`);
+      await loadWorklist(selectedEdiId, worklistPage, worklistSortBy, worklistSortDir);
+    } catch (err) {
+      setBulkCommitState({
+        label: "Bulk failed",
+        detail: err instanceof Error ? err.message : "The bulk commit request could not be completed.",
+        tone: "warning",
+      });
+    } finally {
+      setBulkCommitting(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadWorklist(undefined, 1, "edi", "asc");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const applyFilters = (nextShowMatchedRows: boolean, nextShowUnmatchedRows: boolean, nextLatestYearOnly: boolean) => {
+    setShowMatchedRows(nextShowMatchedRows);
+    setShowUnmatchedRows(nextShowUnmatchedRows);
+    setLatestYearOnly(nextLatestYearOnly);
+    void loadWorklist(selectedEdiId, 1, worklistSortBy, worklistSortDir, nextShowMatchedRows, nextShowUnmatchedRows, nextLatestYearOnly);
+  };
+
+  const toggleSort = (column: WorklistSortKey) => {
+    const nextSortDir: WorklistSortDir =
+      worklistSortBy === column ? (worklistSortDir === "asc" ? "desc" : "asc") : column === "edi" ? "asc" : "desc";
+    setWorklistSortBy(column);
+    setWorklistSortDir(nextSortDir);
+    void loadWorklist(selectedEdiId, 1, column, nextSortDir);
+  };
+
+  const goToPage = (nextPage: number) => {
+    const safePage = Math.min(Math.max(1, nextPage), Math.max(1, worklistTotalPages));
+    void loadWorklist(selectedEdiId, safePage, worklistSortBy, worklistSortDir);
+  };
 
   return (
-    <main style={adminStyles.shell}>
+    <main style={{ ...adminStyles.shell, overflowX: "hidden", overflowY: "auto", alignItems: "start" }}>
       <div style={adminStyles.glowBlue} />
       <div style={adminStyles.glowPink} />
 
@@ -451,12 +438,12 @@ export default function Match835Screen() {
         </div>
 
         <p style={adminStyles.sidebarCopy}>
-          Source-driven 835 matching. We look at EDI first, then confirm against unmatched EFT and Lockbox rows.
+          Source-driven 835 matching. We look at EDI first, then confirm against EFT and Lockbox rows.
         </p>
 
         <nav style={adminStyles.navStack} aria-label="835 match navigation">
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
+            <span style={adminStyles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
         </nav>
@@ -464,10 +451,10 @@ export default function Match835Screen() {
         <div style={adminStyles.sidebarCard}>
           <div style={adminStyles.sidebarCardLabel}>Queue</div>
           <div style={adminStyles.sidebarCardValue}>
-            {summary ? `${summary.ediUnmatched} EDI rows` : "Loading queue"}
+            {summary ? `${summary.ediRows} EDI rows` : "Loading matrix"}
           </div>
           <div style={adminStyles.sidebarCardMeta}>
-            Strong hits can be committed. Close matches stay in the queue for manual review.
+            Y means matched, P means possible, and N means no match yet.
           </div>
         </div>
       </aside>
@@ -477,21 +464,47 @@ export default function Match835Screen() {
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>835 Match screen</div>
             <p style={adminStyles.subtitle}>
-              A source-first workspace for matching EDI against Lockbox and EFT. Strong hits can be committed, while close
-              matches stay in the queue for review.
+              A compact matrix for seeing Y, P, and N at a glance. Select a row to preview the best EFT and Lockbox comparison.
             </p>
-
+            <div style={matchStyles.heroFilterSummary}>
+              <div style={matchStyles.heroFilterRow}>
+                <span style={matchStyles.heroFilterLabel}>Rolling year on file:</span>
+                <span style={matchStyles.heroFilterValue}>{latestYear ?? "Unavailable"}</span>
+              </div>
+              <div style={matchStyles.heroFilterRow}>
+                <span style={matchStyles.heroFilterLabel}>Matched:</span>
+                <span style={matchStyles.heroFilterValue}>{showMatchedRows ? "Shown" : "Hidden"}</span>
+              </div>
+              <div style={matchStyles.heroFilterRow}>
+                <span style={matchStyles.heroFilterLabel}>Non-matches:</span>
+                <span style={matchStyles.heroFilterValue}>{showUnmatchedRows ? "Shown" : "Hidden"}</span>
+              </div>
+            </div>
             <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => void loadWorklist(selectedEdiId)}>
-                Refresh Queue
+              <button
+                type="button"
+                aria-pressed={showMatchedRows}
+                style={showMatchedRows ? adminStyles.primaryButton : adminStyles.secondaryButton}
+                onClick={() => applyFilters(!showMatchedRows, showUnmatchedRows, latestYearOnly)}
+              >
+                Matched
               </button>
               <button
-                style={adminStyles.secondaryButton}
                 type="button"
-                onClick={commitSelectedMatch}
-                disabled={committing || selectedEdiId === null || !detail}
+                aria-pressed={showUnmatchedRows}
+                style={showUnmatchedRows ? adminStyles.primaryButton : adminStyles.secondaryButton}
+                onClick={() => applyFilters(showMatchedRows, !showUnmatchedRows, latestYearOnly)}
               >
-                {committing ? "Committing..." : "Commit"}
+                Non-matches
+              </button>
+              <button
+                type="button"
+                aria-pressed={latestYearOnly}
+                style={latestYearOnly ? adminStyles.primaryButton : adminStyles.secondaryButton}
+                onClick={() => applyFilters(showMatchedRows, showUnmatchedRows, !latestYearOnly)}
+                disabled={!latestYear}
+              >
+                Rolling year
               </button>
             </div>
           </div>
@@ -505,7 +518,7 @@ export default function Match835Screen() {
                     ...statusToneStyles[statusChip.tone].pill,
                   }}
                 >
-                  {statusChip.label}
+                  {summary ? `${summary.ediRows} rows` : "Loading"}
                 </span>
                 <span
                   style={{
@@ -514,64 +527,9 @@ export default function Match835Screen() {
                   }}
                 />
               </div>
-              <div style={adminStyles.heroStatusTitle}>Match what is known first</div>
+              <div style={adminStyles.heroStatusTitle}>Y means matched, P means possible, N means review</div>
               <div style={adminStyles.heroStatusText}>{statusChip.detail}</div>
             </div>
-          </div>
-        </section>
-
-        <section style={adminStyles.statsGrid}>
-          <article style={adminStyles.statCard}>
-            <div style={adminStyles.statLabel}>EDI</div>
-            <div style={adminStyles.statValue}>{summary ? summary.ediUnmatched : "..."}</div>
-            <div style={adminStyles.statDetail}>Unmatched source rows waiting for review.</div>
-          </article>
-          <article style={adminStyles.statCard}>
-            <div style={adminStyles.statLabel}>EFT</div>
-            <div style={adminStyles.statValue}>{summary ? summary.eftUnmatched : "..."}</div>
-            <div style={adminStyles.statDetail}>Available payment rows in the source of truth.</div>
-          </article>
-          <article style={adminStyles.statCard}>
-            <div style={adminStyles.statLabel}>Lockbox</div>
-            <div style={adminStyles.statValue}>{summary ? summary.lockboxUnmatched : "..."}</div>
-            <div style={adminStyles.statDetail}>Legacy bank rows still open for matching.</div>
-          </article>
-        </section>
-
-        <section style={adminStyles.widgetSection}>
-          <div style={adminStyles.sectionHeader}>
-            <div>
-              <div style={adminStyles.sectionKicker}>Match actions</div>
-              <h2 style={adminStyles.sectionTitle}>Fast actions for queue control and source-driven matching</h2>
-            </div>
-            <div style={adminStyles.sectionMeta}>
-              {detail
-                ? `${strongCount} strong candidate(s) found. Close matches stay visible for manual review.`
-                : "Pick an EDI row to inspect strong and close candidates."}
-            </div>
-          </div>
-
-          <div style={adminStyles.widgetGrid}>
-            {actions.map((action) => (
-              <button
-                key={action.title}
-                type="button"
-                onClick={action.onClick}
-                style={{
-                  ...adminStyles.widgetCard,
-                  ...matchToneStyles[action.tone],
-                }}
-              >
-                <div style={adminStyles.widgetTop}>
-                  <div style={adminStyles.widgetBadge}>{action.title}</div>
-                </div>
-                <div style={adminStyles.widgetBody}>
-                  <div style={adminStyles.widgetTitle}>{action.title}</div>
-                  <div style={adminStyles.widgetMeta}>{action.meta}</div>
-                </div>
-                <div style={adminStyles.widgetAction}>{action.action}</div>
-              </button>
-            ))}
           </div>
         </section>
 
@@ -580,7 +538,7 @@ export default function Match835Screen() {
             <div style={matchStyles.panelHeader}>
               <div>
                 <div style={adminStyles.sectionKicker}>EDI worklist</div>
-                <h2 style={adminStyles.sectionTitle}>Unmatched source rows</h2>
+                <h2 style={adminStyles.sectionTitle}>Match status grid</h2>
               </div>
               <div style={matchStyles.panelMeta}>
                 {loading ? "Loading..." : `${worklist.length} visible`}
@@ -589,99 +547,157 @@ export default function Match835Screen() {
 
             {error && <div style={matchStyles.errorBanner}>{error}</div>}
             {message && <div style={matchStyles.successBanner}>{message}</div>}
-
-            <div style={matchStyles.listScroll}>
-              <div style={matchStyles.list}>
-                {worklist.map((row) => {
-                  const selected = row.edi.id === selectedEdiId;
-                  return (
-                    <div key={row.edi.id} style={matchStyles.rowWrap}>
-                      <button
-                        type="button"
-                        onClick={() => void loadDetail(row.edi.id)}
-                        style={{
-                          ...matchStyles.rowCard,
-                          ...(selected ? matchStyles.rowCardSelected : {}),
-                        }}
-                      >
-                        <div style={matchStyles.rowTop}>
-                          <div style={matchStyles.rowId}>EDI #{row.edi.id}</div>
-                          <div style={matchStyles.rowBadge}>
-                            {row.strongCandidateCount > 0
-                              ? "Strong hit"
-                              : row.closeCandidateCount > 0
-                                ? "Close match"
-                                : "Review"}
-                          </div>
-                        </div>
-                        <div style={matchStyles.rowGrid}>
-                          <div>
-                            <div style={matchStyles.rowLabel}>Check</div>
-                            <div style={matchStyles.rowValue}>{row.edi.checkNumber || "(blank)"}</div>
-                          </div>
-                          <div>
-                            <div style={matchStyles.rowLabel}>Amount</div>
-                            <div style={matchStyles.rowValue}>{formatAmount(row.edi.amount)}</div>
-                          </div>
-                          <div>
-                            <div style={matchStyles.rowLabel}>Date</div>
-                            <div style={matchStyles.rowValue}>{formatDate(row.edi.date)}</div>
-                          </div>
-                          <div>
-                            <div style={matchStyles.rowLabel}>Matches</div>
-                            <div style={matchStyles.rowValue}>
-                              {row.eftCandidateCount} EFT / {row.lockboxCandidateCount} Lockbox
-                            </div>
-                          </div>
-                        </div>
-                        <div style={matchStyles.rowFooter}>
-                          <span>Batch {row.edi.batchnum || "-"}</span>
-                          <span>Trans {row.edi.transnum || "-"}</span>
-                          <span>Status {unmatchedText(row.edi.matchstatus)}</span>
-                        </div>
-                      </button>
-
-                      {selected && (
-                        <div style={matchStyles.inlineDetailCard}>
-                          <div style={matchStyles.inlineDetailHeader}>
-                            Selected row detail
-                            <span style={matchStyles.inlineDetailPill}>
-                              {row.strongCandidateCount > 0
-                                ? `${row.strongCandidateCount} strong`
-                                : `${row.closeCandidateCount} close`}
-                            </span>
-                          </div>
-                          <div style={matchStyles.inlineDetailGrid}>
-                            <span>Check {row.edi.checkNumber || "(blank)"}</span>
-                            <span>Amount {formatAmount(row.edi.amount)}</span>
-                            <span>Date {formatDate(row.edi.date)}</span>
-                            <span>Status {unmatchedText(row.edi.matchstatus)}</span>
-                          </div>
-                          <div style={matchStyles.inlineDetailMeta}>
-                            {row.closeCandidateCount > 0
-                              ? `${row.closeCandidateCount} close match(es) are available for manual review.`
-                              : "Strong matches are ready to commit."}
-                            {matchedCount > 0 ? ` ${matchedCount} committed match(es) are visible in the detail panel.` : ""}
-                          </div>
-                          <button style={matchStyles.inlineCommitButton} type="button" onClick={commitSelectedMatch}>
-                            Commit
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {!loading && !worklist.length && (
-                  <div style={matchStyles.emptyState}>
-                    No unmatched EDI rows with candidates are waiting. Once new ETL lands, they will appear here.
-                  </div>
-                )}
+            <div style={matchStyles.gridSummaryBar}>
+              <div style={matchStyles.gridSummaryChip}>
+                <span style={matchStyles.gridSummaryLabel}>Rows</span>
+                <span style={matchStyles.gridSummaryValue}>{summary ? summary.ediRows : 0}</span>
               </div>
+              <div style={matchStyles.gridSummaryChip}>
+                <span style={matchStyles.gridSummaryLabel}>Y</span>
+                <span style={matchStyles.gridSummaryValue}>{summary ? summary.ediMatched : 0}</span>
+              </div>
+              <div style={matchStyles.gridSummaryChip}>
+                <span style={matchStyles.gridSummaryLabel}>P</span>
+                <span style={matchStyles.gridSummaryValue}>{summary ? summary.ediPossible : 0}</span>
+              </div>
+              <div style={matchStyles.gridSummaryChip}>
+                <span style={matchStyles.gridSummaryLabel}>N</span>
+                <span style={matchStyles.gridSummaryValue}>{summary ? summary.ediReview : 0}</span>
+              </div>
+            </div>
+
+            <div style={matchStyles.pagerBar}>
+              <div style={matchStyles.pagerMeta}>
+                Page {worklistPage} of {worklistTotalPages} · {worklistTotalRows} total · {WORKLIST_PAGE_SIZE} per page
+              </div>
+              <div style={matchStyles.pagerActions}>
+                <button
+                  type="button"
+                  style={matchStyles.pagerButton}
+                  onClick={() => goToPage(worklistPage - 1)}
+                  disabled={!worklistHasPreviousPage || loading}
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  style={matchStyles.pagerButton}
+                  onClick={() => goToPage(worklistPage + 1)}
+                  disabled={!worklistHasNextPage || loading}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+
+            <div style={matchStyles.gridScroll}>
+              {worklist.length ? (
+                <table style={matchStyles.matrixTable}>
+                  <thead>
+                    <tr>
+                      <th style={matchStyles.matrixHeadCellId}>
+                        <button type="button" style={matchStyles.sortHeaderButton} onClick={() => toggleSort("edi")}>
+                          <span>EDI</span>
+                          <span style={matchStyles.sortHeaderGlyph}>{worklistSortBy === "edi" ? (worklistSortDir === "asc" ? "▲" : "▼") : ""}</span>
+                        </button>
+                      </th>
+                      <th style={matchStyles.matrixHeadCellCenter}>
+                        <button type="button" style={matchStyles.sortHeaderButton} onClick={() => toggleSort("match")}>
+                          <span>Match</span>
+                          <span style={matchStyles.sortHeaderGlyph}>{worklistSortBy === "match" ? (worklistSortDir === "asc" ? "▲" : "▼") : ""}</span>
+                        </button>
+                      </th>
+                      <th style={matchStyles.matrixHeadCellCenter}>
+                        <button type="button" style={matchStyles.sortHeaderButton} onClick={() => toggleSort("lockbox")}>
+                          <span>Lockbox</span>
+                          <span style={matchStyles.sortHeaderGlyph}>{worklistSortBy === "lockbox" ? (worklistSortDir === "asc" ? "▲" : "▼") : ""}</span>
+                        </button>
+                      </th>
+                      <th style={matchStyles.matrixHeadCellCenter}>
+                        <button type="button" style={matchStyles.sortHeaderButton} onClick={() => toggleSort("eft")}>
+                          <span>EFT</span>
+                          <span style={matchStyles.sortHeaderGlyph}>{worklistSortBy === "eft" ? (worklistSortDir === "asc" ? "▲" : "▼") : ""}</span>
+                        </button>
+                      </th>
+                      <th style={matchStyles.matrixHeadCellPossible}>
+                        <button type="button" style={matchStyles.sortHeaderButton} onClick={() => toggleSort("possible")}>
+                          <span>Possible Match</span>
+                          <span style={matchStyles.sortHeaderGlyph}>{worklistSortBy === "possible" ? (worklistSortDir === "asc" ? "▲" : "▼") : ""}</span>
+                        </button>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {worklist.map((row) => {
+                      const selected = row.edi.id === selectedEdiId;
+                      return (
+                        <tr
+                          key={row.edi.id}
+                          style={{
+                            ...matchStyles.matrixRow,
+                            ...(row.matchCode === "Y"
+                              ? matchStyles.matrixRowY
+                              : row.possibleMatchLabel
+                                ? matchStyles.matrixRowP
+                                : matchStyles.matrixRowN),
+                            ...(selected ? matchStyles.gridRowSelected : {}),
+                          }}
+                          onClick={() => void loadDetail(row.edi.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              event.preventDefault();
+                              void loadDetail(row.edi.id);
+                            }
+                          }}
+                        >
+                          <td style={{ ...matchStyles.matrixCellId, ...(selected ? matchStyles.gridCellSelected : {}) }}>
+                            EDI {row.edi.id}
+                          </td>
+                          <td style={{ ...matchStyles.matrixCellCenter, ...(selected ? matchStyles.gridCellSelected : {}) }}>
+                              <span
+                                style={{
+                                  ...matchStyles.matrixLetter,
+                                  ...statusToneStyles[row.matchCode === "Y" ? "success" : row.possibleMatchLabel ? "warning" : "mist"].pill,
+                                }}
+                              >
+                              {row.matchCode}
+                              </span>
+                            </td>
+                          <td style={{ ...matchStyles.matrixCellCenter, ...(selected ? matchStyles.gridCellSelected : {}) }}>
+                            {row.lockboxMatchCode ? (
+                              <span style={{ ...matchStyles.matrixLetter, ...statusToneStyles.success.pill }}>Y</span>
+                            ) : (
+                              <span style={matchStyles.matrixMuted}>-</span>
+                            )}
+                          </td>
+                          <td style={{ ...matchStyles.matrixCellCenter, ...(selected ? matchStyles.gridCellSelected : {}) }}>
+                            {row.eftMatchCode ? (
+                              <span style={{ ...matchStyles.matrixLetter, ...statusToneStyles.success.pill }}>Y</span>
+                            ) : (
+                              <span style={matchStyles.matrixMuted}>-</span>
+                            )}
+                          </td>
+                          <td style={{ ...matchStyles.matrixCellPossible, ...(selected ? matchStyles.gridCellSelected : {}) }}>
+                            {row.possibleMatchLabel || <span style={matchStyles.matrixMuted}>-</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              ) : (
+                <div style={matchStyles.emptyState}>
+                  {loading
+                    ? "Loading the match matrix..."
+                    : "No EDI rows are available for the matrix yet."}
+                </div>
+              )}
             </div>
           </article>
 
-          <article style={matchStyles.panelSticky}>
+      <article style={matchStyles.panelSticky}>
             <div style={matchStyles.panelHeader}>
               <div>
                 <div style={adminStyles.sectionKicker}>Candidate detail</div>
@@ -689,323 +705,230 @@ export default function Match835Screen() {
                   {detail ? `EDI ${detail.edi.id}` : "Select an EDI row"}
                 </h2>
               </div>
-              <div style={matchStyles.panelMeta}>
-                {showMatches
-                  ? `${matchHistory.length} committed match(es)`
-                  : detail
-                    ? `Check ${detail.edi.checkNumber || "(blank)"}`
-                    : "No row selected"}
+              <div style={matchStyles.panelActions}>
+                <span
+                  style={{
+                    ...matchStyles.commitPill,
+                    ...statusToneStyles[commitState.tone].pill,
+                  }}
+                >
+                  {commitState.label}
+                </span>
+                <button
+                  type="button"
+                  style={matchStyles.inlineCommitButton}
+                  onClick={() => void commitBestMatch()}
+                  disabled={!detail || committing}
+                >
+                  {committing ? "Committing..." : "Commit"}
+                </button>
+                <span
+                  style={{
+                    ...matchStyles.commitPill,
+                    ...statusToneStyles[bulkCommitState.tone].pill,
+                  }}
+                >
+                  {bulkCommitState.label}
+                </span>
+                <button
+                  type="button"
+                  style={matchStyles.inlineCommitButton}
+                  onClick={() => void commitAllExact()}
+                  disabled={bulkCommitting}
+                >
+                  {bulkCommitting ? "Committing all..." : "Commit All 100%"}
+                </button>
               </div>
             </div>
+            <div style={matchStyles.panelMeta}>
+              {detail ? `Check ${detail.edi.checkNumber || "(blank)"}` : "No row selected"}
+            </div>
 
-            {showMatches ? (
-              <div style={matchStyles.detailScroll}>
-                <div style={matchStyles.historyPanel}>
-                  <div style={matchStyles.detailHeader}>835 match archive</div>
-                  <div style={matchStyles.matchedMeta}>
-                    {loadingHistory
-                      ? "Loading committed match history..."
-                      : "These are the EDI rows already committed to EFT and Lockbox."}
-                  </div>
-                  {matchHistory.length ? (
-                    <div style={matchStyles.historyList}>
-                      {matchHistory.map((row) => (
-                        <button
-                          key={`history-${row.edi.id}`}
-                          type="button"
-                          style={matchStyles.historyCard}
-                          onClick={() => void loadDetail(row.edi.id)}
-                        >
-                          <div style={matchStyles.rowTop}>
-                            <div style={matchStyles.rowId}>EDI #{row.edi.id}</div>
-                            <div style={matchStyles.rowBadge}>Matched</div>
-                          </div>
-                          <div style={matchStyles.rowGrid}>
-                            <div>
-                              <div style={matchStyles.rowLabel}>Check</div>
-                              <div style={matchStyles.rowValue}>{row.edi.checkNumber || "(blank)"}</div>
-                            </div>
-                            <div>
-                              <div style={matchStyles.rowLabel}>Amount</div>
-                              <div style={matchStyles.rowValue}>{formatAmount(row.edi.amount)}</div>
-                            </div>
-                            <div>
-                              <div style={matchStyles.rowLabel}>Date</div>
-                              <div style={matchStyles.rowValue}>{formatDate(row.edi.date)}</div>
-                            </div>
-                            <div>
-                              <div style={matchStyles.rowLabel}>Matched</div>
-                              <div style={matchStyles.rowValue}>
-                                {row.matchedEft.length} EFT / {row.matchedLockbox.length} Lockbox
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <div style={matchStyles.emptyState}>No committed 835 matches have been recorded yet.</div>
-                  )}
-                  <button
-                    style={matchStyles.inlineCommitButton}
-                    type="button"
-                    onClick={() => {
-                      setShowMatches(false);
-                      if (detail) {
-                        void loadDetail(detail.edi.id);
-                      }
-                    }}
-                  >
-                    Back to Detail
-                  </button>
-                </div>
-              </div>
-            ) : detail ? (
-              <div style={matchStyles.detailScroll}>
-                <div style={matchStyles.detailStack}>
-                  <div style={matchStyles.detailCard}>
-                    <div style={matchStyles.detailHeader}>Selected EDI row</div>
-                    <div style={matchStyles.detailGrid}>
+            <div style={matchStyles.detailScroll}>
+              {detail ? (
+                <div style={matchStyles.previewStack}>
+                  <div style={matchStyles.previewCard}>
+                    <div style={matchStyles.detailHeader}>Selected row</div>
+                    <div style={matchStyles.previewGrid}>
+                      <div>
+                        <div style={matchStyles.rowLabel}>EDI</div>
+                        <div style={matchStyles.rowValue}>#{detail.edi.id}</div>
+                      </div>
+                      <div>
+                        <div style={matchStyles.rowLabel}>Match</div>
+                        <div style={matchStyles.rowValue}>{formatMatchStatus(detail.edi.matchstatus)}</div>
+                      </div>
                       <div>
                         <div style={matchStyles.rowLabel}>Check</div>
-                        <div style={matchStyles.detailValue}>{detail.edi.checkNumber || "(blank)"}</div>
+                        <div style={matchStyles.rowValue}>{detail.edi.checkNumber || "(blank)"}</div>
                       </div>
                       <div>
                         <div style={matchStyles.rowLabel}>Amount</div>
-                        <div style={matchStyles.detailValue}>{formatAmount(detail.edi.amount)}</div>
+                        <div style={matchStyles.rowValue}>{formatAmount(detail.edi.amount)}</div>
                       </div>
                       <div>
                         <div style={matchStyles.rowLabel}>Date</div>
-                        <div style={matchStyles.detailValue}>{formatDate(detail.edi.date)}</div>
+                        <div style={matchStyles.rowValue}>{formatDate(detail.edi.date)}</div>
                       </div>
                       <div>
                         <div style={matchStyles.rowLabel}>Status</div>
-                        <div style={matchStyles.detailValue}>{unmatchedText(detail.edi.matchstatus)}</div>
+                        <div style={matchStyles.rowValue}>
+                          {isMatchedStatus(detail.edi.matchstatus) ? "Y" : "N"}
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div style={matchStyles.matchedSection}>
-                    <div style={matchStyles.detailHeader}>Matched rows</div>
-                    <div style={matchStyles.matchedMeta}>
-                      {matchedCount > 0
-                        ? "These rows are already marked MATCHED for the selected EDI check."
-                        : "No committed rows are recorded for this EDI yet."}
-                    </div>
-                    <div style={matchStyles.matchedColumns}>
-                      <div style={matchStyles.matchedColumn}>
-                        <div style={matchStyles.candidateHeader}>EFT matched</div>
-                        {detail.matchedEft.length ? (
-                          detail.matchedEft.map((row) => (
-                            <div key={`matched-eft-${row.id}`} style={matchStyles.matchedCard}>
-                              <div style={matchStyles.rowTop}>
-                                <div style={matchStyles.rowId}>EFT #{row.id}</div>
-                                <div style={matchStyles.rowBadge}>Matched</div>
-                              </div>
-                              <div style={matchStyles.rowGrid}>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Check</div>
-                                  <div style={matchStyles.rowValue}>{row.checkNumber || "(blank)"}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Amount</div>
-                                  <div style={matchStyles.rowValue}>{formatAmount(row.amount)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Date</div>
-                                  <div style={matchStyles.rowValue}>{formatDate(row.date)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Status</div>
-                                  <div style={matchStyles.rowValue}>{unmatchedText(row.matchstatus)}</div>
-                                </div>
-                              </div>
-                              <div style={matchStyles.rowFooter}>
-                                <span>Batch {row.batchnum || "-"}</span>
-                                <span>Trans {row.transnum || "-"}</span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div style={matchStyles.emptyMatched}>No EFT matches recorded yet.</div>
-                        )}
-                      </div>
-
-                      <div style={matchStyles.matchedColumn}>
-                        <div style={matchStyles.candidateHeader}>Lockbox matched</div>
-                        {detail.matchedLockbox.length ? (
-                          detail.matchedLockbox.map((row) => (
-                            <div key={`matched-lockbox-${row.id}`} style={matchStyles.matchedCard}>
-                              <div style={matchStyles.rowTop}>
-                                <div style={matchStyles.rowId}>Lockbox #{row.id}</div>
-                                <div style={matchStyles.rowBadge}>Matched</div>
-                              </div>
-                              <div style={matchStyles.rowGrid}>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Check</div>
-                                  <div style={matchStyles.rowValue}>{row.checkNumber || "(blank)"}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Amount</div>
-                                  <div style={matchStyles.rowValue}>{formatAmount(row.amount)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Date</div>
-                                  <div style={matchStyles.rowValue}>{formatDate(row.date)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Status</div>
-                                  <div style={matchStyles.rowValue}>{unmatchedText(row.matchstatus)}</div>
-                                </div>
-                              </div>
-                              <div style={matchStyles.rowFooter}>
-                                <span>Batch {row.batchnum || "-"}</span>
-                                <span>Trans {row.transnum || "-"}</span>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <div style={matchStyles.emptyMatched}>No Lockbox matches recorded yet.</div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div style={matchStyles.splitGrid}>
-                    <div style={matchStyles.candidateColumn}>
-                      <div style={matchStyles.candidateHeader}>EFT candidates</div>
-                      {detail.eftCandidates.length ? (
-                        detail.eftCandidates.map((row) => {
-                          const selected = selectedEftIds.includes(row.id);
-                          return (
-                            <button
-                              key={`eft-${row.id}`}
-                              type="button"
-                              onClick={() => toggleSelection("eft", row)}
-                              style={{
-                                ...matchStyles.candidateCard,
-                                ...(selected ? matchStyles.candidateCardSelected : {}),
-                                ...(row.strongMatch ? matchStyles.candidateCardStrong : {}),
-                              }}
-                            >
-                              <div style={matchStyles.rowTop}>
-                                <div style={matchStyles.rowId}>EFT #{row.id}</div>
-                                <div style={matchStyles.rowBadge}>
-                                  {row.strongMatch ? "Strong hit" : row.closeMatch ? "Close match" : row.reason}
-                                </div>
-                              </div>
-                              <div style={matchStyles.rowGrid}>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Check</div>
-                                  <div style={matchStyles.rowValue}>{row.checkNumber || "(blank)"}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Amount</div>
-                                  <div style={matchStyles.rowValue}>{formatAmount(row.amount)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Date</div>
-                                  <div style={matchStyles.rowValue}>{formatDate(row.date)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Status</div>
-                                  <div style={matchStyles.rowValue}>{unmatchedText(row.matchstatus)}</div>
-                                </div>
-                              </div>
-                              <div style={matchStyles.rowFooter}>
-                                <span>Batch {row.batchnum || "-"}</span>
-                                <span>Trans {row.transnum || "-"}</span>
-                                <span>{selected ? "Selected" : "Click to select"}</span>
-                              </div>
-                            </button>
-                          );
-                        })
+                  <div style={matchStyles.previewColumns}>
+                    <div style={matchStyles.previewCard}>
+                      <div style={matchStyles.detailHeader}>Matched EFT</div>
+                      {detail.matchedEft[0] ? (
+                        <div style={matchStyles.previewBody}>
+                          <div style={matchStyles.previewLine}>Score {detail.matchedEft[0].score}</div>
+                          <div style={matchStyles.previewLine}>Reason {detail.matchedEft[0].reason}</div>
+                          <div style={matchStyles.previewLine}>Check {detail.matchedEft[0].checkNumber || "(blank)"}</div>
+                          <div style={matchStyles.previewLine}>Amount {formatAmount(detail.matchedEft[0].amount)}</div>
+                          <div style={matchStyles.previewLine}>Date {formatDate(detail.matchedEft[0].date)}</div>
+                        </div>
                       ) : (
-                        <div style={matchStyles.emptyCandidate}>No EFT candidates found for this EDI row.</div>
+                        <div style={matchStyles.emptyState}>No matched EFT record on file.</div>
                       )}
                     </div>
 
-                    <div style={matchStyles.candidateColumn}>
-                      <div style={matchStyles.candidateHeader}>Lockbox candidates</div>
-                      {detail.lockboxCandidates.length ? (
-                        detail.lockboxCandidates.map((row) => {
-                          const selected = selectedLockboxIds.includes(row.id);
-                          return (
-                            <button
-                              key={`lockbox-${row.id}`}
-                              type="button"
-                              onClick={() => toggleSelection("lockbox", row)}
-                              style={{
-                                ...matchStyles.candidateCard,
-                                ...(selected ? matchStyles.candidateCardSelected : {}),
-                                ...(row.strongMatch ? matchStyles.candidateCardStrong : {}),
-                              }}
-                            >
-                              <div style={matchStyles.rowTop}>
-                                <div style={matchStyles.rowId}>Lockbox #{row.id}</div>
-                                <div style={matchStyles.rowBadge}>
-                                  {row.strongMatch ? "Strong hit" : row.closeMatch ? "Close match" : row.reason}
-                                </div>
-                              </div>
-                              <div style={matchStyles.rowGrid}>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Check</div>
-                                  <div style={matchStyles.rowValue}>{row.checkNumber || "(blank)"}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Amount</div>
-                                  <div style={matchStyles.rowValue}>{formatAmount(row.amount)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Date</div>
-                                  <div style={matchStyles.rowValue}>{formatDate(row.date)}</div>
-                                </div>
-                                <div>
-                                  <div style={matchStyles.rowLabel}>Status</div>
-                                  <div style={matchStyles.rowValue}>{unmatchedText(row.matchstatus)}</div>
-                                </div>
-                              </div>
-                              <div style={matchStyles.rowFooter}>
-                                <span>Batch {row.batchnum || "-"}</span>
-                                <span>Trans {row.transnum || "-"}</span>
-                                <span>{selected ? "Selected" : "Click to select"}</span>
-                              </div>
-                            </button>
-                          );
-                        })
+                    <div style={matchStyles.previewCard}>
+                      <div style={matchStyles.detailHeader}>Matched Lockbox</div>
+                      {detail.matchedLockbox[0] ? (
+                        <div style={matchStyles.previewBody}>
+                          <div style={matchStyles.previewLine}>Score {detail.matchedLockbox[0].score}</div>
+                          <div style={matchStyles.previewLine}>Reason {detail.matchedLockbox[0].reason}</div>
+                          <div style={matchStyles.previewLine}>Check {detail.matchedLockbox[0].checkNumber || "(blank)"}</div>
+                          <div style={matchStyles.previewLine}>Amount {formatAmount(detail.matchedLockbox[0].amount)}</div>
+                          <div style={matchStyles.previewLine}>Date {formatDate(detail.matchedLockbox[0].date)}</div>
+                        </div>
                       ) : (
-                        <div style={matchStyles.emptyCandidate}>No Lockbox candidates found for this EDI row.</div>
+                        <div style={matchStyles.emptyState}>No matched Lockbox record on file.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={matchStyles.previewColumns}>
+                    <div style={matchStyles.previewCard}>
+                      <div style={matchStyles.detailHeader}>Best EFT candidate</div>
+                      {detail.eftCandidates[0] ? (
+                        <div style={matchStyles.previewBody}>
+                          <div style={matchStyles.previewLine}>Score {detail.eftCandidates[0].score}</div>
+                          <div style={matchStyles.previewLine}>Reason {detail.eftCandidates[0].reason}</div>
+                          <div style={matchStyles.previewLine}>Check {detail.eftCandidates[0].checkNumber || "(blank)"}</div>
+                          <div style={matchStyles.previewLine}>Amount {formatAmount(detail.eftCandidates[0].amount)}</div>
+                          <div style={matchStyles.previewLine}>Date {formatDate(detail.eftCandidates[0].date)}</div>
+                        </div>
+                      ) : (
+                        <div style={matchStyles.emptyState}>No EFT candidate.</div>
+                      )}
+                    </div>
+
+                    <div style={matchStyles.previewCard}>
+                      <div style={matchStyles.detailHeader}>Best Lockbox candidate</div>
+                      {detail.lockboxCandidates[0] ? (
+                        <div style={matchStyles.previewBody}>
+                          <div style={matchStyles.previewLine}>Score {detail.lockboxCandidates[0].score}</div>
+                          <div style={matchStyles.previewLine}>Reason {detail.lockboxCandidates[0].reason}</div>
+                          <div style={matchStyles.previewLine}>Check {detail.lockboxCandidates[0].checkNumber || "(blank)"}</div>
+                          <div style={matchStyles.previewLine}>Amount {formatAmount(detail.lockboxCandidates[0].amount)}</div>
+                          <div style={matchStyles.previewLine}>Date {formatDate(detail.lockboxCandidates[0].date)}</div>
+                        </div>
+                      ) : (
+                        <div style={matchStyles.emptyState}>No Lockbox candidate.</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div style={matchStyles.previewColumns}>
+                    <div style={matchStyles.previewCard}>
+                      <div style={matchStyles.detailHeader}>Pick EFT candidate</div>
+                      {detail.eftCandidates.length ? (
+                        <div style={matchStyles.candidatePanel}>
+                          {detail.eftCandidates.map((candidate) => {
+                            const isSelected = candidate.id === selectedEftCandidateId;
+                            return (
+                              <button
+                                key={candidate.id}
+                                type="button"
+                                style={{
+                                  ...matchStyles.candidateCard,
+                                  ...(isSelected ? matchStyles.candidateCardSelected : {}),
+                                  ...(candidate.exactMatch ? matchStyles.candidateCardStrong : {}),
+                                }}
+                                onClick={() => setSelectedEftCandidateId(candidate.id)}
+                                aria-pressed={isSelected}
+                              >
+                                <div style={matchStyles.candidateHeader}>
+                                  EFT #{candidate.id} {candidate.exactMatch ? "Matched" : ""}
+                                </div>
+                                <div style={matchStyles.previewBody}>
+                                  <div style={matchStyles.previewLine}>Score {candidate.score ?? 0}</div>
+                                  <div style={matchStyles.previewLine}>Reason {candidate.reason || "review"}</div>
+                                  <div style={matchStyles.previewLine}>Check {candidate.checkNumber || "(blank)"}</div>
+                                  <div style={matchStyles.previewLine}>Amount {formatAmount(candidate.amount)}</div>
+                                  <div style={matchStyles.previewLine}>Date {formatDate(candidate.date)}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={matchStyles.emptyState}>No EFT candidates available.</div>
+                      )}
+                    </div>
+
+                    <div style={matchStyles.previewCard}>
+                      <div style={matchStyles.detailHeader}>Pick Lockbox candidate</div>
+                      {detail.lockboxCandidates.length ? (
+                        <div style={matchStyles.candidatePanel}>
+                          {detail.lockboxCandidates.map((candidate) => {
+                            const isSelected = candidate.id === selectedLockboxCandidateId;
+                            return (
+                              <button
+                                key={candidate.id}
+                                type="button"
+                                style={{
+                                  ...matchStyles.candidateCard,
+                                  ...(isSelected ? matchStyles.candidateCardSelected : {}),
+                                  ...(candidate.exactMatch ? matchStyles.candidateCardStrong : {}),
+                                }}
+                                onClick={() => setSelectedLockboxCandidateId(candidate.id)}
+                                aria-pressed={isSelected}
+                              >
+                                <div style={matchStyles.candidateHeader}>
+                                  Lockbox #{candidate.id} {candidate.exactMatch ? "Matched" : ""}
+                                </div>
+                                <div style={matchStyles.previewBody}>
+                                  <div style={matchStyles.previewLine}>Score {candidate.score ?? 0}</div>
+                                  <div style={matchStyles.previewLine}>Reason {candidate.reason || "review"}</div>
+                                  <div style={matchStyles.previewLine}>Check {candidate.checkNumber || "(blank)"}</div>
+                                  <div style={matchStyles.previewLine}>Amount {formatAmount(candidate.amount)}</div>
+                                  <div style={matchStyles.previewLine}>Date {formatDate(candidate.date)}</div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div style={matchStyles.emptyState}>No Lockbox candidates available.</div>
                       )}
                     </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div style={matchStyles.emptyState}>
-                Select an unmatched EDI row on the left to inspect candidate EFT and Lockbox matches.
-              </div>
-            )}
+              ) : (
+                <div style={matchStyles.emptyState}>Select a row on the left to preview its best candidate matches.</div>
+              )}
+            </div>
           </article>
         </section>
       </section>
     </main>
   );
 }
-
-const matchToneStyles: Record<MatchAction["tone"], CSSProperties> = {
-  blue: {
-    background: "linear-gradient(145deg, rgba(212, 232, 255, 0.95), rgba(255, 255, 255, 0.92))",
-  },
-  pink: {
-    background: "linear-gradient(145deg, rgba(255, 225, 236, 0.96), rgba(255, 255, 255, 0.92))",
-  },
-  mist: {
-    background: "linear-gradient(145deg, rgba(231, 240, 247, 0.96), rgba(255, 255, 255, 0.92))",
-  },
-  pearl: {
-    background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
-  },
-};
 
 const matchStyles: Record<string, CSSProperties> = {
   workspace: {
@@ -1024,6 +947,7 @@ const matchStyles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     minHeight: 0,
+    maxHeight: "calc(100vh - 36px)",
   },
   panelSticky: {
     borderRadius: "28px",
@@ -1052,35 +976,416 @@ const matchStyles: Record<string, CSSProperties> = {
     fontWeight: 700,
     color: "#597085",
   },
-  list: {
-    display: "grid",
+  pagerBar: {
+    display: "flex",
+    justifyContent: "space-between",
     gap: "12px",
+    alignItems: "center",
+    marginBottom: "12px",
+    padding: "10px 12px",
+    borderRadius: "16px",
+    background: "rgba(247, 250, 253, 0.96)",
+    border: "1px solid rgba(171, 186, 207, 0.22)",
+    flexWrap: "wrap",
   },
-  rowWrap: {
+  pagerMeta: {
+    fontSize: "12px",
+    color: "#597085",
+    fontWeight: 700,
+  },
+  pagerActions: {
+    display: "flex",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+  pagerButton: {
+    minHeight: "34px",
+    padding: "0 14px",
+    borderRadius: "12px",
+    border: "1px solid rgba(106, 137, 180, 0.32)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#17324f",
+    fontSize: "12px",
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  filterBar: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "12px",
+    alignItems: "center",
+    marginBottom: "12px",
+    padding: "10px 12px",
+    borderRadius: "16px",
+    background: "rgba(247, 250, 253, 0.96)",
+    border: "1px solid rgba(171, 186, 207, 0.22)",
+    flexWrap: "wrap",
+  },
+  filterMeta: {
+    fontSize: "12px",
+    color: "#597085",
+    fontWeight: 700,
+  },
+  filterActions: {
     display: "grid",
     gap: "10px",
+    width: "100%",
   },
-  listScroll: {
-    display: "grid",
+  filterButton: {
+    height: "46px",
+    padding: "0 16px",
+    borderRadius: "16px",
+    border: "1px solid rgba(140, 160, 184, 0.20)",
+    background: "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(236,245,255,0.95) 54%, rgba(255,236,244,0.92) 100%)",
+    color: "#17324f",
+    fontSize: "12px",
+    fontWeight: 700,
+    letterSpacing: "0.01em",
+    textTransform: "none",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: "12px",
+    cursor: "pointer",
+    boxShadow: "0 12px 26px rgba(52, 84, 120, 0.08)",
+    whiteSpace: "nowrap",
+    width: "100%",
+    textAlign: "left",
+  },
+  filterButtonActive: {
+    borderColor: "rgba(109, 142, 186, 0.42)",
+    color: "#12314c",
+    boxShadow: "0 14px 30px rgba(52, 84, 120, 0.12)",
+  },
+  filterButtonCopy: {
+    display: "grid",
+    gap: "2px",
+    minWidth: 0,
+  },
+  filterButtonLabel: {
+    fontSize: "13px",
+    fontWeight: 800,
+    color: "#17324f",
+  },
+  filterButtonValue: {
+    fontSize: "11px",
+    fontWeight: 800,
+    color: "#6c8096",
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+  },
+  filterButtonGlyph: {
+    width: "22px",
+    height: "22px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.76)",
+    color: "#8aa5c6",
+    fontSize: "12px",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+    flex: "0 0 auto",
+  },
+  heroFilterSummary: {
+    display: "grid",
+    gap: "6px",
+    marginTop: "10px",
+    marginBottom: "10px",
+    padding: "10px 12px",
+    borderRadius: "16px",
+    background: "rgba(247, 250, 253, 0.84)",
+    border: "1px solid rgba(171, 186, 207, 0.18)",
+  },
+  heroFilterRow: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px",
+    alignItems: "baseline",
+  },
+  heroFilterLabel: {
+    fontSize: "11px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    fontWeight: 800,
+    color: "#718498",
+  },
+  heroFilterValue: {
+    fontSize: "12px",
+    fontWeight: 800,
+    color: "#17324f",
+  },
+  panelActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  commitPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "38px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid transparent",
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
+  },
+  gridScroll: {
+    display: "block",
     minHeight: 0,
+    overflowX: "hidden",
     overflowY: "auto",
     paddingRight: "6px",
     flex: "1 1 auto",
   },
-  rowCard: {
-    width: "100%",
-    textAlign: "left",
-    borderRadius: "20px",
-    padding: "16px",
-    border: "1px solid rgba(171, 186, 207, 0.28)",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,253,0.92))",
-    cursor: "pointer",
-    boxShadow: "0 10px 20px rgba(52, 84, 120, 0.05)",
+  gridSummaryBar: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "10px",
+    marginBottom: "12px",
   },
-  rowCardSelected: {
-    border: "1px solid rgba(138, 168, 214, 0.65)",
-    boxShadow: "0 16px 28px rgba(111, 146, 196, 0.12)",
+  gridSummaryChip: {
+    borderRadius: "16px",
+    padding: "12px 14px",
+    background: "linear-gradient(180deg, rgba(248,250,253,0.98), rgba(239,245,255,0.96))",
+    border: "1px solid rgba(171, 186, 207, 0.24)",
+    display: "grid",
+    gap: "4px",
+  },
+  gridSummaryLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "#718498",
+    fontWeight: 800,
+  },
+  gridSummaryValue: {
+    fontSize: "18px",
+    fontWeight: 800,
+    color: "#17324f",
+  },
+  matrixTable: {
+    width: "100%",
+    minWidth: "0",
+    tableLayout: "fixed",
+    borderCollapse: "collapse",
+  },
+  matrixHeadCellId: {
+    textAlign: "left",
+    width: "92px",
+    padding: "9px 8px",
+    fontSize: "11px",
+    letterSpacing: "0.16em",
+    textTransform: "uppercase",
+    color: "#66798d",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.32)",
+  },
+  sortHeaderButton: {
+    width: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "8px",
+    padding: 0,
+    border: 0,
+    background: "transparent",
+    color: "inherit",
+    font: "inherit",
+    cursor: "pointer",
+    textTransform: "inherit",
+    letterSpacing: "inherit",
+  },
+  sortHeaderGlyph: {
+    minWidth: "12px",
+    color: "#91a3b6",
+    fontSize: "10px",
+    lineHeight: 1,
+  },
+  matrixHeadCellCenter: {
+    textAlign: "center",
+    width: "68px",
+    padding: "9px 6px",
+    fontSize: "11px",
+    letterSpacing: "0.16em",
+    textTransform: "uppercase",
+    color: "#66798d",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.32)",
+  },
+  matrixHeadCellPossible: {
+    textAlign: "left",
+    width: "180px",
+    padding: "9px 8px",
+    fontSize: "11px",
+    letterSpacing: "0.16em",
+    textTransform: "uppercase",
+    color: "#66798d",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.32)",
+  },
+  matrixRow: {
+    cursor: "pointer",
+  },
+  matrixRowY: {
+    background: "rgba(233, 247, 236, 0.96)",
+  },
+  matrixRowP: {
+    background: "rgba(255, 248, 227, 0.96)",
+  },
+  matrixRowN: {
+    background: "rgba(245, 249, 252, 0.96)",
+  },
+  matrixCellId: {
+    width: "92px",
+    padding: "9px 8px",
+    fontSize: "13px",
+    fontWeight: 800,
+    color: "#17324f",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.20)",
+    whiteSpace: "nowrap",
+  },
+  matrixCellCenter: {
+    width: "68px",
+    padding: "9px 6px",
+    textAlign: "center",
+    fontSize: "12px",
+    fontWeight: 800,
+    color: "#17324f",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.20)",
+  },
+  matrixCellPossible: {
+    width: "180px",
+    padding: "9px 8px",
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#17324f",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.20)",
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
+  matrixLetter: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "28px",
+    minHeight: "26px",
+    borderRadius: "999px",
+    border: "1px solid rgba(140, 160, 184, 0.26)",
+    fontSize: "11px",
+    fontWeight: 900,
+    letterSpacing: "0.12em",
+  },
+  matrixMuted: {
+    color: "#8a9aad",
+    fontWeight: 700,
+  },
+  gridTable: {
+    width: "100%",
+    minWidth: "980px",
+    borderCollapse: "separate",
+    borderSpacing: "0 4px",
+  },
+  gridHeadCell: {
+    position: "sticky",
+    top: 0,
+    zIndex: 1,
+    textAlign: "left",
+    padding: "10px 12px",
+    fontSize: "11px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    color: "#6e8195",
+    background: "rgba(248, 250, 253, 0.96)",
+    backdropFilter: "blur(10px)",
+  },
+  gridHeadCellNumeric: {
+    position: "sticky",
+    top: 0,
+    zIndex: 1,
+    textAlign: "right",
+    padding: "10px 12px",
+    fontSize: "11px",
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    color: "#6e8195",
+    background: "rgba(248, 250, 253, 0.96)",
+    backdropFilter: "blur(10px)",
+  },
+  gridRow: {
+    cursor: "pointer",
+    transition: "transform 0.14s ease, box-shadow 0.14s ease",
+  },
+  gridRowOdd: {
+    background: "rgba(255,255,255,0.92)",
+  },
+  gridRowEven: {
+    background: "rgba(245, 249, 252, 0.95)",
+  },
+  gridRowSelected: {
+    transform: "translateY(-1px)",
+  },
+  gridCellSelected: {
+    background: "rgba(235, 244, 255, 0.99)",
+  },
+  gridCell: {
+    padding: "10px 12px",
+    fontSize: "13px",
+    color: "#19324d",
+    verticalAlign: "middle",
+    borderTop: "1px solid rgba(171, 186, 207, 0.22)",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.22)",
+    background: "inherit",
+  },
+  gridCellStrong: {
+    padding: "10px 12px",
+    fontSize: "13px",
+    fontWeight: 800,
+    color: "#16304d",
+    verticalAlign: "middle",
+    borderTop: "1px solid rgba(171, 186, 207, 0.22)",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.22)",
+    background: "inherit",
+  },
+  gridCellNumeric: {
+    padding: "10px 12px",
+    fontSize: "13px",
+    fontWeight: 800,
+    color: "#19324d",
+    verticalAlign: "middle",
+    textAlign: "right",
+    borderTop: "1px solid rgba(171, 186, 207, 0.22)",
+    borderBottom: "1px solid rgba(171, 186, 207, 0.22)",
+    background: "inherit",
+  },
+  gridStatusPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    borderRadius: "999px",
+    padding: "4px 10px",
+    fontSize: "10px",
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    marginBottom: "6px",
+  },
+  gridStatusMeta: {
+    fontSize: "11px",
+    lineHeight: 1.45,
+    color: "#617589",
+  },
+  gridActionButton: {
+    minHeight: "30px",
+    padding: "0 10px",
+    borderRadius: "12px",
+    border: "1px solid rgba(140, 160, 184, 0.26)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#19324d",
+    fontWeight: 700,
+    cursor: "pointer",
   },
   rowTop: {
     display: "flex",
@@ -1128,46 +1433,6 @@ const matchStyles: Record<string, CSSProperties> = {
     color: "#62768b",
     fontWeight: 700,
   },
-  inlineDetailCard: {
-    borderRadius: "18px",
-    padding: "14px",
-    background: "linear-gradient(145deg, rgba(244, 249, 255, 0.98), rgba(255, 247, 250, 0.96))",
-    border: "1px solid rgba(138, 168, 214, 0.32)",
-    boxShadow: "0 12px 22px rgba(111, 146, 196, 0.10)",
-    display: "grid",
-    gap: "10px",
-  },
-  inlineDetailHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "10px",
-    fontSize: "13px",
-    fontWeight: 800,
-    color: "#17324f",
-  },
-  inlineDetailPill: {
-    borderRadius: "999px",
-    padding: "4px 10px",
-    background: "rgba(225, 235, 247, 0.95)",
-    color: "#365067",
-    fontSize: "11px",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-  },
-  inlineDetailGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "8px 12px",
-    fontSize: "12px",
-    color: "#53697f",
-    fontWeight: 700,
-  },
-  inlineDetailMeta: {
-    fontSize: "12px",
-    lineHeight: 1.5,
-    color: "#496077",
-  },
   historyPanel: {
     display: "grid",
     gap: "12px",
@@ -1213,6 +1478,38 @@ const matchStyles: Record<string, CSSProperties> = {
     paddingRight: "6px",
     flex: "1 1 auto",
   },
+  previewStack: {
+    display: "grid",
+    gap: "14px",
+  },
+  previewColumns: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "14px",
+  },
+  previewCard: {
+    borderRadius: "22px",
+    padding: "16px",
+    background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.92) 100%)",
+    border: "1px solid rgba(175, 193, 218, 0.22)",
+    display: "grid",
+    gap: "12px",
+  },
+  previewGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "12px 16px",
+  },
+  previewBody: {
+    display: "grid",
+    gap: "8px",
+    fontSize: "13px",
+    lineHeight: 1.5,
+  },
+  previewLine: {
+    color: "#17324f",
+    fontWeight: 700,
+  },
   detailCard: {
     borderRadius: "22px",
     padding: "16px",
@@ -1242,6 +1539,10 @@ const matchStyles: Record<string, CSSProperties> = {
     display: "grid",
     gap: "10px",
     minWidth: 0,
+  },
+  candidatePanel: {
+    display: "grid",
+    gap: "10px",
   },
   matchedCard: {
     borderRadius: "18px",

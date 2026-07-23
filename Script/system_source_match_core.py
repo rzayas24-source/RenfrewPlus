@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sqlite3
 from collections import defaultdict
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -39,6 +40,19 @@ def _is_unmatched(status):
     if status is None:
         return True
     return str(status).strip().upper() in UNMATCHED_STATUSES
+
+
+def _is_matched(status):
+    if status is None:
+        return False
+    return str(status).strip().upper().startswith("MATCHED")
+
+
+def _matched_status_value(source="AUTO"):
+    tag = str(source or "AUTO").strip().upper()
+    if tag not in {"AUTO", "MANUAL"}:
+        tag = "AUTO"
+    return f"{MATCHED_STATUS}|{tag}"
 
 
 def ensure_match_indexes(conn=None):
@@ -105,6 +119,9 @@ def _candidate_payload(row, source, edi_norm):
     payload = _row_common_payload(row, source)
     candidate_score = 0
     reasons = []
+    exact_check = False
+    exact_amount = False
+    exact_date = False
 
     candidate_check = payload["checkNumberNorm"]
     edi_check = edi_norm["checkNumberNorm"]
@@ -114,6 +131,7 @@ def _candidate_payload(row, source, edi_norm):
     if candidate_check and candidate_check == edi_check:
         candidate_score += 50
         reasons.append("check")
+        exact_check = True
     elif candidate_check_close and candidate_check_close == edi_check_close:
         candidate_score += 35
         reasons.append("close-check")
@@ -126,16 +144,92 @@ def _candidate_payload(row, source, edi_norm):
     if payload["amountNorm"] and payload["amountNorm"] == edi_norm["amountNorm"]:
         candidate_score += 30
         reasons.append("amount")
+        exact_amount = True
 
     if payload["dateNorm"] and payload["dateNorm"] == edi_norm["dateNorm"]:
         candidate_score += 10
         reasons.append("date")
+        exact_date = True
 
     payload["score"] = candidate_score
     payload["reason"] = "+".join(reasons) if reasons else "review"
-    payload["strongMatch"] = candidate_score >= 80
-    payload["closeMatch"] = 35 <= candidate_score < 80
+    payload["exactMatch"] = exact_check and exact_amount and exact_date
+    payload["strongMatch"] = candidate_score >= 75
+    payload["closeMatch"] = 75 <= candidate_score < 100
     return payload
+
+
+def _best_candidate(candidates):
+    if not candidates:
+        return None
+    return sorted(candidates, key=lambda item: (-item["score"], item["id"]))[0]
+
+
+def _worklist_sort_key(row, sort_by):
+    match_rank = {"N": 0, "P": 1, "Y": 2}
+    lockbox_rank = 1 if row.get("lockboxMatchCode") == "Y" else 0
+    eft_rank = 1 if row.get("eftMatchCode") == "Y" else 0
+    possible_score = int(row.get("possibleMatchScore") or 0)
+    edi_id = int(row["edi"]["id"])
+
+    if sort_by == "match":
+        return (match_rank.get(row.get("matchCode"), 0), edi_id)
+    if sort_by == "lockbox":
+        return (lockbox_rank, edi_id)
+    if sort_by == "eft":
+        return (eft_rank, edi_id)
+    if sort_by == "possible":
+        return (possible_score, edi_id)
+    return (edi_id,)
+
+
+def _date_year_sql(column_name):
+    value = f"TRIM(COALESCE({column_name}, ''))"
+    return (
+        f"CASE "
+        f"WHEN {value} GLOB '[0-9][0-9][0-9][0-9]-*' THEN substr({value}, 1, 4) "
+        f"WHEN {value} GLOB '[0-9][0-9][0-9][0-9]/*' THEN substr({value}, 1, 4) "
+        f"ELSE substr({value}, -4) "
+        f"END"
+    )
+
+
+def _build_edi_visibility_where(show_matched=True, show_unmatched=True, latest_year_only=False, latest_year=None):
+    clauses = []
+
+    if not show_matched and not show_unmatched:
+        clauses.append("1 = 0")
+    elif show_matched and not show_unmatched:
+        clauses.append("UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'")
+    elif show_unmatched and not show_matched:
+        clauses.append("(COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')")
+
+    if latest_year_only:
+        if latest_year is None:
+            clauses.append("1 = 0")
+        else:
+            clauses.append(f"CAST({_date_year_sql('check_date')} AS INTEGER) = {int(latest_year)}")
+
+    if not clauses:
+        return ""
+
+    return "WHERE " + " AND ".join(clauses)
+
+
+def _latest_edi_year(conn):
+    cur = conn.cursor()
+    row = cur.execute(
+        f"""
+        SELECT MAX(CAST({_date_year_sql('check_date')} AS INTEGER)) AS latest_year
+        FROM EDI
+        WHERE TRIM(COALESCE(check_date, '')) != ''
+        """
+    ).fetchone()
+    value = row[0] if row else None
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
 
 
 def _queue_snapshot(conn):
@@ -156,20 +250,34 @@ def _queue_snapshot(conn):
     return summary, "|".join(revision_parts)
 
 
-def build_match_dashboard(limit=50, revision=None):
-    safe_limit = max(1, min(int(limit or 50), 500))
+def build_match_dashboard(
+    limit=250,
+    revision=None,
+    page=1,
+    sort_by="edi",
+    sort_dir="asc",
+    show_matched=True,
+    show_unmatched=True,
+    latest_year_only=False,
+):
+    page_size = max(1, min(int(limit or 250), 250))
+    current_page = max(1, int(page or 1))
+    sort_by = str(sort_by or "edi").strip().lower()
+    if sort_by not in {"edi", "match", "lockbox", "eft", "possible"}:
+        sort_by = "edi"
+    sort_dir = "desc" if str(sort_dir or "asc").strip().lower() == "desc" else "asc"
+
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     ensure_match_indexes(conn)
     queue_summary, current_revision = _queue_snapshot(conn)
-    if revision is not None and str(revision).strip() == current_revision:
-        conn.close()
-        return {
-            "summary": queue_summary,
-            "rows": [],
-            "changed": False,
-            "revision": current_revision,
-        }
+    latest_year = _latest_edi_year(conn)
+    visibility_where = _build_edi_visibility_where(
+        show_matched=show_matched,
+        show_unmatched=show_unmatched,
+        latest_year_only=latest_year_only,
+        latest_year=latest_year,
+    )
 
     edi_rows = _fetch_rows(
         conn,
@@ -184,10 +292,8 @@ def build_match_dashboard(limit=50, revision=None):
             "timestamp",
             "matchstatus",
         ],
-        "WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED' ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
+        f"{visibility_where} ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
     )
-    if len(edi_rows) > safe_limit:
-        edi_rows = edi_rows[:safe_limit]
 
     eft_rows = _fetch_rows(
         conn,
@@ -230,8 +336,51 @@ def build_match_dashboard(limit=50, revision=None):
         "WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED' ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
     )
 
+    matched_eft_rows = _fetch_rows(
+        conn,
+        "EFT",
+        [
+            "Date",
+            "Amount",
+            "CheckNumber",
+            "Payer",
+            "batchnum",
+            "transnum",
+            "timestamp",
+            "matchstatus",
+        ],
+        "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND CheckNumber IS NOT NULL AND TRIM(CheckNumber) != ''",
+    )
+
+    matched_lockbox_rows = _fetch_rows(
+        conn,
+        "Lockbox",
+        [
+            "Transaction Number",
+            "Status",
+            "Note",
+            "Transaction Total",
+            "Deposit Date",
+            "Batch Number",
+            "Check Number",
+            "Check Amount",
+            "Site",
+            "Lockbox",
+            "Payor",
+            "Sequence",
+            "Number of Items",
+            "batchnum",
+            "transnum",
+            "timestamp",
+            "matchstatus",
+        ],
+        "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND \"Check Number\" IS NOT NULL AND TRIM(\"Check Number\") != ''",
+    )
+
     eft_index = defaultdict(list)
     lockbox_index = defaultdict(list)
+    matched_eft_index = defaultdict(list)
+    matched_lockbox_index = defaultdict(list)
     for row in eft_rows:
         norm = normalize_checknum(row.get("CheckNumber"))
         if norm:
@@ -240,6 +389,14 @@ def build_match_dashboard(limit=50, revision=None):
         norm = normalize_checknum(row.get("Check Number"))
         if norm:
             lockbox_index[norm].append(row)
+    for row in matched_eft_rows:
+        norm = normalize_checknum(row.get("CheckNumber"))
+        if norm:
+            matched_eft_index[norm].append(row)
+    for row in matched_lockbox_rows:
+        norm = normalize_checknum(row.get("Check Number"))
+        if norm:
+            matched_lockbox_index[norm].append(row)
 
     worklist = []
     for row in edi_rows:
@@ -258,8 +415,16 @@ def build_match_dashboard(limit=50, revision=None):
             if lockbox_candidate["score"] > 0:
                 lockbox_candidates.append(lockbox_candidate)
 
-        if not eft_candidates and not lockbox_candidates:
-            continue
+        all_candidates = eft_candidates + lockbox_candidates
+        best_possible = _best_candidate(all_candidates)
+        match_status = str(edi_norm.get("matchstatus") or "").strip().upper()
+        has_strong_candidate = bool(best_possible and best_possible.get("strongMatch"))
+        match_code = "Y" if _is_matched(match_status) else "N"
+        possible_match_label = (
+            f"review {best_possible['score']}% (c{best_possible['id']})"
+            if match_code == "N" and best_possible and has_strong_candidate
+            else ""
+        )
 
         worklist.append({
             "edi": edi_norm,
@@ -268,21 +433,50 @@ def build_match_dashboard(limit=50, revision=None):
             "strongCandidateCount": sum(1 for c in eft_candidates + lockbox_candidates if c["strongMatch"]),
             "closeCandidateCount": sum(1 for c in eft_candidates + lockbox_candidates if c["closeMatch"]),
             "hasCheckMatch": bool(check_norm and (eft_candidates or lockbox_candidates)),
+            "matchCode": match_code,
+            "eftMatchCode": "Y" if matched_eft_index.get(check_norm) else "",
+            "lockboxMatchCode": "Y" if matched_lockbox_index.get(check_norm) else "",
+            "possibleMatchLabel": possible_match_label,
+            "possibleMatchScore": best_possible["score"] if best_possible else None,
         })
 
+    reverse = sort_dir == "desc"
+    worklist.sort(key=lambda row: _worklist_sort_key(row, sort_by), reverse=reverse)
+
+    total_rows = len(worklist)
+    total_pages = max(1, math.ceil(total_rows / page_size))
+    current_page = min(current_page, total_pages)
+    start_index = (current_page - 1) * page_size
+    end_index = start_index + page_size
+    page_rows = worklist[start_index:end_index]
+
     summary = {
-        "ediUnmatched": len(worklist),
+        "ediRows": len(edi_rows),
+        "ediMatched": sum(1 for item in worklist if item["matchCode"] == "Y"),
+        "ediPossible": sum(1 for item in worklist if item["possibleMatchLabel"]),
+        "ediReview": sum(1 for item in worklist if item["matchCode"] == "N" and not item["possibleMatchLabel"]),
         "eftUnmatched": len(eft_rows),
         "lockboxUnmatched": len(lockbox_rows),
-        "strongCandidates": sum(1 for item in worklist if item["strongCandidateCount"] > 0),
     }
 
     conn.close()
     return {
         "summary": summary,
-        "rows": worklist,
-        "changed": True,
+        "rows": page_rows,
+        "changed": revision is None or str(revision).strip() != current_revision,
         "revision": current_revision,
+        "page": current_page,
+        "pageSize": page_size,
+        "totalRows": total_rows,
+        "totalPages": total_pages,
+        "hasPreviousPage": current_page > 1,
+        "hasNextPage": current_page < total_pages,
+        "sortBy": sort_by,
+        "sortDir": sort_dir,
+        "latestYear": latest_year,
+        "showMatched": bool(show_matched),
+        "showUnmatched": bool(show_unmatched),
+        "latestYearOnly": bool(latest_year_only),
     }
 
 
@@ -347,7 +541,7 @@ def get_match_detail(edi_id):
         """
         SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
         FROM EFT
-        WHERE UPPER(TRIM(matchstatus)) = 'MATCHED'
+        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
           AND CheckNumber IS NOT NULL
           AND TRIM(CheckNumber) != ''
         """,
@@ -360,7 +554,7 @@ def get_match_detail(edi_id):
                Site, Lockbox, Payor, Sequence, "Number of Items",
                batchnum, transnum, timestamp, matchstatus
         FROM Lockbox
-        WHERE UPPER(TRIM(matchstatus)) = 'MATCHED'
+        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
           AND "Check Number" IS NOT NULL
           AND TRIM("Check Number") != ''
         """,
@@ -408,7 +602,7 @@ def build_match_history(limit=100):
         SELECT rowid AS id, check_date, check_number, check_amount, filename,
                batchnum, transnum, timestamp, matchstatus
         FROM EDI
-        WHERE UPPER(TRIM(matchstatus)) = 'MATCHED'
+        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
         ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) DESC, id DESC
         LIMIT ?
         """,
@@ -419,7 +613,7 @@ def build_match_history(limit=100):
         """
         SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
         FROM EFT
-        WHERE UPPER(TRIM(matchstatus)) = 'MATCHED'
+        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
           AND CheckNumber IS NOT NULL
           AND TRIM(CheckNumber) != ''
         """,
@@ -432,7 +626,7 @@ def build_match_history(limit=100):
                Site, Lockbox, Payor, Sequence, "Number of Items",
                batchnum, transnum, timestamp, matchstatus
         FROM Lockbox
-        WHERE UPPER(TRIM(matchstatus)) = 'MATCHED'
+        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
           AND "Check Number" IS NOT NULL
           AND TRIM("Check Number") != ''
         """,
@@ -487,17 +681,18 @@ def commit_match(edi_id, eft_ids=None, lockbox_ids=None):
 
     conn = get_conn()
     cur = conn.cursor()
+    matched_value = _matched_status_value("MANUAL")
 
-    cur.execute('UPDATE EDI SET matchstatus = ? WHERE id = ?', (MATCHED_STATUS, int(edi_id)))
+    cur.execute('UPDATE EDI SET matchstatus = ? WHERE id = ?', (matched_value, int(edi_id)))
 
     eft_count = 0
     for row_id in eft_ids:
-        cur.execute('UPDATE EFT SET matchstatus = ? WHERE rowid = ?', (MATCHED_STATUS, row_id))
+        cur.execute('UPDATE EFT SET matchstatus = ? WHERE rowid = ?', (matched_value, row_id))
         eft_count += cur.rowcount
 
     lockbox_count = 0
     for row_id in lockbox_ids:
-        cur.execute('UPDATE Lockbox SET matchstatus = ? WHERE rowid = ?', (MATCHED_STATUS, row_id))
+        cur.execute('UPDATE Lockbox SET matchstatus = ? WHERE rowid = ?', (matched_value, row_id))
         lockbox_count += cur.rowcount
 
     conn.commit()
@@ -511,11 +706,12 @@ def commit_match(edi_id, eft_ids=None, lockbox_ids=None):
     }
 
 
-def commit_all_strong_matches():
+def commit_all_strong_matches(match_source="AUTO"):
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     ensure_match_indexes(conn)
     cur = conn.cursor()
+    matched_value = _matched_status_value(match_source)
 
     edi_rows = _fetch_rows(
         conn,
@@ -576,6 +772,8 @@ def commit_all_strong_matches():
 
     eft_index = defaultdict(list)
     lockbox_index = defaultdict(list)
+    matched_eft_index = defaultdict(list)
+    matched_lockbox_index = defaultdict(list)
     for row in eft_rows:
         norm = normalize_checknum(row.get("CheckNumber"))
         if norm:
@@ -584,6 +782,56 @@ def commit_all_strong_matches():
         norm = normalize_checknum(row.get("Check Number"))
         if norm:
             lockbox_index[norm].append(row)
+
+    matched_eft_rows = _fetch_rows(
+        conn,
+        "EFT",
+        [
+            "Date",
+            "Amount",
+            "CheckNumber",
+            "Payer",
+            "batchnum",
+            "transnum",
+            "timestamp",
+            "matchstatus",
+        ],
+        "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND CheckNumber IS NOT NULL AND TRIM(CheckNumber) != ''",
+    )
+
+    matched_lockbox_rows = _fetch_rows(
+        conn,
+        "Lockbox",
+        [
+            "Transaction Number",
+            "Status",
+            "Note",
+            "Transaction Total",
+            "Deposit Date",
+            "Batch Number",
+            "Check Number",
+            "Check Amount",
+            "Site",
+            "Lockbox",
+            "Payor",
+            "Sequence",
+            "Number of Items",
+            "batchnum",
+            "transnum",
+            "timestamp",
+            "matchstatus",
+        ],
+        "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND \"Check Number\" IS NOT NULL AND TRIM(\"Check Number\") != ''",
+    )
+
+    for row in matched_eft_rows:
+        norm = normalize_checknum(row.get("CheckNumber"))
+        if norm:
+            matched_eft_index[norm].append(row)
+    for row in matched_lockbox_rows:
+        norm = normalize_checknum(row.get("Check Number"))
+        if norm:
+            matched_lockbox_index[norm].append(row)
 
     used_edi = set()
     used_eft = set()
@@ -596,47 +844,48 @@ def commit_all_strong_matches():
         edi_norm = _row_common_payload(row, "EDI")
         check_norm = edi_norm["checkNumberNorm"]
 
-        strong_eft = []
-        strong_lockbox = []
+        exact_eft = []
+        exact_lockbox = []
+        has_record_match = bool(matched_eft_index.get(check_norm) or matched_lockbox_index.get(check_norm))
 
         for candidate in eft_index.get(check_norm, []):
             if candidate["id"] in used_eft:
                 continue
             eft_candidate = _candidate_payload(candidate, "EFT", edi_norm)
-            if eft_candidate["strongMatch"]:
-                strong_eft.append(eft_candidate)
+            if eft_candidate["exactMatch"]:
+                exact_eft.append(eft_candidate)
 
         for candidate in lockbox_index.get(check_norm, []):
             if candidate["id"] in used_lockbox:
                 continue
             lockbox_candidate = _candidate_payload(candidate, "Lockbox", edi_norm)
-            if lockbox_candidate["strongMatch"]:
-                strong_lockbox.append(lockbox_candidate)
+            if lockbox_candidate["exactMatch"]:
+                exact_lockbox.append(lockbox_candidate)
 
-        if not strong_eft and not strong_lockbox:
+        if not has_record_match and not exact_eft and not exact_lockbox:
             continue
 
         cur.execute(
             "UPDATE EDI SET matchstatus = ? WHERE id = ? AND (COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')",
-            (MATCHED_STATUS, int(row["id"])),
+            (matched_value, int(row["id"])),
         )
         if cur.rowcount:
             edi_count += 1
             used_edi.add(row["id"])
 
-        for candidate in strong_eft:
+        for candidate in exact_eft:
             cur.execute(
                 "UPDATE EFT SET matchstatus = ? WHERE rowid = ? AND (COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')",
-                (MATCHED_STATUS, int(candidate["id"])),
+                (matched_value, int(candidate["id"])),
             )
             if cur.rowcount:
                 eft_count += 1
                 used_eft.add(candidate["id"])
 
-        for candidate in strong_lockbox:
+        for candidate in exact_lockbox:
             cur.execute(
                 'UPDATE Lockbox SET matchstatus = ? WHERE rowid = ? AND (COALESCE(TRIM(matchstatus), \'\') = \'\' OR UPPER(TRIM(matchstatus)) = \'UNMATCHED\')',
-                (MATCHED_STATUS, int(candidate["id"])),
+                (matched_value, int(candidate["id"])),
             )
             if cur.rowcount:
                 lockbox_count += 1
@@ -650,5 +899,6 @@ def commit_all_strong_matches():
         "ediMatched": edi_count,
         "eftMatched": eft_count,
         "lockboxMatched": lockbox_count,
+        "exactMatched": edi_count,
         "strongMatched": edi_count,
     }

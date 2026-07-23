@@ -3,10 +3,12 @@ import axios from "axios";
 const API = "http://127.0.0.1:8000";
 
 export interface SourceMatchSummary {
-  ediUnmatched: number;
+  ediRows: number;
+  ediMatched: number;
+  ediPossible: number;
+  ediReview: number;
   eftUnmatched: number;
   lockboxUnmatched: number;
-  strongCandidates: number;
 }
 
 export type SourceMatchWorklistSummary = SourceMatchSummary;
@@ -26,6 +28,7 @@ export interface SourceMatchRow {
   matchstatus: string | null;
   score?: number;
   reason?: string;
+  exactMatch?: boolean;
   strongMatch?: boolean;
   closeMatch?: boolean;
 }
@@ -39,6 +42,11 @@ export interface SourceMatchWorklistRow {
   strongCandidateCount: number;
   closeCandidateCount: number;
   hasCheckMatch: boolean;
+  matchCode: "Y" | "N" | "P";
+  eftMatchCode: "Y" | "";
+  lockboxMatchCode: "Y" | "";
+  possibleMatchLabel: string;
+  possibleMatchScore?: number | null;
 }
 
 export interface SourceMatchWorklistResponse {
@@ -46,6 +54,18 @@ export interface SourceMatchWorklistResponse {
   rows: SourceMatchWorklistRow[];
   changed: boolean;
   revision: string;
+  page: number;
+  pageSize: number;
+  totalRows: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+  sortBy: string;
+  sortDir: "asc" | "desc";
+  latestYear?: number | null;
+  showMatched?: boolean;
+  showUnmatched?: boolean;
+  latestYearOnly?: boolean;
 }
 
 export interface SourceMatchDetail {
@@ -80,11 +100,35 @@ export interface SourceMatchCommitResponse {
   lockboxMatched: number;
 }
 
-export const getSourceMatchWorklist = (limit = 50, revision?: string | null) =>
+export interface SourceMatchBulkCommitResponse {
+  status: string;
+  ediMatched: number;
+  eftMatched: number;
+  lockboxMatched: number;
+  exactMatched?: number;
+  strongMatched?: number;
+}
+
+export const getSourceMatchWorklist = (
+  limit = 250,
+  revision?: string | null,
+  page = 1,
+  sortBy = "edi",
+  sortDir: "asc" | "desc" = "asc",
+  showMatched = true,
+  showUnmatched = true,
+  latestYearOnly = false,
+) =>
   axios.get<SourceMatchWorklistResponse>(`${API}/match/worklist`, {
     params: {
       limit,
       ...(revision ? { revision } : {}),
+      page,
+      sort_by: sortBy,
+      sort_dir: sortDir,
+      show_matched: showMatched,
+      show_unmatched: showUnmatched,
+      latest_year_only: latestYearOnly,
     },
   });
 
@@ -96,3 +140,6 @@ export const getSourceMatchHistory = (limit = 100) =>
 
 export const commitSourceMatch = (payload: SourceMatchCommitRequest) =>
   axios.post<SourceMatchCommitResponse>(`${API}/match/commit`, payload);
+
+export const commitAllExactMatches = () =>
+  axios.post<SourceMatchBulkCommitResponse>(`${API}/match/commit-exact-hits`);
