@@ -27,6 +27,7 @@ import SiteReviewScreen from "./Screens/sitereviewscreen";
 import MainScreen from "./Screens/mainscreen";
 import AdminScreen from "./Screens/adminscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
+import WorklistEditorScreen from "./Screens/worklisteditor";
 import NextLoader from "./Screens/nextloader";
 import Queue from "./Screens/queue";
 import RejectList from "./Screens/rejectlist";
@@ -185,6 +186,7 @@ export default function ScreenManager() {
         <Route path="/835-match" element={<Match835Screen />} />
         <Route path="/site-review" element={<SiteReviewScreen />} />
         <Route path="/approved" element={<ApprovedList />} />
+        <Route path="/worklist-editor" element={<WorklistEditorScreen />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />
         <Route path="/balancecheck" element={<BalanceCheckScreen />} />
         <Route path="/balsheet" element={<Balsheet />} />

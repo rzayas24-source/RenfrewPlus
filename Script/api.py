@@ -52,6 +52,8 @@ def _ensure_source_table_columns_on_startup():
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
+        ensure_tasks_table(conn)
+        normalize_tasks_table_categories(conn)
         refresh_source_table_mirrors(conn)
     finally:
         conn.close()
@@ -140,6 +142,68 @@ def ensure_balsheet_notes_table(conn=None):
         cur.execute(
             f'ALTER TABLE {_quote_identifier("Balsheet_notes")} ADD COLUMN {_quote_identifier("message")} TEXT'
         )
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+TASK_TABLE_COLUMNS = [
+    ("task_id", "TEXT PRIMARY KEY"),
+    ("task_list", "TEXT NOT NULL"),
+    ("title", "TEXT NOT NULL"),
+    ("details", "TEXT NOT NULL DEFAULT ''"),
+    ("category", "TEXT NOT NULL DEFAULT ''"),
+    ("recurrence", "TEXT NOT NULL DEFAULT 'none'"),
+    ("action_type", "TEXT NOT NULL DEFAULT 'none'"),
+    ("action_label", "TEXT NOT NULL DEFAULT ''"),
+    ("action_value", "TEXT NOT NULL DEFAULT ''"),
+    ("done", "INTEGER NOT NULL DEFAULT 0"),
+    ("sort_order", "INTEGER NOT NULL DEFAULT 0"),
+    ("next_due_at", "TEXT"),
+    ("completed_at", "TEXT"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
+WORKLIST_TASK_CATEGORY = "worklist"
+NORMAL_TASK_CATEGORY = "task"
+
+
+def ensure_tasks_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in TASK_TABLE_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("tasks")} ({column_defs})')
+    cur.execute(f'CREATE INDEX IF NOT EXISTS idx_tasks_list_order ON {_quote_identifier("tasks")} ({_quote_identifier("task_list")}, {_quote_identifier("sort_order")}, {_quote_identifier("title")})')
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def normalize_tasks_table_categories(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    cur.execute(
+        f"""
+        UPDATE {_quote_identifier("tasks")}
+        SET {_quote_identifier("category")} = CASE
+            WHEN LOWER({_quote_identifier("task_list")}) = 'template' THEN ?
+            ELSE ?
+        END
+        WHERE {_quote_identifier("task_list")} IN ('template', 'live')
+        """,
+        (WORKLIST_TASK_CATEGORY, NORMAL_TASK_CATEGORY),
+    )
     conn.commit()
 
     if close_conn:
@@ -356,6 +420,63 @@ def _append_table_from_dataframe(conn, table_name: str, df: pd.DataFrame):
     return int(len(clean_df))
 
 
+def _normalize_task_payload(task: dict, task_id: str | None = None, sort_order: int | None = None):
+    title = str(task.get("title") or "").strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="title is required")
+
+    task_list = str(task.get("task_list") or "live").strip().lower() or "live"
+    recurrence = str(task.get("recurrence") or "none").strip().lower()
+    if recurrence not in {"none", "daily", "weekly", "monthly"}:
+        recurrence = "none"
+
+    action_type = str(task.get("action_type") or "none").strip().lower()
+    if action_type not in {"none", "url", "copy", "copy_details"}:
+        action_type = "none"
+
+    now = datetime.now().isoformat(timespec="seconds")
+    next_due_at = str(task.get("next_due_at") or "").strip() or None
+    completed_at = str(task.get("completed_at") or "").strip() or None
+
+    return {
+        "task_id": str(task_id or task.get("task_id") or "").strip() or f"task-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        "task_list": task_list,
+        "title": title,
+        "details": str(task.get("details") or "").strip(),
+        "category": WORKLIST_TASK_CATEGORY if task_list == "template" else NORMAL_TASK_CATEGORY,
+        "recurrence": recurrence,
+        "action_type": action_type,
+        "action_label": str(task.get("action_label") or "").strip(),
+        "action_value": str(task.get("action_value") or "").strip(),
+        "done": 1 if bool(task.get("done")) else 0,
+        "sort_order": int(sort_order if sort_order is not None else task.get("sort_order") or 0),
+        "next_due_at": next_due_at,
+        "completed_at": completed_at,
+        "created_at": str(task.get("created_at") or now).strip(),
+        "updated_at": str(task.get("updated_at") or now).strip(),
+    }
+
+
+def _task_row_to_payload(row):
+    return {
+        "id": str(row["task_id"]),
+        "task_list": str(row["task_list"] or ""),
+        "title": str(row["title"] or ""),
+        "details": str(row["details"] or ""),
+        "category": str(row["category"] or ""),
+        "recurrence": str(row["recurrence"] or "none"),
+        "action_type": str(row["action_type"] or "none"),
+        "action_label": str(row["action_label"] or ""),
+        "action_value": str(row["action_value"] or ""),
+        "done": bool(row["done"]),
+        "sort_order": int(row["sort_order"] or 0),
+        "next_due_at": str(row["next_due_at"] or "") or None,
+        "completed_at": str(row["completed_at"] or "") or None,
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+    }
+
+
 def _normalize_eft_key_columns(df: pd.DataFrame, key_columns: list[str]) -> pd.DataFrame:
     normalized = df.loc[:, key_columns].copy()
     for column in key_columns:
@@ -428,6 +549,20 @@ def _load_calendar_rows(conn):
 
     rows.sort(key=lambda row: row["_bankSort"] or datetime.max)
     return rows
+
+
+def _load_task_rows(conn, task_list: str = "live"):
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        f"""
+        SELECT *
+        FROM {_quote_identifier("tasks")}
+        WHERE {_quote_identifier("task_list")} = ?
+        ORDER BY {_quote_identifier("sort_order")} ASC, {_quote_identifier("created_at")} ASC, {_quote_identifier("task_id")} ASC
+        """,
+        (task_list,),
+    ).fetchall()
+    return [_task_row_to_payload(row) for row in rows]
 
 
 def _live_cashing_totals(conn):
@@ -828,6 +963,227 @@ def post_calendar_set_work_day(payload: dict):
 def post_calendar_advance_work_day():
     advance_current_work_day()
     return _calendar_status_payload()
+
+
+@app.get("/tasks")
+def get_tasks(task_list: str = "live"):
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+
+    try:
+        return _load_task_rows(conn, task_list=task_list)
+    finally:
+        conn.close()
+
+
+@app.post("/tasks")
+def post_task(task: dict):
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+
+    try:
+        normalized = _normalize_task_payload(task)
+        columns = [name for name, _ in TASK_TABLE_COLUMNS]
+        quoted_columns = ", ".join(_quote_identifier(name) for name in columns)
+        placeholders = ", ".join(["?"] * len(columns))
+        conn.execute(
+            f'INSERT INTO {_quote_identifier("tasks")} ({quoted_columns}) VALUES ({placeholders})',
+            tuple(normalized[column] for column in columns),
+        )
+        conn.commit()
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("tasks")} WHERE {_quote_identifier("task_id")} = ?',
+            (normalized["task_id"],),
+        ).fetchone()
+        return _task_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.post("/tasks/bulk-replace")
+def replace_tasks(payload: dict):
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+
+    task_list = str(payload.get("task_list") or "live").strip() or "live"
+    tasks = payload.get("tasks", [])
+    if not isinstance(tasks, list):
+        raise HTTPException(status_code=400, detail="tasks must be a list")
+
+    try:
+        conn.execute(
+            f'DELETE FROM {_quote_identifier("tasks")} WHERE {_quote_identifier("task_list")} = ?',
+            (task_list,),
+        )
+        normalized_rows = []
+        for index, task in enumerate(tasks):
+            if not isinstance(task, dict):
+                continue
+            normalized = _normalize_task_payload(task, sort_order=index)
+            normalized["task_list"] = task_list
+            normalized_rows.append(normalized)
+
+        if normalized_rows:
+            columns = [name for name, _ in TASK_TABLE_COLUMNS]
+            quoted_columns = ", ".join(_quote_identifier(name) for name in columns)
+            placeholders = ", ".join(["?"] * len(columns))
+            conn.executemany(
+                f'INSERT INTO {_quote_identifier("tasks")} ({quoted_columns}) VALUES ({placeholders})',
+                [tuple(row[column] for column in columns) for row in normalized_rows],
+            )
+        conn.commit()
+        return {"status": "ok", "task_list": task_list, "rows": len(normalized_rows)}
+    finally:
+        conn.close()
+
+
+@app.post("/tasks/import-template")
+def import_template_to_live(payload: dict | None = None):
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+    conn.row_factory = sqlite3.Row
+
+    payload = payload or {}
+    source_list = str(payload.get("source_list") or "template").strip() or "template"
+    target_list = str(payload.get("target_list") or "live").strip() or "live"
+
+    try:
+        rows = conn.execute(
+            f"""
+            SELECT *
+            FROM {_quote_identifier("tasks")}
+            WHERE {_quote_identifier("task_list")} = ?
+            ORDER BY {_quote_identifier("sort_order")} ASC, {_quote_identifier("created_at")} ASC, {_quote_identifier("task_id")} ASC
+            """,
+            (source_list,),
+        ).fetchall()
+        conn.execute(
+            f'DELETE FROM {_quote_identifier("tasks")} WHERE {_quote_identifier("task_list")} = ?',
+            (target_list,),
+        )
+        copied_rows = []
+        now = datetime.now().isoformat(timespec="seconds")
+        for index, row in enumerate(rows):
+            copied = _task_row_to_payload(row)
+            copied["id"] = f'task-{datetime.now().strftime("%Y%m%d%H%M%S%f")}-{index}'
+            copied["task_list"] = target_list
+            copied["sort_order"] = index
+            copied["created_at"] = now
+            copied["updated_at"] = now
+            copied_rows.append(_normalize_task_payload(copied, task_id=copied["id"], sort_order=index))
+
+        if copied_rows:
+            columns = [name for name, _ in TASK_TABLE_COLUMNS]
+            quoted_columns = ", ".join(_quote_identifier(name) for name in columns)
+            placeholders = ", ".join(["?"] * len(columns))
+            conn.executemany(
+                f'INSERT INTO {_quote_identifier("tasks")} ({quoted_columns}) VALUES ({placeholders})',
+                [tuple(row[column] for column in columns) for row in copied_rows],
+            )
+        conn.commit()
+        return {"status": "ok", "source_list": source_list, "target_list": target_list, "rows": len(copied_rows)}
+    finally:
+        conn.close()
+
+
+@app.put("/tasks/{task_id}")
+def put_task(task_id: str, task: dict):
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute(
+            f'SELECT * FROM {_quote_identifier("tasks")} WHERE {_quote_identifier("task_id")} = ?',
+            (task_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+        normalized = _normalize_task_payload(task, task_id=task_id)
+        conn.execute(
+            f"""
+            UPDATE {_quote_identifier("tasks")}
+            SET
+                {_quote_identifier("task_list")} = ?,
+                {_quote_identifier("title")} = ?,
+                {_quote_identifier("details")} = ?,
+                {_quote_identifier("category")} = ?,
+                {_quote_identifier("recurrence")} = ?,
+                {_quote_identifier("action_type")} = ?,
+                {_quote_identifier("action_label")} = ?,
+                {_quote_identifier("action_value")} = ?,
+                {_quote_identifier("done")} = ?,
+                {_quote_identifier("sort_order")} = ?,
+                {_quote_identifier("next_due_at")} = ?,
+                {_quote_identifier("completed_at")} = ?,
+                {_quote_identifier("created_at")} = ?,
+                {_quote_identifier("updated_at")} = ?
+            WHERE {_quote_identifier("task_id")} = ?
+            """,
+            (
+                normalized["task_list"],
+                normalized["title"],
+                normalized["details"],
+                normalized["category"],
+                normalized["recurrence"],
+                normalized["action_type"],
+                normalized["action_label"],
+                normalized["action_value"],
+                normalized["done"],
+                normalized["sort_order"],
+                normalized["next_due_at"],
+                normalized["completed_at"],
+                normalized["created_at"],
+                normalized["updated_at"],
+                task_id,
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("tasks")} WHERE {_quote_identifier("task_id")} = ?',
+            (task_id,),
+        ).fetchone()
+        return _task_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: str):
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("tasks")} WHERE {_quote_identifier("task_id")} = ?',
+            (task_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Task not found")
+        conn.commit()
+        return {"status": "ok", "task_id": task_id}
+    finally:
+        conn.close()
+
+
+@app.get("/tasks/template")
+def get_task_template():
+    init_db()
+    conn = get_conn()
+    ensure_tasks_table(conn)
+
+    try:
+        return _load_task_rows(conn, task_list="template")
+    finally:
+        conn.close()
 
 
 @app.get("/admin/tables")

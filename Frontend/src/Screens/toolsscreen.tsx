@@ -143,6 +143,15 @@ export default function ToolsScreen() {
             <span style={adminStyles.navButtonLabel}>Duplicate Check</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
+          <button
+            className="sidebar-nav-button"
+            style={adminStyles.navButton}
+            type="button"
+            onClick={() => navigate("/worklist-editor")}
+          >
+            <span style={adminStyles.navButtonLabel}>Daily Worklist</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>â†—</span>
+          </button>
         </nav>
 
         <div style={adminStyles.sidebarCard}>
