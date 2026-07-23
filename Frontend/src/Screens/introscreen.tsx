@@ -1,9 +1,9 @@
-﻿// src/Screens/introscreen.tsx
-
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchPendingByDay } from "../api/introscreen_api";
+import { styles as adminStyles } from "./adminscreen";
+import { WorklistBrandButton } from "../worklist/worklist";
 
 interface PendingItem {
   id: number;
@@ -37,7 +37,6 @@ export default function IntroScreen() {
   const [pending, setPending] = useState<PendingByDay>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     fetchPendingByDay()
@@ -62,230 +61,256 @@ export default function IntroScreen() {
 
   if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.statusText}>Loading pending items...</div>
+      <main style={adminStyles.shell}>
+        <div style={adminStyles.glowBlue} />
+        <div style={adminStyles.glowPink} />
+        <div style={introStyles.loadingState}>Loading pending items...</div>
       </main>
     );
   }
 
   return (
-    <main style={styles.page}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Pending Items</h1>
-          <div style={styles.subtitle}>{totalPending} file{totalPending === 1 ? "" : "s"} waiting</div>
+    <main style={adminStyles.shell}>
+      <div style={adminStyles.glowBlue} />
+      <div style={adminStyles.glowPink} />
+
+      <aside style={adminStyles.sidebar}>
+        <div style={adminStyles.brandWrap}>
+          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
+            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
+          </WorklistBrandButton>
+          <div style={adminStyles.brandWomenMark} aria-hidden="true">
+            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
+          </div>
         </div>
-        <div style={styles.menu}>
-          <button
-            style={styles.menuButton}
-            type="button"
-            onClick={() => setMenuOpen((current) => !current)}
-            title="More options"
-            aria-label="More options"
-            aria-expanded={menuOpen}
-          >
-            ...
+
+        <p style={adminStyles.sidebarCopy}>
+          A calm pending-items console for moving through day-based review batches.
+        </p>
+
+        <nav style={adminStyles.navStack} aria-label="Pending navigation">
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
+            <span style={adminStyles.navButtonLabel}>Site Review</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
-          {menuOpen && (
-            <div style={styles.menuDropdown}>
-              <button
-                style={styles.menuItem}
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  navigate("/balsheet/view");
-                }}
-              >
-                Balsheet
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/approved")}>
+            <span style={adminStyles.navButtonLabel}>Approved</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
+          </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/sites")}>
+            <span style={adminStyles.navButtonLabel}>Sites</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
+          </button>
+        </nav>
+
+        <div style={adminStyles.sidebarCard}>
+          <div style={adminStyles.sidebarCardLabel}>Today</div>
+          <div style={adminStyles.sidebarCardValue}>{totalPending} pending</div>
+          <div style={adminStyles.sidebarCardMeta}>
+            {days.length > 0 ? `${days.length} day group${days.length === 1 ? "" : "s"} ready to review.` : "No pending work found."}
+          </div>
+        </div>
+      </aside>
+
+      <section style={adminStyles.content}>
+        <section style={adminStyles.heroShell}>
+          <div style={adminStyles.heroCopy}>
+            <div style={adminStyles.kicker}>Pending items</div>
+            <p style={adminStyles.subtitle}>
+              Review the day groups, open a batch, and step straight into the attachment flow.
+            </p>
+
+            <div style={adminStyles.heroActions}>
+              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/site-review")}>
+                Open Site Review
               </button>
-              <button
-                style={styles.menuItem}
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false);
-                  navigate("/approved");
-                }}
-              >
-                Approved Batches
+              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/attachments")}>
+                Open Queue
               </button>
             </div>
-          )}
-        </div>
-      </header>
+          </div>
 
-      {error && <div style={styles.errorText}>{error}</div>}
-
-      {days.length === 0 && !error && (
-        <div style={styles.statusText}>No pending items found.</div>
-      )}
-
-      <section style={styles.dayList}>
-        {days.map((day) => (
-          <div key={day} style={styles.dayGroup}>
-            <div style={styles.dayHeader}>
-              <h2 style={styles.dayTitle}>{formatDay(day)}</h2>
-              <div style={styles.dayActions}>
-                <span style={styles.count}>{pending[day].length}</span>
-                <button
-                  style={styles.smallButton}
-                  onClick={() => navigate(`/attachments?day=${encodeURIComponent(day)}`)}
-                >
-                  Review
-                </button>
+          <div style={adminStyles.heroArt}>
+            <div style={adminStyles.heroStatusCard}>
+              <div style={adminStyles.heroStatusTop}>
+                <span style={adminStyles.statusPill}>Review batches</span>
+                <span style={adminStyles.statusDot} />
+              </div>
+              <div style={adminStyles.heroStatusTitle}>One day, one bundle</div>
+              <div style={adminStyles.heroStatusText}>
+                Each day group opens the matching attachment queue and stays tied to that batch.
               </div>
             </div>
-
-            <ul style={styles.fileList}>
-              {pending[day].map((item) => (
-                <li key={item.id} style={styles.fileItem}>{item.filename}</li>
-              ))}
-            </ul>
           </div>
-        ))}
+        </section>
+
+        <section style={adminStyles.statsGrid}>
+          <article style={adminStyles.statCard}>
+            <div style={adminStyles.statLabel}>Pending</div>
+            <div style={adminStyles.statValue}>{totalPending}</div>
+            <div style={adminStyles.statDetail}>All items currently waiting in the queue.</div>
+          </article>
+          <article style={adminStyles.statCard}>
+            <div style={adminStyles.statLabel}>Days</div>
+            <div style={adminStyles.statValue}>{days.length}</div>
+            <div style={adminStyles.statDetail}>Grouped by the batch day for review.</div>
+          </article>
+          <article style={adminStyles.statCard}>
+            <div style={adminStyles.statLabel}>Top group</div>
+            <div style={adminStyles.statValue}>{days[0] ? formatDay(days[0]) : "None"}</div>
+            <div style={adminStyles.statDetail}>The next day bundle waiting at the top of the stack.</div>
+          </article>
+        </section>
+
+        <section style={adminStyles.widgetSection}>
+          <div style={adminStyles.sectionHeader}>
+            <div>
+              <div style={adminStyles.sectionKicker}>Day groups</div>
+              <h2 style={adminStyles.sectionTitle}>Select a batch day to review its attachments</h2>
+            </div>
+            <div style={adminStyles.sectionMeta}>
+              The review button opens the matching day bundle in the attachments screen.
+            </div>
+          </div>
+
+          {error && <div style={introStyles.errorBanner}>{error}</div>}
+
+          {days.length === 0 && !error && <div style={introStyles.emptyState}>No pending items found.</div>}
+
+          <div style={introStyles.dayGrid}>
+            {days.map((day) => (
+              <article key={day} style={introStyles.dayCard}>
+                <div style={introStyles.dayTop}>
+                  <div>
+                    <div style={introStyles.dayLabel}>Batch Day</div>
+                    <div style={introStyles.dayTitle}>{formatDay(day)}</div>
+                  </div>
+                  <div style={introStyles.countPill}>{pending[day].length} item{pending[day].length === 1 ? "" : "s"}</div>
+                </div>
+
+                <div style={introStyles.dayMeta}>
+                  {pending[day][0]?.filename || "No filename available"}
+                </div>
+
+                <ul style={introStyles.fileList}>
+                  {pending[day].map((item) => (
+                    <li key={item.id} style={introStyles.fileItem}>
+                      {item.filename}
+                    </li>
+                  ))}
+                </ul>
+
+                <div style={introStyles.dayActions}>
+                  <button
+                    style={adminStyles.primaryButton}
+                    type="button"
+                    onClick={() => navigate(`/attachments?day=${encodeURIComponent(day)}`)}
+                  >
+                    Review Day
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
       </section>
     </main>
   );
 }
 
-const styles: Record<string, CSSProperties> = {
-  page: {
+const introStyles: Record<string, CSSProperties> = {
+  loadingState: {
     minHeight: "100vh",
-    boxSizing: "border-box",
-    padding: "28px",
-    background: "#f6f7f9",
-    color: "#1f2933",
-    fontFamily: "Inter, Segoe UI, Arial, sans-serif",
+    display: "grid",
+    placeItems: "center",
+    color: "#5f6b7a",
+    fontSize: "18px",
   },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "16px",
-    marginBottom: "24px",
+  errorBanner: {
+    marginBottom: "14px",
+    padding: "12px 14px",
+    borderRadius: "10px",
+    border: "1px solid #f0b4b4",
+    background: "#fff5f5",
+    color: "#a32121",
   },
-  title: {
-    margin: 0,
-    fontSize: "28px",
-    fontWeight: 700,
-  },
-  subtitle: {
-    marginTop: "6px",
-    fontSize: "15px",
+  emptyState: {
+    padding: "18px 16px",
+    borderRadius: "16px",
+    border: "1px dashed rgba(140, 160, 184, 0.30)",
+    background: "rgba(255,255,255,0.8)",
     color: "#5f6b7a",
   },
-  menu: {
-    position: "relative",
-  },
-  menuButton: {
-    width: "36px",
-    height: "34px",
-    border: "1px solid #c8d0dc",
-    borderRadius: "6px",
-    background: "#ffffff",
-    color: "#1f2933",
-    cursor: "pointer",
-    fontSize: "18px",
-    fontWeight: 700,
-    lineHeight: 1,
-  },
-  menuDropdown: {
-    position: "absolute",
-    top: "40px",
-    right: 0,
-    zIndex: 5,
-    minWidth: "170px",
-    border: "1px solid #c8d0dc",
-    borderRadius: "6px",
-    background: "#ffffff",
-    boxShadow: "0 8px 18px rgba(31, 41, 51, 0.12)",
-    overflow: "hidden",
-  },
-  menuItem: {
-    width: "100%",
-    padding: "10px 12px",
-    border: 0,
-    background: "#ffffff",
-    color: "#1f2933",
-    cursor: "pointer",
-    textAlign: "left",
-    fontSize: "14px",
-  },
-  dayList: {
-    display: "flex",
-    flexDirection: "column",
+  dayGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
     gap: "14px",
+    alignItems: "start",
   },
-  dayGroup: {
-    border: "1px solid #d9dee7",
-    borderRadius: "8px",
-    background: "#ffffff",
-    overflow: "hidden",
+  dayCard: {
+    padding: "18px",
+    borderRadius: "24px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.86)",
+    boxShadow: "0 18px 34px rgba(52, 84, 120, 0.06)",
   },
-  dayHeader: {
+  dayTop: {
     display: "flex",
-    alignItems: "center",
     justifyContent: "space-between",
     gap: "12px",
-    padding: "14px 16px",
-    borderBottom: "1px solid #edf0f4",
-    background: "#fbfcfe",
+    alignItems: "start",
+    marginBottom: "10px",
+  },
+  dayLabel: {
+    fontSize: "12px",
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "#72859a",
+    fontWeight: 800,
+    marginBottom: "8px",
   },
   dayTitle: {
-    margin: 0,
-    fontSize: "17px",
-    fontWeight: 700,
+    fontSize: "18px",
+    lineHeight: 1.4,
+    fontWeight: 800,
+    color: "#17324f",
   },
-  dayActions: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-  },
-  smallButton: {
-    height: "32px",
-    padding: "0 12px",
-    border: "1px solid #1f6feb",
-    borderRadius: "6px",
-    background: "#1f6feb",
-    color: "#ffffff",
-    fontSize: "14px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-  count: {
-    minWidth: "28px",
-    height: "24px",
-    padding: "0 8px",
-    borderRadius: "999px",
-    background: "#eef4ff",
-    color: "#1f4e91",
+  countPill: {
     display: "inline-flex",
     alignItems: "center",
-    justifyContent: "center",
-    fontSize: "13px",
-    fontWeight: 700,
+    padding: "7px 10px",
+    borderRadius: "999px",
+    background: "rgba(214, 229, 255, 0.9)",
+    color: "#1f4e91",
+    fontWeight: 800,
+    fontSize: "12px",
+    whiteSpace: "nowrap",
+  },
+  dayMeta: {
+    fontSize: "14px",
+    lineHeight: 1.6,
+    color: "#597085",
+    marginBottom: "14px",
   },
   fileList: {
     listStyle: "none",
     margin: 0,
     padding: 0,
+    display: "grid",
+    gap: "8px",
   },
   fileItem: {
-    padding: "10px 16px",
-    borderBottom: "1px solid #f0f2f5",
-    fontSize: "15px",
+    padding: "10px 12px",
+    borderRadius: "14px",
+    background: "rgba(247, 250, 253, 0.96)",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    fontSize: "14px",
     overflowWrap: "anywhere",
+    color: "#35506d",
   },
-  statusText: {
-    fontSize: "18px",
-    color: "#4b5563",
-  },
-  errorText: {
-    marginBottom: "18px",
-    padding: "12px 14px",
-    border: "1px solid #f0b4b4",
-    borderRadius: "6px",
-    background: "#fff5f5",
-    color: "#a32121",
-    fontSize: "15px",
+  dayActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    marginTop: "16px",
   },
 };

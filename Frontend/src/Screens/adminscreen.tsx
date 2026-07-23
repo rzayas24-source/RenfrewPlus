@@ -55,6 +55,14 @@ export default function AdminScreen() {
       path: "/home",
       footnote: "Config",
     },
+    {
+      title: "Sites",
+      meta: "Add, edit, and deactivate sites used by the review dropdowns.",
+      tone: "mist",
+      action: "Open Sites",
+      path: "/sites",
+      footnote: "Population",
+    },
   ];
 
   const stats: StatCard[] = [
@@ -101,6 +109,10 @@ export default function AdminScreen() {
           </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin/tables")}>
             <span style={styles.navButtonLabel}>Tables</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>?</span>
+          </button>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/sites")}>
+            <span style={styles.navButtonLabel}>Sites</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>?</span>
           </button>
         </nav>

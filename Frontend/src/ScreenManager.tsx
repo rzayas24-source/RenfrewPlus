@@ -15,6 +15,7 @@ import CashScreen from "./Screens/cashscreen";
 import ERAConvertScreen from "./Screens/eraconvertscreen";
 import HTMLConvertScreen from "./Screens/htmlconvertscreen";
 import ImportScreen from "./Screens/importscreen";
+import EmailDownloaderScreen from "./Screens/emaildownloaderscreen";
 import EFTUploadScreen from "./Screens/eft_uploadscreen";
 import Upload835Screen from "./Screens/835uploadscreen";
 import LockboxImportScreen from "./Screens/lockbox_importscreen";
@@ -24,6 +25,7 @@ import DuplicateCheckScreen from "./Screens/duplicatecheckscreen";
 import BankingScreen from "./Screens/bankingscreen";
 import Match835Screen from "./Screens/835matchscreen";
 import SiteReviewScreen from "./Screens/sitereviewscreen";
+import SnapshotGeneratorScreen from "./Screens/snapshotgeneratorscreen";
 import MainScreen from "./Screens/mainscreen";
 import AdminScreen from "./Screens/adminscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
@@ -185,6 +187,8 @@ export default function ScreenManager() {
         <Route path="/banking" element={<BankingScreen />} />
         <Route path="/835-match" element={<Match835Screen />} />
         <Route path="/site-review" element={<SiteReviewScreen />} />
+        <Route path="/email-downloader" element={<EmailDownloaderScreen />} />
+        <Route path="/snapshot-generator" element={<SnapshotGeneratorScreen />} />
         <Route path="/approved" element={<ApprovedList />} />
         <Route path="/worklist-editor" element={<WorklistEditorScreen />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />

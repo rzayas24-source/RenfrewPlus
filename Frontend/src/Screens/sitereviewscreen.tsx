@@ -54,16 +54,23 @@ export default function SiteReviewScreen() {
       path: "/cash",
     },
     {
+      title: "Snapshot Generator",
+      meta: "Render review snapshots for the downloaded email bundle.",
+      tone: "mist",
+      action: "Open Snapshots",
+      path: "/snapshot-generator",
+    },
+    {
       title: "Site Notes",
       meta: "Use this card for reminders, exceptions, and follow-up details.",
-      tone: "mist",
+      tone: "pearl",
       action: "Open Notes",
       path: "/approved",
     },
     {
       title: "Workspace Home",
       meta: "Return to the main dashboard whenever you need the full menu.",
-      tone: "pearl",
+      tone: "blue",
       action: "Back to Main",
       path: "/",
     },
@@ -127,6 +134,12 @@ export default function SiteReviewScreen() {
             <div style={adminStyles.heroActions}>
               <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/site")}>
                 Open Site
+              </button>
+              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/email-downloader")}>
+                Open Email Downloader
+              </button>
+              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/snapshot-generator")}>
+                Open Snapshot Generator
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/cash")}>
                 Open Cash

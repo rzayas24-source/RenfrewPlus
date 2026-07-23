@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { approveAttachment } from "../api/attachmentreview_api";
+import { approveAttachment, updateAttachmentSite } from "../api/attachmentreview_api";
 import { getSites } from "../api/keyproof_api";
 import type { KeyproofDraft, SiteOption } from "../api/keyproof_api";
 import "./keyproof.css";
@@ -221,6 +221,9 @@ export default function Keyproof() {
     if (!attachmentId) return;
 
     window.localStorage.setItem(keyproofStorageKey(attachmentId), JSON.stringify(form));
+    if (form.site) {
+      void updateAttachmentSite(Number(attachmentId), form.site);
+    }
 
     const result = runBalanceCheck();
 
@@ -239,6 +242,9 @@ export default function Keyproof() {
     if (!attachmentId) return;
 
     window.localStorage.setItem(keyproofStorageKey(attachmentId), JSON.stringify(form));
+    if (form.site) {
+      await updateAttachmentSite(Number(attachmentId), form.site);
+    }
 
     const result = runBalanceCheck();
 

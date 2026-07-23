@@ -2,7 +2,11 @@ import os
 import shutil
 import sqlite3
 import re
+import json
+import tempfile
 import zipfile
+import subprocess
+import sys
 from io import BytesIO
 from datetime import datetime
 from collections import defaultdict
@@ -33,6 +37,9 @@ ZIP_835_TRN_FOLDER = os.path.join(WORKFLOW_ROOT, "1.TRN")
 ZIP_835_ERA_FOLDER = os.path.join(WORKFLOW_ROOT, "2.ERA")
 ZIP_835_HTML_FOLDER = os.path.join(WORKFLOW_ROOT, "3.HTML")
 ZIP_835_TRN_ARCHIVE_FOLDER = os.path.join(ZIP_835_TRN_FOLDER, "Loaded")
+EMAIL_DOWNLOADER_SCRIPT = os.path.join(os.path.dirname(__file__), "site_emaildownloader.py")
+SNAPSHOT_GENERATOR_SCRIPT = os.path.join(os.path.dirname(__file__), "site_snapshotgenerator.py")
+PYTHONW_EXE = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
 
 app = FastAPI()
 
@@ -48,6 +55,8 @@ app.add_middleware(
 def _ensure_source_table_columns_on_startup():
     conn = get_conn()
     try:
+        ensure_imported_files_table(conn)
+        backfill_imported_file_batches(conn)
         ensure_source_table_columns(conn)
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
@@ -64,6 +73,240 @@ def get_conn():
 
 def _quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
+
+
+_BATCH_PREFIX_RE = re.compile(r"^(?P<batch_id>\d{2}\.\d{2}\.\d{2})-")
+
+
+def _batch_info_from_filename(filename: str):
+    match = _BATCH_PREFIX_RE.match(filename or "")
+    if not match:
+        return None, None
+
+    batch_id = match.group("batch_id")
+    try:
+        batch_date = datetime.strptime(batch_id, "%m.%d.%y").strftime("%Y-%m-%d")
+    except ValueError:
+        batch_date = batch_id
+    return batch_id, batch_date
+
+
+IMPORTED_FILES_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("filename", "TEXT"),
+    ("moved_from", "TEXT"),
+    ("moved_to", "TEXT"),
+    ("archived_to", "TEXT"),
+    ("processed_at", "TEXT"),
+    ("site", "TEXT"),
+    ("detail", "TEXT"),
+    ("amount", "REAL"),
+    ("snapshot_path", "TEXT"),
+    ("review_status", "TEXT DEFAULT 'Pending'"),
+    ("reviewer", "TEXT"),
+    ("review_notes", "TEXT"),
+    ("batch_id", "TEXT"),
+    ("batch_date", "TEXT"),
+    ("email_id", "TEXT"),
+    ("original_filename", "TEXT"),
+    ("download_notes", "TEXT"),
+    ("source_type", "TEXT"),
+]
+
+
+def ensure_imported_files_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in IMPORTED_FILES_TABLE_COLUMNS
+    )
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("imported_files")} ({column_defs})')
+
+    existing_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("imported_files")})').fetchall()
+    }
+    for column_name, column_type in IMPORTED_FILES_TABLE_COLUMNS:
+        if column_name.lower() in existing_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("imported_files")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def backfill_imported_file_batches(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    rows = cur.execute(
+        """
+        SELECT id, filename, batch_id, batch_date
+        FROM imported_files
+        WHERE filename IS NOT NULL AND filename != ''
+        """
+    ).fetchall()
+
+    changed = False
+    for row_id, filename, current_batch_id, current_batch_date in rows:
+        batch_id, batch_date = _batch_info_from_filename(filename)
+        if not batch_id and not batch_date:
+            continue
+
+        updates = []
+        params = []
+        if batch_id and current_batch_id != batch_id:
+            updates.append("batch_id = ?")
+            params.append(batch_id)
+        if batch_date and current_batch_date != batch_date:
+            updates.append("batch_date = ?")
+            params.append(batch_date)
+
+        if not updates:
+            continue
+
+        params.append(row_id)
+        cur.execute(
+            f'UPDATE {_quote_identifier("imported_files")} SET {", ".join(updates)} WHERE id = ?',
+            params,
+        )
+        changed = True
+
+    if changed:
+        conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def _normalize_pending_day(value):
+    if value in (None, ""):
+        return None
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    formats = [
+        "%Y-%m-%d",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S.%f",
+        "%m/%d/%Y",
+        "%m/%d/%Y %H:%M:%S",
+        "%m.%d.%Y",
+        "%m.%d.%y",
+        "%m-%d-%Y",
+        "%m-%d-%y",
+    ]
+
+    for fmt in formats:
+        try:
+            if fmt in ("%Y-%m-%d %H:%M:%S", "%m/%d/%Y %H:%M:%S"):
+                candidate = text[:19]
+            elif fmt in ("%Y-%m-%dT%H:%M:%S.%f",):
+                candidate = text[:26]
+            else:
+                candidate = text[:10]
+            return datetime.strptime(candidate, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    if "T" in text:
+        try:
+            return datetime.fromisoformat(text.replace("Z", "")).strftime("%Y-%m-%d")
+        except ValueError:
+            pass
+
+    return text[:10] if len(text) >= 10 else text
+
+
+def _row_pending_day(row, batch_date_index, batch_id_index, processed_at_index):
+    for index in (batch_date_index, batch_id_index, processed_at_index):
+        if index is None or index >= len(row):
+            continue
+        normalized = _normalize_pending_day(row[index])
+        if normalized:
+            return normalized
+    return "Unknown"
+
+
+def _run_pythonw_worker(*args):
+    if not os.path.exists(PYTHONW_EXE):
+        raise HTTPException(status_code=500, detail="pythonw.exe was not found")
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+        output_path = tmp.name
+
+    try:
+        completed = subprocess.run(
+            [PYTHONW_EXE, EMAIL_DOWNLOADER_SCRIPT, *args, "--output", output_path],
+            cwd=os.path.dirname(__file__),
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+        if completed.returncode != 0:
+            stderr = (completed.stderr or "").strip()
+            stdout = (completed.stdout or "").strip()
+            detail = stderr or stdout or "Email downloader worker failed"
+            raise HTTPException(status_code=500, detail=detail)
+
+        if not os.path.exists(output_path):
+            raise HTTPException(status_code=500, detail="Email downloader worker did not return output")
+
+        with open(output_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=500, detail="Email downloader worker timed out") from exc
+    finally:
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
+
+
+def _run_script_worker(script_path, *args, timeout=120):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
+        output_path = tmp.name
+
+    try:
+        completed = subprocess.run(
+            [sys.executable, script_path, "run", *args, "--output", output_path],
+            cwd=os.path.dirname(__file__),
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if completed.returncode != 0:
+            stderr = (completed.stderr or "").strip()
+            stdout = (completed.stdout or "").strip()
+            detail = stderr or stdout or "Snapshot generator worker failed"
+            raise HTTPException(status_code=500, detail=detail)
+
+        if not os.path.exists(output_path):
+            raise HTTPException(status_code=500, detail="Snapshot generator worker did not return output")
+
+        with open(output_path, "r", encoding="utf-8") as handle:
+            return json.load(handle)
+    except subprocess.TimeoutExpired as exc:
+        raise HTTPException(status_code=500, detail="Snapshot generator worker timed out") from exc
+    finally:
+        try:
+            os.remove(output_path)
+        except OSError:
+            pass
 
 
 BALSHEET_TABLE_COLUMNS = [
@@ -711,20 +954,27 @@ def _calendar_range_payload(start_str, end_str):
 # GET FIRST PENDING IMPORTED FILE
 # ------------------------------------------------------------
 @app.get("/attachments/pending")
-def get_first_pending():
+def get_first_pending(day: str | None = None):
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, filename, snapshot_path, review_status
+        SELECT id, filename, site, snapshot_path, review_status, batch_date, batch_id, processed_at
         FROM imported_files
         WHERE review_status = 'Pending'
         ORDER BY id ASC
-        LIMIT 1
     """)
 
-    row = cur.fetchone()
+    rows = cur.fetchall()
     conn.close()
+
+    desired_day = _normalize_pending_day(day) if day else None
+    row = None
+    for candidate in rows:
+        if desired_day and _row_pending_day(candidate, 5, 6, 7) != desired_day:
+            continue
+        row = candidate
+        break
 
     if not row:
         return {"done": True}
@@ -732,10 +982,61 @@ def get_first_pending():
     return {
         "id": row[0],
         "filename": row[1],
-        "snapshot": row[2],
-        "status": row[3],
+        "site": row[2],
+        "snapshot": row[3],
+        "status": row[4],
         "done": False
     }
+
+
+@app.get("/email-downloader/folders")
+def get_email_downloader_folders():
+    try:
+        return _run_pythonw_worker("folders")
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load folders: {exc}") from exc
+
+
+@app.get("/email-downloader/dates")
+def get_email_downloader_dates(folder_index: int):
+    try:
+        return _run_pythonw_worker("dates", "--folder-index", str(int(folder_index)))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to load dates: {exc}") from exc
+
+
+@app.post("/email-downloader/run")
+def run_email_downloader(payload: dict):
+    try:
+        folder_index = int(payload.get("folder_index"))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="folder_index is required") from exc
+
+    date_value = payload.get("date_value")
+    move_messages_after = bool(payload.get("move_messages_after"))
+    dest_folder_index = payload.get("dest_folder_index")
+
+    try:
+        args = ["run", "--folder-index", str(folder_index)]
+        if date_value:
+            args.extend(["--date-value", str(date_value)])
+        if move_messages_after:
+            args.append("--move-messages-after")
+        if dest_folder_index not in (None, ""):
+            args.extend(["--dest-folder-index", str(int(dest_folder_index))])
+        result = _run_pythonw_worker(*args)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to run email downloader: {exc}") from exc
+
+    return result
+
+
+@app.post("/snapshot-generator/run")
+def run_snapshot_generator():
+    try:
+        return _run_script_worker(SNAPSHOT_GENERATOR_SCRIPT)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to run snapshot generator: {exc}") from exc
 
 
 @app.get("/queue")
@@ -764,37 +1065,13 @@ def get_queue():
     ]
 
 
-def _pending_day_label(value):
-    if not value:
-        return "Unknown"
-
-    text = str(value).strip()
-    if not text:
-        return "Unknown"
-
-    for fmt in ("%m/%d/%Y %H:%M:%S", "%m/%d/%Y", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
-        try:
-            parsed = datetime.strptime(text[:19], fmt) if fmt.endswith("%H:%M:%S") and len(text) >= 19 else datetime.strptime(text[:10], fmt)
-            return parsed.strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-
-    if "T" in text:
-        try:
-            return datetime.fromisoformat(text.replace("Z", "")).strftime("%Y-%m-%d")
-        except ValueError:
-            pass
-
-    return text[:10] if len(text) >= 10 else text
-
-
 @app.get("/pending/by-day")
 def get_pending_by_day():
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, filename, processed_at
+        SELECT id, filename, batch_date, batch_id, processed_at
         FROM imported_files
         WHERE review_status = 'Pending'
         ORDER BY id ASC
@@ -802,7 +1079,7 @@ def get_pending_by_day():
 
     grouped = {}
     for row in cur.fetchall():
-        day = _pending_day_label(row[2])
+        day = _row_pending_day(row, 2, 3, 4)
         grouped.setdefault(day, []).append({
             "id": row[0],
             "filename": row[1],
@@ -3738,20 +4015,27 @@ def delete_balsheet_entry(entry_id: str):
 # NEXT PENDING FILE
 # ------------------------------------------------------------
 @app.get("/attachments/{attachment_id}/next")
-def get_next(attachment_id: int):
+def get_next(attachment_id: int, day: str | None = None):
     conn = get_conn()
     cur = conn.cursor()
 
     cur.execute("""
-        SELECT id, filename, snapshot_path, review_status
+        SELECT id, filename, site, snapshot_path, review_status, batch_date, batch_id, processed_at
         FROM imported_files
         WHERE review_status = 'Pending' AND id > ?
         ORDER BY id ASC
-        LIMIT 1
     """, (attachment_id,))
 
-    row = cur.fetchone()
+    rows = cur.fetchall()
     conn.close()
+
+    desired_day = _normalize_pending_day(day) if day else None
+    row = None
+    for candidate in rows:
+        if desired_day and _row_pending_day(candidate, 5, 6, 7) != desired_day:
+            continue
+        row = candidate
+        break
 
     if not row:
         return {"done": True}
@@ -3759,10 +4043,73 @@ def get_next(attachment_id: int):
     return {
         "id": row[0],
         "filename": row[1],
-        "snapshot": row[2],
-        "status": row[3],
+        "site": row[2],
+        "snapshot": row[3],
+        "status": row[4],
         "done": False
     }
+
+
+@app.get("/attachments/{attachment_id}/previous")
+def get_previous(attachment_id: int, day: str | None = None):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, filename, site, snapshot_path, review_status, batch_date, batch_id, processed_at
+        FROM imported_files
+        WHERE review_status = 'Pending' AND id < ?
+        ORDER BY id DESC
+    """, (attachment_id,))
+
+    rows = cur.fetchall()
+    conn.close()
+
+    desired_day = _normalize_pending_day(day) if day else None
+    row = None
+    for candidate in rows:
+        if desired_day and _row_pending_day(candidate, 5, 6, 7) != desired_day:
+            continue
+        row = candidate
+        break
+
+    if not row:
+        return {"done": True}
+
+    return {
+        "id": row[0],
+        "filename": row[1],
+        "site": row[2],
+        "snapshot": row[3],
+        "status": row[4],
+        "done": False
+    }
+
+
+@app.put("/attachments/{attachment_id}/site")
+def update_attachment_site(attachment_id: int, payload: dict):
+    site = (payload.get("site") or "").strip()
+    if not site:
+        raise HTTPException(status_code=400, detail="site is required")
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        UPDATE imported_files
+        SET site = ?
+        WHERE id = ?
+        """,
+        (site, attachment_id),
+    )
+    if cur.rowcount == 0:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    conn.commit()
+    conn.close()
+    return {"status": "ok", "id": attachment_id, "site": site}
 
 
 # ------------------------------------------------------------
