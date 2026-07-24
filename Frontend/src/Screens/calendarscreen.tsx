@@ -387,8 +387,8 @@ export default function CalendarScreen() {
         </p>
 
         <nav style={styles.navStack} aria-label="Calendar navigation">
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={styles.navButtonLabel}>Home</span>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/cash")}>
+            <span style={styles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>?</span>
           </button>
         </nav>

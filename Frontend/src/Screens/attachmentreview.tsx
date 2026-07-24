@@ -9,6 +9,7 @@ import {
   updateAttachmentSite,
 } from "../api/attachmentreview_api";
 import type { PendingAttachment } from "../api/attachmentreview_api";
+import { fetchPendingByDay } from "../api/introscreen_api";
 import { getSites, type SiteOption } from "../api/keyproof_api";
 import { styles as adminStyles } from "./adminscreen";
 import { WorklistBrandButton } from "../worklist/worklist";
@@ -47,6 +48,7 @@ export default function AttachmentReviewScreen() {
   const [zoom, setZoom] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingSites, setLoadingSites] = useState(true);
+  const [batchCount, setBatchCount] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [siteError, setSiteError] = useState<string | null>(null);
   const [savingSite, setSavingSite] = useState(false);
@@ -81,6 +83,17 @@ export default function AttachmentReviewScreen() {
         setError(err instanceof Error ? err.message : "Failed to load attachment");
       })
       .finally(() => setLoading(false));
+  }, [day]);
+
+  useEffect(() => {
+    fetchPendingByDay()
+      .then((data) => {
+        const dayKey = day || "Unknown";
+        setBatchCount(Array.isArray(data?.[dayKey]) ? data[dayKey].length : 0);
+      })
+      .catch(() => {
+        setBatchCount(null);
+      });
   }, [day]);
 
   const siteOptions = useMemo(() => sites, [sites]);
@@ -133,14 +146,14 @@ export default function AttachmentReviewScreen() {
     const next = await getNextAttachment(currentId, day);
     const nextAttachment = next.done ? null : next;
     setAttachment(nextAttachment);
-    setSite(nextAttachment?.site || "");
+    setSite(nextAttachment?.site || site);
   }
 
   async function moveToPrevious(currentId: number) {
     const previous = await getPreviousAttachment(currentId, day);
     const previousAttachment = previous.done ? null : previous;
     setAttachment(previousAttachment);
-    setSite(previousAttachment?.site || "");
+    setSite(previousAttachment?.site || site);
   }
 
   async function handleReview() {
@@ -243,9 +256,11 @@ export default function AttachmentReviewScreen() {
         </div>
 
         <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Choices</div>
-          <div style={adminStyles.sidebarCardValue}>{siteOptions.length}</div>
-          <div style={adminStyles.sidebarCardMeta}>Pulled from the sites table.</div>
+          <div style={adminStyles.sidebarCardLabel}>Batch items</div>
+          <div style={adminStyles.sidebarCardValue}>{batchCount ?? "..."}</div>
+          <div style={adminStyles.sidebarCardMeta}>
+            {day ? "Counted from the current batch day." : "Counted from all pending items."}
+          </div>
         </div>
       </aside>
 
@@ -445,6 +460,7 @@ export default function AttachmentReviewScreen() {
           )}
         </section>
       </section>
+
     </main>
   );
 }

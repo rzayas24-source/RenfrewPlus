@@ -75,11 +75,11 @@ export default function ToolsScreen() {
       path: "/lockbox-import",
     },
     {
-      title: "Workspace Home",
-      meta: "Return to the main dashboard whenever you need the full menu.",
+      title: "Cash",
+      meta: "Return to the Cash screen whenever you need the full menu.",
       tone: "mist",
-      action: "Back to Main",
-      path: "/",
+      action: "Back to Cash",
+      path: "/cash",
     },
   ];
 
@@ -103,8 +103,8 @@ export default function ToolsScreen() {
         </p>
 
         <nav style={adminStyles.navStack} aria-label="Tools navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
+            <span style={adminStyles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button

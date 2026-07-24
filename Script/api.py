@@ -4145,17 +4145,76 @@ def get_snapshot(attachment_id: int):
 
     cur.execute("SELECT snapshot_path FROM imported_files WHERE id = ?", (attachment_id,))
     row = cur.fetchone()
-    conn.close()
 
     if not row or not row[0]:
-        raise HTTPException(status_code=404, detail="Snapshot not found")
+        fallback_path = os.path.join(WORKFLOW_ROOT, "snapshots", f"{attachment_id}.png")
+        if not os.path.exists(fallback_path):
+            conn.close()
+            raise HTTPException(status_code=404, detail="Snapshot not found")
+
+        cur.execute(
+            """
+            UPDATE imported_files
+            SET snapshot_path = ?
+            WHERE id = ?
+            """,
+            (fallback_path, attachment_id),
+        )
+        conn.commit()
+        conn.close()
+        return FileResponse(fallback_path)
 
     snapshot_path = row[0]
 
     if not os.path.exists(snapshot_path):
-        raise HTTPException(status_code=404, detail="Snapshot file missing")
+        fallback_path = os.path.join(WORKFLOW_ROOT, "snapshots", f"{attachment_id}.png")
+        if not os.path.exists(fallback_path):
+            conn.close()
+            raise HTTPException(status_code=404, detail="Snapshot file missing")
 
+        cur.execute(
+            """
+            UPDATE imported_files
+            SET snapshot_path = ?
+            WHERE id = ?
+            """,
+            (fallback_path, attachment_id),
+        )
+        conn.commit()
+        conn.close()
+        return FileResponse(fallback_path)
+
+    conn.close()
     return FileResponse(snapshot_path)
+
+
+@app.get("/attachments/{attachment_id}/original")
+def get_original_attachment(attachment_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("SELECT moved_to, original_filename, filename FROM imported_files WHERE id = ?", (attachment_id,))
+    row = cur.fetchone()
+
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    moved_to, original_filename, stored_filename = row
+    candidate_paths = [moved_to]
+
+    if original_filename:
+        candidate_paths.append(os.path.join(WORKFLOW_ROOT, "4.Emails", original_filename))
+    if stored_filename:
+        candidate_paths.append(os.path.join(WORKFLOW_ROOT, "4.Emails", stored_filename))
+
+    for candidate_path in candidate_paths:
+        if candidate_path and os.path.exists(candidate_path):
+            conn.close()
+            return FileResponse(candidate_path)
+
+    conn.close()
+    raise HTTPException(status_code=404, detail="Original file not found")
 
 
 # ------------------------------------------------------------

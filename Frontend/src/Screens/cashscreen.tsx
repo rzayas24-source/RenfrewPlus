@@ -107,6 +107,14 @@ export default function CashScreen() {
             <span style={adminStyles.navButtonLabel}>Home</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/calendar")}>
+            <span style={adminStyles.navButtonLabel}>Calendar</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
+          </button>
+          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
+            <span style={adminStyles.navButtonLabel}>Tools</span>
+            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
+          </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/balsheet/view")}>
             <span style={adminStyles.navButtonLabel}>Balance Sheet</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>

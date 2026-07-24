@@ -110,14 +110,6 @@ export default function MainScreen() {
             <span style={styles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/calendar")}>
-            <span style={styles.navButtonLabel}>Calendar</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/tools")}>
-            <span style={styles.navButtonLabel}>Tools</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
             <span style={styles.navButtonLabel}>Admin</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
@@ -148,14 +140,6 @@ export default function MainScreen() {
               A calm workspace for review, approvals, and balance-sheet work.
             </p>
 
-            <div style={styles.heroActions}>
-              <button style={styles.primaryButton} type="button" onClick={() => navigate("/site")}>
-                Continue Review
-              </button>
-              <button style={styles.secondaryButton} type="button" onClick={() => navigate("/balsheet/view")}>
-                Balsheet View
-              </button>
-            </div>
           </div>
 
           <div style={styles.heroArt}>
@@ -429,34 +413,6 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "16px",
     lineHeight: 1.7,
     color: "#536579",
-  },
-  heroActions: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "12px",
-    marginTop: "22px",
-  },
-  primaryButton: {
-    height: "46px",
-    padding: "0 18px",
-    border: 0,
-    borderRadius: "16px",
-    background: "#98d4ff",
-    color: "#0f2238",
-    fontWeight: 800,
-    boxShadow: "0 14px 26px rgba(152, 212, 255, 0.24)",
-    cursor: "pointer",
-  },
-  secondaryButton: {
-    height: "46px",
-    padding: "0 18px",
-    border: "1px solid rgba(140, 160, 184, 0.24)",
-    borderRadius: "16px",
-    background: "rgba(255,255,255,0.76)",
-    color: "#16304d",
-    fontWeight: 800,
-    boxShadow: "0 12px 24px rgba(52, 84, 120, 0.06)",
-    cursor: "pointer",
   },
   heroArt: {
     display: "flex",

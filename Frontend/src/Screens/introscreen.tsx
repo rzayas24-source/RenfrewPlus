@@ -97,10 +97,6 @@ export default function IntroScreen() {
             <span style={adminStyles.navButtonLabel}>Approved</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
           </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/sites")}>
-            <span style={adminStyles.navButtonLabel}>Sites</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
         </nav>
 
         <div style={adminStyles.sidebarCard}>

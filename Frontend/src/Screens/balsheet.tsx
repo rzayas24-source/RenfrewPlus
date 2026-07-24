@@ -196,6 +196,8 @@ export default function Balsheet() {
   } | null>(null);
   const cellRefs = useRef<Array<Array<HTMLTableCellElement | null>>>([]);
   const selectionInputRef = useRef<HTMLInputElement | null>(null);
+  const inlineCellInputRef = useRef<HTMLInputElement | null>(null);
+  const cancelInlineEditRef = useRef(false);
 
   const postingDateIso = displayDateToIso(postingDate);
 
@@ -304,10 +306,15 @@ export default function Balsheet() {
 
   useEffect(() => {
     if (isEditingSelection) {
-      selectionInputRef.current?.focus();
-      selectionInputRef.current?.select();
+      if (sheetLocked) {
+        selectionInputRef.current?.focus();
+        selectionInputRef.current?.select();
+      } else {
+        inlineCellInputRef.current?.focus();
+        inlineCellInputRef.current?.select();
+      }
     }
-  }, [isEditingSelection]);
+  }, [isEditingSelection, selectedCell, sheetLocked]);
 
   useEffect(() => {
     if (sheetLocked) {
@@ -344,37 +351,42 @@ export default function Balsheet() {
     );
   }
 
-  function handleEditSelectedCell() {
-    if (!selectedCell) {
-      return;
-    }
-
+  function beginInlineCellEdit(rowIndex: number, columnIndex: number) {
     if (sheetLocked) {
+      return;
+    }
+
+    const row = visibleRows[rowIndex];
+    const column = sheetColumns[columnIndex];
+    if (!row || !column || column.key === "entry_id") {
+      return;
+    }
+
+    setActiveCell({ rowIndex, columnIndex });
+    setSelectionDraft(
+      column.numeric ? formatCurrency(row[column.key]) : String(row[column.key] ?? "")
+    );
+    setIsEditingSelection(true);
+    cancelInlineEditRef.current = false;
+  }
+
+  async function commitInlineCellEdit() {
+    if (!selectedCell || sheetLocked) {
+      return;
+    }
+
+    setLoading(true);
+    setMessage(null);
+    try {
+      await updateSelectedCell(selectionDraft);
       setError(null);
-      setMessage("Cell locked.");
-      return;
+      setMessage(`Saved ${selectedCell.label} for ${selectedCell.address}.`);
+      setIsEditingSelection(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save cell");
+    } finally {
+      setLoading(false);
     }
-
-    if (!isEditingSelection) {
-      setSelectionDraft(selectedCell.value ?? "");
-      setIsEditingSelection(true);
-      return;
-    }
-
-    void (async () => {
-      setLoading(true);
-      setMessage(null);
-      try {
-        await updateSelectedCell(selectionDraft);
-        setError(null);
-        setMessage(`Saved ${selectedCell.label} for ${selectedCell.address}.`);
-        setIsEditingSelection(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to save cell");
-      } finally {
-        setLoading(false);
-      }
-    })();
   }
 
   function handleSelectionInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
@@ -384,23 +396,11 @@ export default function Balsheet() {
 
     if (event.key === "Enter") {
       event.preventDefault();
-      void (async () => {
-        setLoading(true);
-        setMessage(null);
-        try {
-          await updateSelectedCell(selectionDraft);
-          setError(null);
-          setMessage(`Saved ${selectedCell?.label ?? "cell"} for ${selectedCell?.address ?? ""}.`);
-          setIsEditingSelection(false);
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Failed to save cell");
-        } finally {
-          setLoading(false);
-        }
-      })();
+      void commitInlineCellEdit();
     } else if (event.key === "Escape") {
       event.preventDefault();
       setSelectionDraft(selectedCell?.value ?? "");
+      cancelInlineEditRef.current = true;
       setIsEditingSelection(false);
     }
   }
@@ -413,10 +413,6 @@ export default function Balsheet() {
     if (sheetLocked) {
       setError(null);
       setMessage("Cell locked.");
-      return;
-    }
-
-    if (!window.confirm(`Clear ${selectedCell.label} for ${selectedCell.address}?`)) {
       return;
     }
 
@@ -864,7 +860,7 @@ export default function Balsheet() {
             type="button"
             onClick={() => navigate("/cash")}
           >
-            <span style={styles.navButtonLabel}>Back</span>
+            <span style={styles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>
               &gt;
             </span>
@@ -1042,9 +1038,6 @@ export default function Balsheet() {
                 aria-label="Active cell value"
               />
               <div style={styles.selectionActionStack}>
-                <button type="button" style={styles.selectionActionButton} onClick={handleEditSelectedCell}>
-                  {isEditingSelection ? "Save" : "Edit"}
-                </button>
                 <button type="button" style={styles.selectionActionDangerButton} onClick={handleClearSelectedCell}>
                   Clear
                 </button>
@@ -1101,6 +1094,15 @@ export default function Balsheet() {
                           return (
                             <tr key={row.entry_id} style={highlightRow ? styles.ediHighlightRow : undefined}>
                               {sheetColumns.map((column, columnIndex) => (
+                                (() => {
+                                  const isInlineEditingCell =
+                                    !!selectedCell &&
+                                    isEditingSelection &&
+                                    !sheetLocked &&
+                                    selectedCell.rowId === row.entry_id &&
+                                    selectedCell.columnKey === column.key;
+
+                                  return (
                                 <td
                                   key={column.key}
                                   ref={(element) => {
@@ -1112,14 +1114,35 @@ export default function Balsheet() {
                                   tabIndex={0}
                                   onFocus={() => setActiveCell({ rowIndex, columnIndex })}
                                   onKeyDown={(event) => handleCellKeyDown(event, rowIndex, columnIndex)}
+                                  onDoubleClick={() => beginInlineCellEdit(rowIndex, columnIndex)}
                                   style={getCellStyle(!!column.numeric, rowIndex, columnIndex)}
                                 >
-                                  {column.key === "entry_id"
-                                    ? row.entry_id
-                                    : column.numeric
-                                      ? formatCurrency(row[column.key])
-                                      : String(row[column.key] ?? "")}
+                                  {isInlineEditingCell ? (
+                                    <input
+                                      ref={inlineCellInputRef}
+                                      value={selectionDraft}
+                                      onChange={(event) => setSelectionDraft(event.target.value)}
+                                      onKeyDown={handleSelectionInputKeyDown}
+                                      onBlur={() => {
+                                        if (cancelInlineEditRef.current) {
+                                          cancelInlineEditRef.current = false;
+                                          return;
+                                        }
+                                        void commitInlineCellEdit();
+                                      }}
+                                      style={styles.inlineCellInput}
+                                      aria-label={`Edit ${column.label}`}
+                                    />
+                                  ) : column.key === "entry_id" ? (
+                                    row.entry_id
+                                  ) : column.numeric ? (
+                                    formatCurrency(row[column.key])
+                                  ) : (
+                                    String(row[column.key] ?? "")
+                                  )}
                                 </td>
+                                  );
+                                })()
                               ))}
                             </tr>
                           );
@@ -1666,23 +1689,23 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     boxSizing: "border-box",
   },
+  inlineCellInput: {
+    width: "100%",
+    minHeight: "34px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(106, 137, 180, 0.42)",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.98)",
+    padding: "6px 8px",
+    color: "#17324f",
+    font: "inherit",
+    outline: "none",
+  },
   selectionActionStack: {
     display: "grid",
     gridTemplateColumns: "auto auto auto",
     gap: "8px",
     alignItems: "stretch",
-  },
-  selectionActionButton: {
-    minWidth: "62px",
-    padding: "0 12px",
-    borderRadius: "12px",
-    border: "1px solid rgba(156, 176, 201, 0.40)",
-    background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(235,242,250,0.98) 100%)",
-    color: "#23405e",
-    fontSize: "13px",
-    fontWeight: 800,
-    cursor: "pointer",
-    boxShadow: "0 10px 18px rgba(94, 120, 154, 0.10)",
   },
   selectionActionDangerButton: {
     minWidth: "72px",

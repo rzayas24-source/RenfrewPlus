@@ -118,7 +118,7 @@ export default function ImportScreen() {
 
         <nav style={adminStyles.navStack} aria-label="Import navigation">
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
+            <span style={adminStyles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
           </button>
           <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/lockbox-import")}>
