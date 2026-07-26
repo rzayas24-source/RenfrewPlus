@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import { getBankingSpreadsheet, type BankingSpreadsheetGroup, type BankingSpreadsheetResponse } from "../api/banking_api";
 import { getCalendarStatus, type CalendarStatus } from "../api/calendar_api";
 
@@ -316,51 +316,17 @@ export default function BankingScreen() {
   const sections = visibleGroups;
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft banking console for bank-side review, reconciliation, and match follow-up.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Banking navigation">          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Current Bank Day</div>
-          <div style={adminStyles.sidebarCardValue}>
-            {calendarStatus?.currentBankDay ?? calendarStatus?.todayBankDay ?? "Loading..."}
-          </div>
-          <div style={adminStyles.sidebarCardMeta}>
-            {calendarStatus?.currentWorkDay
-              ? `Posting day: ${calendarStatus.currentWorkDay}`
-              : "No posting day mapped yet."}
-          </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>{loading ? "Loading spreadsheet" : "Banking spreadsheet ready"}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            EFT and Lockbox are shown as separate groups, with an EDI flag when a source EDI exists.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="A soft banking console for bank-side review, reconciliation, and match follow-up."
+      onBack={() => navigate("/cash")}
+      sidebarCardLabel="Current Bank Day"
+      sidebarCardValue={calendarStatus?.currentBankDay ?? calendarStatus?.todayBankDay ?? "Loading..."}
+      sidebarCardMeta={
+        calendarStatus?.currentWorkDay
+          ? `Posting day: ${calendarStatus.currentWorkDay}`
+          : "No posting day mapped yet."
+      }
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -373,12 +339,6 @@ export default function BankingScreen() {
             <div style={adminStyles.heroActions}>
               <button style={adminStyles.primaryButton} type="button" onClick={() => void loadSpreadsheet()}>
                 {refreshing ? "Refreshing..." : "Refresh Spreadsheet"}
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/835-match")}>
-                Open 835 Match
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/cash")}>
-                Open Cash
               </button>
             </div>
           </div>
@@ -466,7 +426,7 @@ export default function BankingScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -769,6 +729,7 @@ const bankingStyles: Record<string, CSSProperties> = {
     outline: "none",
   },
 };
+
 
 
 

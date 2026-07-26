@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getTemplateTasks, importTemplateToLive, replaceTasks, type TaskDraft, type TaskRecord } from "../api/tasks_api";
+import { AdminShell } from "../components/AdminShell";
+import { getTemplateTasks, replaceTasks, type TaskDraft, type TaskRecord } from "../api/tasks_api";
 import { styles as adminStyles } from "./adminscreen";
 import {
   DEFAULT_DAILY_WORKLIST_TEMPLATE,
@@ -9,7 +10,6 @@ import {
   type DailyWorklistActionType,
   type DailyWorklistTemplateItem,
 } from "../worklist/dailyWorklistTemplate";
-import { WorklistBrandButton } from "../worklist/worklist";
 
 function makeId(title: string) {
   return `daily-${title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || Date.now()}`;
@@ -177,55 +177,13 @@ export default function WorklistEditorScreen() {
       .catch(() => undefined);
   }
 
-  function loadIntoLiveWorklist() {
-    void Promise.resolve(saveTemplate())
-      .then(() => importTemplateToLive("template", "live"))
-      .then(() => navigate("/tools"))
-      .catch(() => undefined);
-  }
-
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          Edit the seeded daily work list here, then push it into the live work list when you are ready.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Worklist editor navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
-            <span style={adminStyles.navButtonLabel}>Back to Tools</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button
-            className="sidebar-nav-button"
-            style={adminStyles.navButton}
-            type="button"
-            onClick={loadIntoLiveWorklist}
-          >
-            <span style={adminStyles.navButtonLabel}>Load into Work list</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Template</div>
-          <div style={adminStyles.sidebarCardValue}>{items.length} items</div>
-          <div style={adminStyles.sidebarCardMeta}>Worklist category stays fixed for the preset list.</div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="Edit the seeded daily work list here, then push it into the live work list when you are ready."
+      onBack={() => navigate("/tools")}
+      ribbonTitle="Worklist Menu"
+      useGlobalMenuFallback={false}
+    >
       <section style={styles.content}>
         <div style={styles.hero}>
           <div>
@@ -257,10 +215,10 @@ export default function WorklistEditorScreen() {
                 <div style={styles.cardIndex}>{index + 1}</div>
                 <div style={styles.cardActions}>
                   <button type="button" onClick={() => moveItem(item.id, -1)} style={styles.iconButton}>
-                    ↑
+                    ^
                   </button>
                   <button type="button" onClick={() => moveItem(item.id, 1)} style={styles.iconButton}>
-                    ↓
+                    v
                   </button>
                   <button type="button" onClick={() => duplicateItem(item.id)} style={styles.iconButton}>
                     Duplicate
@@ -332,7 +290,7 @@ export default function WorklistEditorScreen() {
           ))}
         </div>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -342,6 +300,7 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gap: "16px",
     minWidth: 0,
+    paddingTop: "88px",
   },
   hero: {
     display: "flex",
@@ -368,10 +327,22 @@ const styles: Record<string, CSSProperties> = {
     color: "#55708a",
   },
   heroActions: {
+    position: "fixed",
+    top: "18px",
+    left: "282px",
+    right: "16px",
+    zIndex: 4,
     display: "flex",
     flexWrap: "wrap",
     gap: "8px",
-    justifyContent: "flex-end",
+    justifyContent: "flex-start",
+    alignItems: "center",
+    padding: "10px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
   primaryButton: {
     height: "38px",

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { WorklistBrandButton } from "../worklist/worklist";
+import { AdminShell } from "../components/AdminShell";
 import {
   addCalendarDays,
   advanceCalendarWorkDay,
@@ -368,40 +368,14 @@ export default function CalendarScreen() {
   ];
 
   return (
-    <main style={styles.shell}>
-      <div style={styles.glowBlue} />
-      <div style={styles.glowPink} />
-
-      <aside style={styles.sidebar}>
-        <div style={styles.brandWrap}>
-          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={styles.sidebarCopy}>
-          Calendar manager for bank days, posting day, and live source-table totals.
-        </p>
-
-        <nav style={styles.navStack} aria-label="Calendar navigation">
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={styles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={styles.sidebarCard}>
-          <div style={styles.sidebarCardLabel}>Current Posting Day</div>
-          <div style={styles.sidebarCardValue}>{status?.currentWorkDay ?? "No posting day"}</div>
-          <div style={styles.sidebarCardMeta}>
-            {status?.currentBankDay ? `Bank day: ${status.currentBankDay}` : "No bank day mapped yet."}
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="Calendar manager for bank days, posting day, and live source-table totals."
+      sidebarCardLabel="Current Posting Day"
+      sidebarCardValue={status?.currentWorkDay ?? "No posting day"}
+      sidebarCardMeta={status?.currentBankDay ? `Bank day: ${status.currentBankDay}` : "No bank day mapped yet."}
+      onBack={() => navigate("/cash")}
+      ribbonTitle="Calendar Menu"
+    >
       <section style={styles.content}>
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
@@ -683,7 +657,7 @@ export default function CalendarScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -803,6 +777,12 @@ const styles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     letterSpacing: "0.01em",
   },
+  navButtonBack: {
+    background: "linear-gradient(135deg, rgba(248,250,252,0.98) 0%, rgba(222,233,244,0.96) 56%, rgba(200,214,231,0.96) 100%)",
+    border: "1px solid rgba(126, 146, 170, 0.24)",
+    color: "#27415d",
+    boxShadow: "0 12px 26px rgba(52, 84, 120, 0.10)",
+  },
   navButtonLabel: {
     fontSize: "14px",
     fontWeight: 800,
@@ -817,6 +797,11 @@ const styles: Record<string, CSSProperties> = {
     color: "#8aa5c6",
     fontSize: "12px",
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+  },
+  navButtonBackGlyph: {
+    background: "rgba(255,255,255,0.74)",
+    color: "#5f7fa2",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.72)",
   },
   sidebarCard: {
     marginTop: "18px",
@@ -850,6 +835,7 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: "18px",
+    paddingTop: "88px",
   },
   heroShell: {
     display: "grid",
@@ -884,10 +870,21 @@ const styles: Record<string, CSSProperties> = {
     color: "#536579",
   },
   heroActions: {
+    position: "fixed",
+    top: "18px",
+    left: "282px",
+    right: "16px",
+    zIndex: 4,
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
-    marginTop: "20px",
+    alignItems: "center",
+    padding: "10px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
   primaryButton: {
     height: "44px",

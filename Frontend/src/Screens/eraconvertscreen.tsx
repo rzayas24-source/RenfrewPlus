@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import { getBankingSpreadsheet, type BankingSpreadsheetResponse } from "../api/banking_api";
 import { getCalendarStatus, type CalendarStatus } from "../api/calendar_api";
 import { convertEraFiles, getEraSpreadsheet, type EraConvertResponse, type EraSpreadsheetResponse } from "../api/era_convert_api";
@@ -283,31 +283,12 @@ export default function ERAConvertScreen() {
   ];
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft ERA conversion console for 835 review, handoff, and follow-up work.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="ERA converter navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
+    <AdminShell
+      sidebarCopy="A soft ERA conversion console for 835 review, handoff, and follow-up work."
+      onBack={() => navigate("/tools")}
+      backButtonFirst
+      ribbonTitle="ERA Convert Menu"
+      sidebarTopCard={
         <div style={adminStyles.sidebarCard}>
           <div style={adminStyles.sidebarCardLabel}>Source</div>
           <div
@@ -327,8 +308,9 @@ export default function ERAConvertScreen() {
             ERA files are read from the 2.ERA folder, then renamed and moved into the completed folder for the selected posting day.
           </div>
         </div>
-
-        <div style={adminStyles.sidebarCard}>
+      }
+      sidebarMiddleCard={
+        <>
           <div style={adminStyles.sidebarCardLabel}>Posting Day</div>
           <label style={eraStyles.dateField}>
             <span style={eraStyles.dateFieldLabel}>Select date</span>
@@ -342,35 +324,24 @@ export default function ERAConvertScreen() {
           <div style={adminStyles.sidebarCardMeta}>
             {activeBankDay ? `Bank day: ${activeBankDay}` : "No bank day mapped yet."}
           </div>
-        </div>
-      </aside>
-
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
-          <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>ERAConvert screen</div>
-            <p style={adminStyles.subtitle}>
-              A calm workspace for ERA conversion, review, and follow-up.
-            </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/835-upload")}>
-                Open 835 Upload
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
-                Open Banking
-              </button>
-            </div>
+        </>
+      }
+    >
+      <section style={eraPageStyles.content}>
+        <section style={eraPageStyles.heroShell}>
+          <div style={eraPageStyles.heroCopy}>
+            <div style={eraPageStyles.kicker}>ERA convert</div>
+            <p style={eraPageStyles.subtitle}>ERA Convert Screen</p>
           </div>
 
-          <div style={adminStyles.heroArt}>
-            <div style={adminStyles.heroStatusCard}>
-              <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>ERA window</span>
-                <span style={adminStyles.statusDot} />
+          <div style={eraPageStyles.heroArt}>
+            <div style={eraPageStyles.heroStatusCard}>
+              <div style={eraPageStyles.heroStatusTop}>
+                <span style={eraPageStyles.statusPill}>ERA window</span>
+                <span style={eraPageStyles.statusDot} />
               </div>
-              <div style={adminStyles.heroStatusTitle}>EDI by bank day</div>
-              <div style={adminStyles.heroStatusText}>
+              <div style={eraPageStyles.heroStatusTitle}>EDI by bank day</div>
+              <div style={eraPageStyles.heroStatusText}>
                 This page filters the banking spreadsheet down to rows that have EDI available for the selected posting day,
                 then shows matching files from the 2.ERA folder below.
               </div>
@@ -381,17 +352,17 @@ export default function ERAConvertScreen() {
         <section style={eraStyles.convertCard}>
           <div style={eraStyles.convertCardTop}>
             <div>
-              <div style={adminStyles.sectionKicker}>Convert</div>
-              <h2 style={adminStyles.sectionTitle}>Rename the ERA files in 2.ERA</h2>
+              <div style={eraPageStyles.sectionKicker}>Convert</div>
+              <h2 style={eraPageStyles.sectionTitle}>Rename the ERA files in 2.ERA</h2>
             </div>
             <div style={eraStyles.statusChip}>{convertStatusTag}</div>
           </div>
-          <div style={adminStyles.sectionMeta}>
+          <div style={eraPageStyles.sectionMeta}>
             Rename every matched ERA file using the selected posting day, then move the results to
             <span style={eraStyles.inlineCode}>2.ERA/Renamed</span>.
           </div>
           <div style={eraStyles.convertActions}>
-            <button style={adminStyles.primaryButton} type="button" onClick={() => void handleConvert()} disabled={converting}>
+            <button style={eraPageStyles.primaryButton} type="button" onClick={() => void handleConvert()} disabled={converting}>
               {converting ? "Converting..." : "Convert Files"}
             </button>
             <div style={eraStyles.convertMessage}>{convertStatusMessage}</div>
@@ -406,7 +377,7 @@ export default function ERAConvertScreen() {
 
         <section style={eraStyles.metricRow}>
           {metrics.map((metric) => (
-            <article key={metric.label} style={{ ...adminStyles.statCard, ...eraStyles.metricCard }}>
+            <article key={metric.label} style={{ ...eraPageStyles.statCard, ...eraStyles.metricCard }}>
               <div style={eraStyles.metricLabel}>{metric.label}</div>
               <div style={eraStyles.metricValue}>{metric.value}</div>
               <div style={eraStyles.metricDetail}>{metric.detail}</div>
@@ -418,15 +389,15 @@ export default function ERAConvertScreen() {
           <div style={eraStyles.tableHeader}>
             <button type="button" style={eraStyles.sectionHeaderButton} onClick={() => setBankTableCollapsed((current) => !current)}>
               <div style={eraStyles.sectionHeaderCopy}>
-                <div style={adminStyles.sectionKicker}>EDI spreadsheet</div>
-                <h2 style={{ ...adminStyles.sectionTitle, ...eraStyles.singleLineTitle }}>
+                <div style={eraPageStyles.sectionKicker}>EDI spreadsheet</div>
+                <h2 style={{ ...eraPageStyles.sectionTitle, ...eraStyles.singleLineTitle }}>
                   Items with EDI available for the selected bank day
                 </h2>
               </div>
               <div style={eraStyles.collapseChip}>{bankTableCollapsed ? "Expand" : "Collapse"}</div>
             </button>
             <div style={eraStyles.sectionMetaWrap}>
-              <div style={adminStyles.sectionMeta}>
+              <div style={eraPageStyles.sectionMeta}>
                 {loading
                   ? "Loading banking and calendar data..."
                   : activeBankDay
@@ -488,15 +459,15 @@ export default function ERAConvertScreen() {
           <div style={eraStyles.tableHeader}>
             <button type="button" style={eraStyles.sectionHeaderButton} onClick={() => setEraTableCollapsed((current) => !current)}>
               <div style={eraStyles.sectionHeaderCopy}>
-                <div style={adminStyles.sectionKicker}>2.ERA spreadsheet</div>
-                <h2 style={{ ...adminStyles.sectionTitle, ...eraStyles.singleLineTitle }}>
+                <div style={eraPageStyles.sectionKicker}>2.ERA spreadsheet</div>
+                <h2 style={{ ...eraPageStyles.sectionTitle, ...eraStyles.singleLineTitle }}>
                   Matched ERA files for the selected bank day
                 </h2>
               </div>
               <div style={eraStyles.collapseChip}>{eraTableCollapsed ? "Expand" : "Collapse"}</div>
             </button>
             <div style={eraStyles.sectionMetaWrap}>
-              <div style={adminStyles.sectionMeta}>
+              <div style={eraPageStyles.sectionMeta}>
                 {loadingEra
                   ? "Searching files in 2.ERA..."
                   : eraData?.bankDay
@@ -556,9 +527,150 @@ export default function ERAConvertScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
+
+const eraPageStyles: Record<string, CSSProperties> = {
+  content: {
+    display: "grid",
+    gap: "18px",
+    alignContent: "start",
+  },
+  heroShell: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 0.9fr)",
+    gap: "18px",
+    padding: "24px",
+    borderRadius: "34px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(243,247,252,0.96) 42%, rgba(247,250,255,0.92) 100%)",
+    boxShadow: "0 24px 48px rgba(52, 84, 120, 0.08)",
+    position: "relative",
+    overflow: "hidden",
+  },
+  heroCopy: {
+    display: "grid",
+    gap: "14px",
+    alignContent: "start",
+  },
+  kicker: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.16em",
+    color: "#6d7f93",
+    fontWeight: 800,
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: "28px",
+    lineHeight: 1.15,
+    letterSpacing: "-0.02em",
+    color: "#17324f",
+    fontWeight: 800,
+    maxWidth: "18ch",
+  },
+  primaryButton: {
+    border: "none",
+    borderRadius: "14px",
+    padding: "12px 16px",
+    background: "linear-gradient(135deg, #2f5f8f 0%, #1e4064 100%)",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 12px 24px rgba(47, 95, 143, 0.24)",
+  },
+  secondaryButton: {
+    border: "1px solid rgba(99, 124, 151, 0.22)",
+    borderRadius: "14px",
+    padding: "12px 16px",
+    background: "rgba(255,255,255,0.88)",
+    color: "#35506d",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  heroArt: {
+    display: "grid",
+    alignItems: "stretch",
+  },
+  heroStatusCard: {
+    padding: "20px",
+    borderRadius: "26px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(236,243,251,0.96) 100%)",
+    boxShadow: "0 18px 38px rgba(52, 84, 120, 0.08)",
+    display: "grid",
+    gap: "10px",
+    alignContent: "start",
+  },
+  heroStatusTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+  },
+  statusPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "rgba(224, 237, 250, 0.95)",
+    color: "#35506d",
+    fontSize: "11px",
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  },
+  statusDot: {
+    width: "11px",
+    height: "11px",
+    borderRadius: "999px",
+    background: "linear-gradient(135deg, #4caf7d 0%, #79d8a9 100%)",
+    boxShadow: "0 0 0 6px rgba(76, 175, 125, 0.12)",
+  },
+  heroStatusTitle: {
+    fontSize: "24px",
+    lineHeight: 1.08,
+    fontWeight: 900,
+    color: "#17324f",
+  },
+  heroStatusText: {
+    fontSize: "14px",
+    lineHeight: 1.7,
+    color: "#536579",
+  },
+  statCard: {
+    padding: "18px",
+    borderRadius: "24px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(145deg, rgba(255,255,255,0.94) 0%, rgba(245,249,253,0.98) 100%)",
+    boxShadow: "0 16px 32px rgba(52, 84, 120, 0.06)",
+  },
+  sectionKicker: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.16em",
+    color: "#6d7f93",
+    fontWeight: 800,
+    marginBottom: "6px",
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: "24px",
+    lineHeight: 1.12,
+    color: "#17324f",
+    fontWeight: 900,
+  },
+  sectionMeta: {
+    fontSize: "13px",
+    lineHeight: 1.6,
+    color: "#536579",
+    maxWidth: "34ch",
+  },
+};
 
 const eraStyles: Record<string, CSSProperties> = {
   dateField: {

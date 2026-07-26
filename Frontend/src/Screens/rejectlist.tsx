@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { getRejectList } from "../api/rejectlist_api";
 
 interface RejectedBatch {
@@ -10,7 +9,6 @@ interface RejectedBatch {
 }
 
 const RejectedList = () => {
-    const navigate = useNavigate();
     const [rejected, setRejected] = useState<RejectedBatch[]>([]);
 
     useEffect(() => {
@@ -47,13 +45,6 @@ const RejectedList = () => {
                     ))}
                 </tbody>
             </table>
-
-            <button
-                onClick={() => navigate("/")}
-                style={{ padding: "10px 20px", marginTop: "20px" }}
-            >
-                Back
-            </button>
         </div>
     );
 };

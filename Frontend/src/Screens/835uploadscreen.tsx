@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import {
   approve835EdiStage,
   load835TrnFiles,
@@ -325,55 +325,22 @@ export default function Upload835Screen() {
   };
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".zip"
-        multiple
-        hidden
-        onChange={handleZipInputChange}
-      />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          835 upload workspace in the same shell family as the EFT upload screen.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="835 upload navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
+    <AdminShell
+      sidebarCopy="835 upload workspace in the same shell family as the EFT upload screen."
+      onBack={() => navigate("/import")}
+      backButtonFirst
+      ribbonTitle="835 Upload Menu"
+      sidebarMiddleCard={
+        <>
           <div style={adminStyles.sidebarCardLabel}>Last 835</div>
-          <div style={adminStyles.sidebarCardValue}>{last835Date}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            Pulled from the current banking source summary.
+          <div style={adminStyles.sidebarCardValue}>
+            <strong>{last835Date}</strong>
           </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>835 upload ready</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            This screen mirrors the EFT upload shell and is ready for 835-specific logic later.
-          </div>
-        </div>
-      </aside>
+          <div style={adminStyles.sidebarCardMeta}>Pulled from the current banking source summary.</div>
+        </>
+      }
+    >
+      <input ref={fileInputRef} type="file" accept=".zip" multiple hidden onChange={handleZipInputChange} />
 
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
@@ -880,9 +847,10 @@ export default function Upload835Screen() {
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
+
 
 
 

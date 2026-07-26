@@ -72,6 +72,7 @@ function compareChecks(left: string, right: string) {
 
 export default function HTMLConvertScreen() {
   const navigate = useNavigate();
+  const [isRibbonOpen, setIsRibbonOpen] = useState(false);
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null);
   const [bankingData, setBankingData] = useState<BankingSpreadsheetResponse | null>(null);
   const [htmlData, setHtmlData] = useState<HtmlSpreadsheetResponse | null>(null);
@@ -268,21 +269,21 @@ export default function HTMLConvertScreen() {
           <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
             <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
           </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
+          <button
+            type="button"
+            onClick={() => setIsRibbonOpen((current) => !current)}
+            style={adminStyles.brandWomenMark}
+            aria-label={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
+            aria-expanded={isRibbonOpen}
+            title={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
+          >
             <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
+          </button>
         </div>
 
         <p style={adminStyles.sidebarCopy}>
           A soft HTML workspace focused on check numbers from the 3.HTML folder.
         </p>
-
-        <nav style={adminStyles.navStack} aria-label="HTML converter navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
 
         <div style={adminStyles.sidebarCard}>
           <div style={adminStyles.sidebarCardLabel}>Source</div>
@@ -321,32 +322,62 @@ export default function HTMLConvertScreen() {
         </div>
       </aside>
 
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
-          <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>HTMLConvert screen</div>
-            <p style={adminStyles.subtitle}>
-              Initial HTML tables built around bank-day check numbers from the 3.HTML folder.
-            </p>
+      <section
+        style={{
+          ...adminStyles.ribbonShell,
+          ...(isRibbonOpen ? adminStyles.ribbonShellOpen : adminStyles.ribbonShellClosed),
+        }}
+        aria-hidden={!isRibbonOpen}
+      >
+        <div style={adminStyles.ribbonHeader}>
+          <div>
+            <div style={adminStyles.ribbonKicker}>Gazebo Menu</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsRibbonOpen(false)}
+            style={adminStyles.ribbonCloseButton}
+            aria-label="Close gazebo menu"
+          >
+            X
+          </button>
+        </div>
 
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/banking")}>
-                Open Banking
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/tools")}>
-                Back to Tools
-              </button>
-            </div>
+        <div style={adminStyles.ribbonBody}>
+          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/tools")}>
+            <div style={adminStyles.ribbonButtonTitle}>Tools</div>
+            <div style={adminStyles.ribbonButtonMeta}>Return to tools hub</div>
+          </button>
+          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/era-convert")}>
+            <div style={adminStyles.ribbonButtonTitle}>ERA Convert</div>
+            <div style={adminStyles.ribbonButtonMeta}>Sibling workflow</div>
+          </button>
+          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/otherday")}>
+            <div style={adminStyles.ribbonButtonTitle}>Other Day Check</div>
+            <div style={adminStyles.ribbonButtonMeta}>Missing row review</div>
+          </button>
+          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/duplicatecheck")}>
+            <div style={adminStyles.ribbonButtonTitle}>Duplicate Check</div>
+            <div style={adminStyles.ribbonButtonMeta}>Duplicate review</div>
+          </button>
+        </div>
+      </section>
+
+      <section style={htmlPageStyles.content}>
+        <section style={htmlPageStyles.heroShell}>
+          <div style={htmlPageStyles.heroCopy}>
+            <div style={htmlPageStyles.kicker}>HTML convert</div>
+            <p style={htmlPageStyles.subtitle}>HTML Convert</p>
           </div>
 
-          <div style={adminStyles.heroArt}>
-            <div style={adminStyles.heroStatusCard}>
-              <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>HTML window</span>
-                <span style={adminStyles.statusDot} />
+          <div style={htmlPageStyles.heroArt}>
+            <div style={htmlPageStyles.heroStatusCard}>
+              <div style={htmlPageStyles.heroStatusTop}>
+                <span style={htmlPageStyles.statusPill}>HTML window</span>
+                <span style={htmlPageStyles.statusDot} />
               </div>
-              <div style={adminStyles.heroStatusTitle}>Check number first</div>
-              <div style={adminStyles.heroStatusText}>
+              <div style={htmlPageStyles.heroStatusTitle}>Check number first</div>
+              <div style={htmlPageStyles.heroStatusText}>
                 We are keeping this first pass lean: bank-day checks up top, matching HTML files below, and no conversion
                 workflow yet.
               </div>
@@ -356,7 +387,7 @@ export default function HTMLConvertScreen() {
 
         <section style={htmlStyles.metricRow}>
           {metrics.map((metric) => (
-            <article key={metric.label} style={{ ...adminStyles.statCard, ...htmlStyles.metricCard }}>
+            <article key={metric.label} style={{ ...htmlPageStyles.statCard, ...htmlStyles.metricCard }}>
               <div style={htmlStyles.metricLabel}>{metric.label}</div>
               <div style={htmlStyles.metricValue}>{metric.value}</div>
               <div style={htmlStyles.metricDetail}>{metric.detail}</div>
@@ -367,17 +398,17 @@ export default function HTMLConvertScreen() {
         <section style={htmlStyles.convertCard}>
           <div style={htmlStyles.convertCardTop}>
             <div>
-              <div style={adminStyles.sectionKicker}>Convert</div>
-              <h2 style={adminStyles.sectionTitle}>Rename the HTML files in 3.HTML</h2>
+              <div style={htmlPageStyles.sectionKicker}>Convert</div>
+              <h2 style={htmlPageStyles.sectionTitle}>Rename the HTML files in 3.HTML</h2>
             </div>
             <div style={htmlStyles.statusChip}>{convertStatusTag}</div>
           </div>
-          <div style={adminStyles.sectionMeta}>
+          <div style={htmlPageStyles.sectionMeta}>
             Rename matched HTML files using the selected posting day, then move them to
             <span style={htmlStyles.inlineCode}>3.HTML/Renamed</span>.
           </div>
           <div style={htmlStyles.convertActions}>
-            <button style={adminStyles.primaryButton} type="button" onClick={() => void handleConvert()} disabled={converting}>
+            <button style={htmlPageStyles.primaryButton} type="button" onClick={() => void handleConvert()} disabled={converting}>
               {converting ? "Converting..." : "Convert Files"}
             </button>
             <div style={htmlStyles.convertMessage}>{convertStatusMessage}</div>
@@ -394,15 +425,15 @@ export default function HTMLConvertScreen() {
           <div style={htmlStyles.tableHeader}>
             <button type="button" style={htmlStyles.sectionHeaderButton} onClick={() => setBankTableCollapsed((current) => !current)}>
               <div style={htmlStyles.sectionHeaderCopy}>
-                <div style={adminStyles.sectionKicker}>EDI spreadsheet</div>
-                <h2 style={{ ...adminStyles.sectionTitle, ...htmlStyles.singleLineTitle }}>
+                <div style={htmlPageStyles.sectionKicker}>EDI spreadsheet</div>
+                <h2 style={{ ...htmlPageStyles.sectionTitle, ...htmlStyles.singleLineTitle }}>
                   Items with EDI available for the selected bank day
                 </h2>
               </div>
               <div style={htmlStyles.collapseChip}>{bankTableCollapsed ? "Expand" : "Collapse"}</div>
             </button>
             <div style={htmlStyles.sectionMetaWrap}>
-              <div style={adminStyles.sectionMeta}>
+              <div style={htmlPageStyles.sectionMeta}>
                 {loading
                   ? "Loading banking and calendar data..."
                   : activeBankDay
@@ -460,15 +491,15 @@ export default function HTMLConvertScreen() {
           <div style={htmlStyles.tableHeader}>
             <button type="button" style={htmlStyles.sectionHeaderButton} onClick={() => setHtmlTableCollapsed((current) => !current)}>
               <div style={htmlStyles.sectionHeaderCopy}>
-                <div style={adminStyles.sectionKicker}>3.HTML spreadsheet</div>
-                <h2 style={{ ...adminStyles.sectionTitle, ...htmlStyles.singleLineTitle }}>
+                <div style={htmlPageStyles.sectionKicker}>3.HTML spreadsheet</div>
+                <h2 style={{ ...htmlPageStyles.sectionTitle, ...htmlStyles.singleLineTitle }}>
                   Matched HTML files for the selected bank day
                 </h2>
               </div>
               <div style={htmlStyles.collapseChip}>{htmlTableCollapsed ? "Expand" : "Collapse"}</div>
             </button>
             <div style={htmlStyles.sectionMetaWrap}>
-              <div style={adminStyles.sectionMeta}>
+              <div style={htmlPageStyles.sectionMeta}>
                 {loadingHtml
                   ? "Searching files in C:\\Renfrew\\Workflow\\3.HTML..."
                   : htmlData?.bankDay
@@ -523,6 +554,137 @@ export default function HTMLConvertScreen() {
     </main>
   );
 }
+
+const htmlPageStyles: Record<string, CSSProperties> = {
+  content: {
+    display: "grid",
+    gap: "18px",
+    alignContent: "start",
+  },
+  heroShell: {
+    display: "grid",
+    gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, 0.9fr)",
+    gap: "18px",
+    padding: "24px",
+    borderRadius: "34px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(243,247,252,0.96) 42%, rgba(247,250,255,0.92) 100%)",
+    boxShadow: "0 24px 48px rgba(52, 84, 120, 0.08)",
+    position: "relative",
+    overflow: "hidden",
+  },
+  heroCopy: {
+    display: "grid",
+    gap: "14px",
+    alignContent: "start",
+  },
+  kicker: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.16em",
+    color: "#6d7f93",
+    fontWeight: 800,
+  },
+  subtitle: {
+    margin: 0,
+    fontSize: "28px",
+    lineHeight: 1.15,
+    letterSpacing: "-0.02em",
+    color: "#17324f",
+    fontWeight: 800,
+    maxWidth: "18ch",
+  },
+  primaryButton: {
+    border: "none",
+    borderRadius: "14px",
+    padding: "12px 16px",
+    background: "linear-gradient(135deg, #2f5f8f 0%, #1e4064 100%)",
+    color: "#ffffff",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 12px 24px rgba(47, 95, 143, 0.24)",
+  },
+  heroArt: {
+    display: "grid",
+    alignItems: "stretch",
+  },
+  heroStatusCard: {
+    padding: "20px",
+    borderRadius: "26px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(145deg, rgba(255,255,255,0.98) 0%, rgba(236,243,251,0.96) 100%)",
+    boxShadow: "0 18px 38px rgba(52, 84, 120, 0.08)",
+    display: "grid",
+    gap: "10px",
+    alignContent: "start",
+  },
+  heroStatusTop: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+  },
+  statusPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    padding: "6px 10px",
+    borderRadius: "999px",
+    background: "rgba(224, 237, 250, 0.95)",
+    color: "#35506d",
+    fontSize: "11px",
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+  },
+  statusDot: {
+    width: "11px",
+    height: "11px",
+    borderRadius: "999px",
+    background: "linear-gradient(135deg, #4caf7d 0%, #79d8a9 100%)",
+    boxShadow: "0 0 0 6px rgba(76, 175, 125, 0.12)",
+  },
+  heroStatusTitle: {
+    fontSize: "24px",
+    lineHeight: 1.08,
+    fontWeight: 900,
+    color: "#17324f",
+  },
+  heroStatusText: {
+    fontSize: "14px",
+    lineHeight: 1.7,
+    color: "#536579",
+  },
+  statCard: {
+    padding: "18px",
+    borderRadius: "24px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(145deg, rgba(255,255,255,0.94) 0%, rgba(245,249,253,0.98) 100%)",
+    boxShadow: "0 16px 32px rgba(52, 84, 120, 0.06)",
+  },
+  sectionKicker: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.16em",
+    color: "#6d7f93",
+    fontWeight: 800,
+    marginBottom: "6px",
+  },
+  sectionTitle: {
+    margin: 0,
+    fontSize: "24px",
+    lineHeight: 1.12,
+    color: "#17324f",
+    fontWeight: 900,
+  },
+  sectionMeta: {
+    fontSize: "13px",
+    lineHeight: 1.6,
+    color: "#536579",
+    maxWidth: "34ch",
+  },
+};
 
 const htmlStyles: Record<string, CSSProperties> = {
   dateField: {

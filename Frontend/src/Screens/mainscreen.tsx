@@ -27,6 +27,30 @@ export default function MainScreen() {
 
   const widgets: WidgetCard[] = [
     {
+      title: "Collections",
+      meta: "Open the collections workspace for follow-up and receivables tracking.",
+      tone: "pearl",
+      action: "Open Collections",
+      path: "/collections",
+      footnote: "Menu item",
+    },
+    {
+      title: "Finance",
+      meta: "Open finance-related workflow tools and review screens.",
+      tone: "pearl",
+      action: "Open Finance",
+      path: "/finance",
+      footnote: "Menu item",
+    },
+    {
+      title: "Business",
+      meta: "Open business-related workflow tools and review screens.",
+      tone: "blue",
+      action: "Open Business",
+      path: "/business",
+      footnote: "Menu item",
+    },
+    {
       title: "Site Review",
       meta: "Open pending batches, review attachments, and keep the queue moving.",
       tone: "blue",
@@ -110,6 +134,18 @@ export default function MainScreen() {
             <span style={styles.navButtonLabel}>Cash</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
           </button>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/collections")}>
+            <span style={styles.navButtonLabel}>Collections</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+          </button>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/finance")}>
+            <span style={styles.navButtonLabel}>Finance</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+          </button>
+          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/business")}>
+            <span style={styles.navButtonLabel}>Business</span>
+            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
+          </button>
           <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
             <span style={styles.navButtonLabel}>Admin</span>
             <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
@@ -171,13 +207,13 @@ export default function MainScreen() {
         </section>
 
         <section style={styles.widgetSection}>
-          <div style={styles.sectionHeader}>
+            <div style={styles.sectionHeader}>
             <div>
               <div style={styles.sectionKicker}>Widgets</div>
               <h2 style={styles.sectionTitle}>Everything feels connected</h2>
             </div>
             <div style={styles.sectionMeta}>
-              The four main paths are still here, but now they live in a much softer, more premium frame.
+              The main paths stay focused on the core workspace while Collections holds the follow-up group.
             </div>
           </div>
 
@@ -209,7 +245,7 @@ export default function MainScreen() {
   );
 }
 
-const styles: Record<string, CSSProperties> = {
+export const styles: Record<string, CSSProperties> = {
   shell: {
     minHeight: "100vh",
     padding: "18px",
@@ -291,6 +327,10 @@ const styles: Record<string, CSSProperties> = {
     overflow: "hidden",
     padding: "4px",
     flexShrink: 0,
+    position: "sticky",
+    top: "18px",
+    alignSelf: "flex-start",
+    zIndex: 2,
   },
   brandWomenImage: {
     width: "100%",
@@ -374,6 +414,8 @@ const styles: Record<string, CSSProperties> = {
     gap: "18px",
   },
   heroShell: {
+    position: "relative",
+    zIndex: 1,
     display: "grid",
     gridTemplateColumns: "minmax(0, 1.2fr) minmax(300px, 0.9fr)",
     gap: "18px",

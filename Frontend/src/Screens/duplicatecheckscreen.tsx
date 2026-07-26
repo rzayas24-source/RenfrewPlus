@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import { getDuplicateCheckSpreadsheet, type DuplicateCheckSpreadsheetResponse, type DuplicateCheckRow } from "../api/duplicatecheck_api";
 
 type DuplicateMetric = {
@@ -77,56 +77,20 @@ export default function DuplicateCheckScreen() {
   const duplicateFilenameList = data?.duplicateFilenameList ?? [];
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft workspace for duplicate filename review and bank-day checks.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Duplicate check navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>{data?.currentWorkDay || "Loading..."}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            Focused on duplicate filenames for the active bank day.
-          </div>
-        </div>
-      </aside>
-
-      <section style={adminStyles.content}>
+    <AdminShell
+      sidebarCopy="A soft workspace for duplicate filename review and bank-day checks."
+      onBack={() => navigate("/tools")}
+      sidebarCardLabel="Today"
+      sidebarCardValue={data?.currentWorkDay || "Loading..."}
+      sidebarCardMeta="Focused on duplicate filenames for the active bank day."
+    >
+      <section style={{ ...adminStyles.content, paddingTop: "0" }}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Duplicate Check</div>
             <p style={adminStyles.subtitle}>
               Spreadsheet view of duplicate filenames for the current bank day.
             </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/tools")}>
-                Back to Tools
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
-                Open Banking
-              </button>
-            </div>
           </div>
 
           <div style={adminStyles.heroArt}>
@@ -234,7 +198,7 @@ export default function DuplicateCheckScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -420,6 +384,7 @@ const duplicateStyles: Record<string, CSSProperties> = {
     wordBreak: "break-word",
   },
 };
+
 
 
 

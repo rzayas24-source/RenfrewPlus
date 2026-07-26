@@ -39,5 +39,6 @@ if not DB_PATH:
 # -----------------------------------------
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row   # ⭐ REQUIRED ⭐
     return conn

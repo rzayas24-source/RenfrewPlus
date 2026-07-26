@@ -7,6 +7,9 @@ import tempfile
 import zipfile
 import subprocess
 import sys
+import hashlib
+import hmac
+import secrets
 from io import BytesIO
 from datetime import datetime
 from collections import defaultdict
@@ -62,13 +65,16 @@ def _ensure_source_table_columns_on_startup():
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
         ensure_tasks_table(conn)
+        ensure_auth_tables(conn)
         normalize_tasks_table_categories(conn)
         refresh_source_table_mirrors(conn)
     finally:
         conn.close()
 
 def get_conn():
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("PRAGMA foreign_keys = ON")
+    return conn
 
 
 def _quote_identifier(name: str) -> str:
@@ -451,6 +457,288 @@ def normalize_tasks_table_categories(conn=None):
 
     if close_conn:
         conn.close()
+
+
+AUTH_ROLE_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("name", "TEXT NOT NULL UNIQUE"),
+    ("description", "TEXT NOT NULL DEFAULT ''"),
+    ("permissions_json", "TEXT NOT NULL DEFAULT '[]'"),
+    ("is_system", "INTEGER NOT NULL DEFAULT 0"),
+    ("active", "INTEGER NOT NULL DEFAULT 1"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
+AUTH_USER_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("signin", "TEXT NOT NULL UNIQUE"),
+    ("display_name", "TEXT NOT NULL DEFAULT ''"),
+    ("password_hash", "TEXT NOT NULL"),
+    ("role_id", "INTEGER NOT NULL REFERENCES roles(id) ON UPDATE CASCADE ON DELETE RESTRICT"),
+    ("active", "INTEGER NOT NULL DEFAULT 1"),
+    ("last_login_at", "TEXT"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
+DEFAULT_AUTH_ROLES = [
+    {
+        "name": "Admin",
+        "description": "Full access across screens, settings, and permissions.",
+        "permissions": ["*"],
+    },
+    {
+        "name": "Manager",
+        "description": "Can manage day-to-day operations and shared menus.",
+        "permissions": [
+            "menu.view",
+            "menu.manage",
+            "feature.view",
+            "feature.manage",
+        ],
+    },
+    {
+        "name": "User",
+        "description": "Standard access for everyday work.",
+        "permissions": [
+            "menu.view",
+            "feature.view",
+        ],
+    },
+]
+
+
+def _utc_now_iso() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds")
+
+
+def _json_permissions(value) -> str:
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return "[]"
+        try:
+            parsed = json.loads(text)
+        except Exception:
+            parsed = [item.strip() for item in text.split(",") if item.strip()]
+        return json.dumps(parsed)
+
+    if value is None:
+        return "[]"
+
+    if isinstance(value, (list, tuple, set)):
+        return json.dumps([str(item).strip() for item in value if str(item).strip()])
+
+    return json.dumps([str(value).strip()])
+
+
+def _hash_password(password: str) -> str:
+    password = str(password or "")
+    if not password:
+        raise HTTPException(status_code=400, detail="password is required")
+
+    salt = secrets.token_hex(16)
+    iterations = 120000
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations,
+    ).hex()
+    return f"pbkdf2_sha256${iterations}${salt}${digest}"
+
+
+def _verify_password(password: str, stored_hash: str) -> bool:
+    password = str(password or "")
+    stored_hash = str(stored_hash or "")
+    if not password or not stored_hash:
+        return False
+
+    parts = stored_hash.split("$")
+    if len(parts) != 4:
+        return hmac.compare_digest(password, stored_hash)
+
+    algorithm, iterations_text, salt, expected = parts
+    if algorithm != "pbkdf2_sha256":
+        return False
+
+    try:
+        iterations = int(iterations_text)
+    except ValueError:
+        return False
+
+    actual = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        iterations,
+    ).hex()
+    return hmac.compare_digest(actual, expected)
+
+
+def ensure_auth_tables(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+
+    role_column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in AUTH_ROLE_TABLE_COLUMNS
+    )
+    user_column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in AUTH_USER_TABLE_COLUMNS
+    )
+
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("roles")} ({role_column_defs})')
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("users")} ({user_column_defs})')
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS idx_users_role_id ON {_quote_identifier("users")} ({_quote_identifier("role_id")})'
+    )
+
+    existing_role_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("roles")})').fetchall()
+    }
+    for column_name, column_type in AUTH_ROLE_TABLE_COLUMNS:
+        if column_name.lower() in existing_role_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("roles")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    existing_user_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("users")})').fetchall()
+    }
+    for column_name, column_type in AUTH_USER_TABLE_COLUMNS:
+        if column_name.lower() in existing_user_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("users")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    for role_seed in DEFAULT_AUTH_ROLES:
+        permissions_json = _json_permissions(role_seed["permissions"])
+        existing_role = cur.execute(
+            f'SELECT id FROM {_quote_identifier("roles")} WHERE LOWER({_quote_identifier("name")}) = LOWER(?)',
+            (role_seed["name"],),
+        ).fetchone()
+        if existing_role:
+            continue
+
+        cur.execute(
+            f'INSERT INTO {_quote_identifier("roles")} ({_quote_identifier("name")}, {_quote_identifier("description")}, {_quote_identifier("permissions_json")}, {_quote_identifier("is_system")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, 1, 1, ?, ?)',
+            (
+                role_seed["name"],
+                role_seed["description"],
+                permissions_json,
+                _utc_now_iso(),
+                _utc_now_iso(),
+            ),
+        )
+
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def _role_row_to_payload(row):
+    permissions = []
+    try:
+        permissions = json.loads(row["permissions_json"] or "[]")
+    except Exception:
+        permissions = []
+
+    return {
+        "id": row["id"],
+        "name": row["name"],
+        "description": row["description"],
+        "permissions": permissions,
+        "is_system": bool(row["is_system"]),
+        "active": bool(row["active"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _user_row_to_payload(row):
+    return {
+        "id": row["id"],
+        "signin": row["signin"],
+        "display_name": row["display_name"],
+        "role_id": row["role_id"],
+        "role_name": row["role_name"],
+        "active": bool(row["active"]),
+        "last_login_at": row["last_login_at"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _fetch_role_or_404(conn, role_id: int):
+    role = conn.execute(
+        f'SELECT * FROM {_quote_identifier("roles")} WHERE id = ?',
+        (role_id,),
+    ).fetchone()
+    if not role:
+        raise HTTPException(status_code=404, detail="Role not found")
+    return role
+
+
+def _create_user_record(conn, payload: dict):
+    signin = str(payload.get("signin") or "").strip()
+    password = str(payload.get("password") or "")
+    role_id = payload.get("role_id")
+    display_name = str(payload.get("display_name") or "").strip()
+
+    if not signin:
+        raise HTTPException(status_code=400, detail="signin is required")
+    if role_id in (None, ""):
+        raise HTTPException(status_code=400, detail="role_id is required")
+
+    try:
+        role_id = int(role_id)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="role_id must be a number")
+
+    _fetch_role_or_404(conn, role_id)
+
+    password_hash = _hash_password(password)
+    now = _utc_now_iso()
+    cur = conn.cursor()
+    cur.execute(
+        f'INSERT INTO {_quote_identifier("users")} ({_quote_identifier("signin")}, {_quote_identifier("display_name")}, {_quote_identifier("password_hash")}, {_quote_identifier("role_id")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        (signin, display_name, password_hash, role_id, 1 if payload.get("active", True) else 0, now, now),
+    )
+    return cur.lastrowid
+
+
+def _get_user_by_signin(conn, signin: str):
+    return conn.execute(
+        f"""
+        SELECT
+            u.id,
+            u.signin,
+            u.display_name,
+            u.password_hash,
+            u.role_id,
+            u.active,
+            u.last_login_at,
+            u.created_at,
+            u.updated_at,
+            r.name AS role_name,
+            r.description AS role_description,
+            r.permissions_json AS role_permissions_json
+        FROM {_quote_identifier("users")} u
+        LEFT JOIN {_quote_identifier("roles")} r ON r.id = u.role_id
+        WHERE LOWER(u.signin) = LOWER(?)
+        """,
+        (signin,),
+    ).fetchone()
 
 
 def _balsheet_order_clause() -> str:
@@ -4255,6 +4543,299 @@ def reject_attachment(attachment_id: int):
     conn.close()
 
     return {"status": "rejected", "id": attachment_id}
+
+
+@app.get("/auth/roles")
+def list_roles():
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        rows = conn.execute(
+            f'SELECT * FROM {_quote_identifier("roles")} ORDER BY {_quote_identifier("name")} ASC'
+        ).fetchall()
+        return [_role_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/auth/roles")
+def create_role(role: dict):
+    name = str(role.get("name") or "").strip()
+    description = str(role.get("description") or "").strip()
+    permissions_json = _json_permissions(role.get("permissions", []))
+
+    if not name:
+        raise HTTPException(status_code=400, detail="name is required")
+
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        now = _utc_now_iso()
+        cur = conn.cursor()
+        cur.execute(
+            f'INSERT INTO {_quote_identifier("roles")} ({_quote_identifier("name")}, {_quote_identifier("description")}, {_quote_identifier("permissions_json")}, {_quote_identifier("is_system")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, 0, ?, ?, ?)',
+            (name, description, permissions_json, 1 if role.get("active", True) else 0, now, now),
+        )
+        conn.commit()
+        created = cur.execute(
+            f'SELECT * FROM {_quote_identifier("roles")} WHERE id = ?',
+            (cur.lastrowid,),
+        ).fetchone()
+        return _role_row_to_payload(created)
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Role already exists")
+    finally:
+        conn.close()
+
+
+@app.put("/auth/roles/{role_id}")
+def update_role(role_id: int, role: dict):
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        existing = _fetch_role_or_404(conn, role_id)
+        name = str(role.get("name") or existing["name"]).strip()
+        description = str(role.get("description") or existing["description"]).strip()
+        permissions_json = _json_permissions(role.get("permissions", existing["permissions_json"]))
+        active = 1 if role.get("active", bool(existing["active"])) else 0
+
+        conn.execute(
+            f'UPDATE {_quote_identifier("roles")} SET {_quote_identifier("name")} = ?, {_quote_identifier("description")} = ?, {_quote_identifier("permissions_json")} = ?, {_quote_identifier("active")} = ?, {_quote_identifier("updated_at")} = ? WHERE id = ?',
+            (name, description, permissions_json, active, _utc_now_iso(), role_id),
+        )
+        conn.commit()
+        updated = conn.execute(
+            f'SELECT * FROM {_quote_identifier("roles")} WHERE id = ?',
+            (role_id,),
+        ).fetchone()
+        return _role_row_to_payload(updated)
+    finally:
+        conn.close()
+
+
+@app.get("/auth/users")
+def list_users():
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        rows = conn.execute(
+            f"""
+            SELECT
+                u.id,
+                u.signin,
+                u.display_name,
+                u.role_id,
+                u.active,
+                u.last_login_at,
+                u.created_at,
+                u.updated_at,
+                r.name AS role_name
+            FROM {_quote_identifier("users")} u
+            LEFT JOIN {_quote_identifier("roles")} r ON r.id = u.role_id
+            ORDER BY u.signin COLLATE NOCASE ASC
+            """
+        ).fetchall()
+        return [_user_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/auth/users")
+def create_user(user: dict):
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        user_id = _create_user_record(conn, user)
+        conn.commit()
+        created = conn.execute(
+            f"""
+            SELECT
+                u.id,
+                u.signin,
+                u.display_name,
+                u.role_id,
+                u.active,
+                u.last_login_at,
+                u.created_at,
+                u.updated_at,
+                r.name AS role_name
+            FROM {_quote_identifier("users")} u
+            LEFT JOIN {_quote_identifier("roles")} r ON r.id = u.role_id
+            WHERE u.id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        return _user_row_to_payload(created)
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Signin already exists")
+    finally:
+        conn.close()
+
+
+@app.put("/auth/users/{user_id}")
+def update_user(user_id: int, user: dict):
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        existing = conn.execute(
+            f'SELECT * FROM {_quote_identifier("users")} WHERE id = ?',
+            (user_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        signin = str(user.get("signin") or existing["signin"]).strip()
+        display_name = str(user.get("display_name") or existing["display_name"]).strip()
+        role_id = int(user.get("role_id") or existing["role_id"])
+        active = 1 if user.get("active", bool(existing["active"])) else 0
+
+        _fetch_role_or_404(conn, role_id)
+
+        params = [signin, display_name, role_id, active, _utc_now_iso(), user_id]
+        update_clause = [
+            f'{_quote_identifier("signin")} = ?',
+            f'{_quote_identifier("display_name")} = ?',
+            f'{_quote_identifier("role_id")} = ?',
+            f'{_quote_identifier("active")} = ?',
+            f'{_quote_identifier("updated_at")} = ?',
+        ]
+
+        if user.get("password"):
+            update_clause.insert(2, f'{_quote_identifier("password_hash")} = ?')
+            params.insert(2, _hash_password(user.get("password")))
+
+        conn.execute(
+            f'UPDATE {_quote_identifier("users")} SET {", ".join(update_clause)} WHERE id = ?',
+            tuple(params),
+        )
+        conn.commit()
+        updated = conn.execute(
+            f"""
+            SELECT
+                u.id,
+                u.signin,
+                u.display_name,
+                u.role_id,
+                u.active,
+                u.last_login_at,
+                u.created_at,
+                u.updated_at,
+                r.name AS role_name
+            FROM {_quote_identifier("users")} u
+            LEFT JOIN {_quote_identifier("roles")} r ON r.id = u.role_id
+            WHERE u.id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        return _user_row_to_payload(updated)
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=400, detail="Signin already exists")
+    finally:
+        conn.close()
+
+
+@app.post("/auth/login")
+def login(payload: dict):
+    signin = str(payload.get("signin") or "").strip()
+    password = str(payload.get("password") or "")
+    if not signin or not password:
+        raise HTTPException(status_code=400, detail="signin and password are required")
+
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        user = _get_user_by_signin(conn, signin)
+        if not user or not user["active"]:
+            raise HTTPException(status_code=401, detail="Invalid signin or password")
+        if not _verify_password(password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid signin or password")
+
+        now = _utc_now_iso()
+        conn.execute(
+            f'UPDATE {_quote_identifier("users")} SET {_quote_identifier("last_login_at")} = ?, {_quote_identifier("updated_at")} = ? WHERE id = ?',
+            (now, now, user["id"]),
+        )
+        conn.commit()
+
+        permissions = []
+        try:
+            permissions = json.loads(user["role_permissions_json"] or "[]")
+        except Exception:
+            permissions = []
+
+        return {
+            "id": user["id"],
+            "signin": user["signin"],
+            "display_name": user["display_name"],
+            "role": {
+                "id": user["role_id"],
+                "name": user["role_name"],
+                "description": user["role_description"],
+                "permissions": permissions,
+            },
+            "permissions": permissions,
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/auth/bootstrap-admin")
+def bootstrap_admin(payload: dict):
+    signin = str(payload.get("signin") or "").strip()
+    password = str(payload.get("password") or "")
+    display_name = str(payload.get("display_name") or "Administrator").strip()
+
+    if not signin or not password:
+        raise HTTPException(status_code=400, detail="signin and password are required")
+
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        existing_user_count = conn.execute(
+            f'SELECT COUNT(*) FROM {_quote_identifier("users")}'
+        ).fetchone()[0]
+        if existing_user_count:
+            raise HTTPException(status_code=409, detail="Bootstrap is only allowed when no users exist")
+
+        admin_role = conn.execute(
+            f'SELECT id FROM {_quote_identifier("roles")} WHERE LOWER({_quote_identifier("name")}) = LOWER(?)',
+            ("Admin",),
+        ).fetchone()
+        if not admin_role:
+            raise HTTPException(status_code=500, detail="Admin role is missing")
+
+        user_id = _create_user_record(
+            conn,
+            {
+                "signin": signin,
+                "password": password,
+                "role_id": admin_role[0],
+                "display_name": display_name,
+                "active": True,
+            },
+        )
+        conn.commit()
+        created = conn.execute(
+            f"""
+            SELECT
+                u.id,
+                u.signin,
+                u.display_name,
+                u.role_id,
+                u.active,
+                u.last_login_at,
+                u.created_at,
+                u.updated_at,
+                r.name AS role_name
+            FROM {_quote_identifier("users")} u
+            LEFT JOIN {_quote_identifier("roles")} r ON r.id = u.role_id
+            WHERE u.id = ?
+            """,
+            (user_id,),
+        ).fetchone()
+        return _user_row_to_payload(created)
+    finally:
+        conn.close()
 
 
 @app.get("/sites")

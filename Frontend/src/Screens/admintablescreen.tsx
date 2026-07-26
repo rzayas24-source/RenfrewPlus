@@ -1,10 +1,9 @@
-import type { CSSProperties } from "react";
+﻿import type { CSSProperties } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { WorklistBrandButton } from "../worklist/worklist";
 import { getAdminTable, getAdminTables } from "../api/admin_tables_api";
 import type { AdminTableDetail, AdminTableSummary } from "../api/admin_tables_api";
-
+import { AdminShell } from "../components/AdminShell";
 const ROW_LIMIT = 250;
 
 export default function AdminTableScreen() {
@@ -159,52 +158,23 @@ export default function AdminTableScreen() {
   };
 
   return (
-    <main style={styles.shell}>
-      <div style={styles.glowBlue} />
-      <div style={styles.glowPink} />
-
-      <aside style={styles.sidebar}>
-        <div style={styles.brandWrap}>
-          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={styles.sidebarCopy}>
-          Browse every database table, inspect columns, and preview live rows without leaving the admin shell.
-        </p>
-
-        <nav style={styles.navStack} aria-label="Admin table navigation">
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/admin")}>
-            <span style={styles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={styles.sidebarCard}>
-          <div style={styles.sidebarCardLabel}>Tables</div>
-          <div style={styles.sidebarCardValue}>{tables.length}</div>
-          <div style={styles.sidebarCardMeta}>
-            {selectedSummary ? `${selectedSummary.rowCount} rows in ${selectedSummary.name}` : "Select a table to inspect it."}
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="Browse every database table, inspect columns, and preview live rows without leaving the admin shell."
+      onBack={() => navigate("/admin")}
+      ribbonItems={[
+        { title: "Users", meta: "Role management", onClick: () => navigate("/admin/users") },
+        { title: "Tables", meta: "Database browser", onClick: () => navigate("/admin/tables") },
+        { title: "Tools", meta: "Utilities panel", onClick: () => navigate("/tools") },
+        { title: "Cash", meta: "Financial view", onClick: () => navigate("/cash") },
+      ]}
+    >
       <section style={styles.content}>
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
             <div style={styles.kicker}>Table viewer</div>
-            <p style={styles.subtitle}>
-              A read-only view of every SQLite table in the active workflow database.
-            </p>
+            <p style={styles.subtitle}>A read-only view of every SQLite table in the active workflow database.</p>
 
             <div style={styles.heroActions}>
-              <button style={styles.primaryButton} type="button" onClick={() => navigate("/admin")}>
-                Back to Admin
-              </button>
               <button
                 style={styles.secondaryButton}
                 type="button"
@@ -242,7 +212,9 @@ export default function AdminTableScreen() {
           <article style={styles.statCard}>
             <div style={styles.statLabel}>Selected</div>
             <div style={styles.statValue}>{selectedSummary?.name ?? "None"}</div>
-            <div style={styles.statDetail}>{selectedSummary ? `${selectedSummary.columnCount} columns` : "Choose a table on the left."}</div>
+            <div style={styles.statDetail}>
+              {selectedSummary ? `${selectedSummary.columnCount} columns` : "Choose a table on the left."}
+            </div>
           </article>
           <article style={styles.statCard}>
             <div style={styles.statLabel}>Preview</div>
@@ -258,9 +230,7 @@ export default function AdminTableScreen() {
                 <div style={styles.sectionKicker}>All tables</div>
                 <h2 style={styles.sectionTitle}>Database tables</h2>
               </div>
-              <div style={styles.sectionMeta}>
-                {loadingTables ? "Loading..." : `${filteredTables.length} shown`}
-              </div>
+              <div style={styles.sectionMeta}>{loadingTables ? "Loading..." : `${filteredTables.length} shown`}</div>
             </div>
 
             <input
@@ -284,12 +254,10 @@ export default function AdminTableScreen() {
                       setSortDirection("asc");
                     }
                   }}
-                  >
-                    <span>Table</span>
-                    <span style={styles.tableListHeaderIcon}>
-                    {sortField === "name" ? getSortLabel(sortDirection) : "Sort"}
-                    </span>
-                  </button>
+                >
+                  <span>Table</span>
+                  <span style={styles.tableListHeaderIcon}>{sortField === "name" ? getSortLabel(sortDirection) : "Sort"}</span>
+                </button>
                 <button
                   type="button"
                   style={styles.tableListHeaderButton}
@@ -303,9 +271,7 @@ export default function AdminTableScreen() {
                   }}
                 >
                   <span>Rows</span>
-                  <span style={styles.tableListHeaderIcon}>
-                    {sortField === "rows" ? getSortLabel(sortDirection) : "Sort"}
-                  </span>
+                  <span style={styles.tableListHeaderIcon}>{sortField === "rows" ? getSortLabel(sortDirection) : "Sort"}</span>
                 </button>
                 <button
                   type="button"
@@ -320,9 +286,7 @@ export default function AdminTableScreen() {
                   }}
                 >
                   <span>Cols</span>
-                  <span style={styles.tableListHeaderIcon}>
-                    {sortField === "cols" ? getSortLabel(sortDirection) : "Sort"}
-                  </span>
+                  <span style={styles.tableListHeaderIcon}>{sortField === "cols" ? getSortLabel(sortDirection) : "Sort"}</span>
                 </button>
               </div>
 
@@ -346,11 +310,9 @@ export default function AdminTableScreen() {
                 );
               })}
 
-                {!visibleTables.length && !loadingTables && (
-                  <div style={styles.emptyState}>No tables match that search.</div>
-                )}
-              </div>
+              {!visibleTables.length && !loadingTables && <div style={styles.emptyState}>No tables match that search.</div>}
             </div>
+          </div>
 
           <div style={styles.detailPane}>
             <div style={styles.panelHeader}>
@@ -359,11 +321,7 @@ export default function AdminTableScreen() {
                 <h2 style={styles.sectionTitle}>{tableDetail?.name ?? "Select a table"}</h2>
               </div>
               <div style={styles.sectionMeta}>
-                {loadingDetail
-                  ? "Loading preview..."
-                  : tableDetail
-                    ? `${tableDetail.rowCount} rows total`
-                    : "0 rows total"}
+                {loadingDetail ? "Loading preview..." : tableDetail ? `${tableDetail.rowCount} rows total` : "0 rows total"}
               </div>
             </div>
 
@@ -410,11 +368,7 @@ export default function AdminTableScreen() {
                     <thead>
                       <tr>
                         <th style={styles.headerCell}>
-                          <button
-                            type="button"
-                            style={styles.headerSortButton}
-                            onClick={() => togglePreviewSort("rowid")}
-                          >
+                          <button type="button" style={styles.headerSortButton} onClick={() => togglePreviewSort("rowid")}>
                             <span>rowid</span>
                             <span style={styles.headerSortIcon}>
                               {previewSortField === "rowid" ? getSortLabel(previewSortDirection) : "Sort"}
@@ -423,11 +377,7 @@ export default function AdminTableScreen() {
                         </th>
                         {columnNames.map((columnName) => (
                           <th key={columnName} style={styles.headerCell}>
-                            <button
-                              type="button"
-                              style={styles.headerSortButton}
-                              onClick={() => togglePreviewSort(columnName)}
-                            >
+                            <button type="button" style={styles.headerSortButton} onClick={() => togglePreviewSort(columnName)}>
                               <span>{columnName}</span>
                               <span style={styles.headerSortIcon}>
                                 {previewSortField === columnName ? getSortLabel(previewSortDirection) : "Sort"}
@@ -462,7 +412,7 @@ export default function AdminTableScreen() {
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -645,6 +595,7 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: "18px",
+    paddingTop: "88px",
   },
   heroShell: {
     display: "grid",
@@ -679,10 +630,21 @@ const styles: Record<string, CSSProperties> = {
     color: "#536579",
   },
   heroActions: {
+    position: "fixed",
+    top: "18px",
+    left: "282px",
+    right: "16px",
+    zIndex: 4,
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
-    marginTop: "20px",
+    alignItems: "center",
+    padding: "10px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
   primaryButton: {
     height: "44px",
@@ -1012,6 +974,9 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "14px",
   },
 };
+
+
+
 
 
 

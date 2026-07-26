@@ -87,9 +87,6 @@ export default function SnapshotGeneratorScreen() {
               <button style={adminStyles.primaryButton} type="button" onClick={handleRun} disabled={running}>
                 {running ? "Running..." : "Run Snapshot Generator"}
               </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/site-review")}>
-                Back to Site Review
-              </button>
             </div>
           </div>
 

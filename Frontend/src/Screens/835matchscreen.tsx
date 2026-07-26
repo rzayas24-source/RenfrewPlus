@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import {
   commitSourceMatch,
   commitAllExactMatches,
@@ -423,42 +423,13 @@ export default function Match835Screen() {
   };
 
   return (
-    <main style={{ ...adminStyles.shell, overflowX: "hidden", overflowY: "auto", alignItems: "start" }}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          Source-driven 835 matching. We look at EDI first, then confirm against EFT and Lockbox rows.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="835 match navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Queue</div>
-          <div style={adminStyles.sidebarCardValue}>
-            {summary ? `${summary.ediRows} EDI rows` : "Loading matrix"}
-          </div>
-          <div style={adminStyles.sidebarCardMeta}>
-            Y means matched, P means possible, and N means no match yet.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="Source-driven 835 matching. We look at EDI first, then confirm against EFT and Lockbox rows."
+      onBack={() => navigate("/cash")}
+      sidebarCardLabel="Queue"
+      sidebarCardValue={summary ? `${summary.ediRows} EDI rows` : "Loading matrix"}
+      sidebarCardMeta="Y means matched, P means possible, and N means no match yet."
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -926,7 +897,7 @@ export default function Match835Screen() {
           </article>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -934,42 +905,42 @@ const matchStyles: Record<string, CSSProperties> = {
   workspace: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.2fr)",
-    gap: "18px",
+    gap: "10px",
     alignItems: "stretch",
   },
   panel: {
-    borderRadius: "28px",
-    padding: "20px",
-    background: "rgba(255,255,255,0.82)",
+    borderRadius: "20px",
+    padding: "12px",
+    background: "rgba(255,255,255,0.88)",
     border: "1px solid rgba(140, 160, 184, 0.16)",
-    boxShadow: "0 18px 34px rgba(52, 84, 120, 0.06)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.06)",
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
     minHeight: 0,
-    maxHeight: "calc(100vh - 36px)",
+    maxHeight: "calc(100vh - 24px)",
   },
   panelSticky: {
-    borderRadius: "28px",
-    padding: "20px",
-    background: "rgba(255,255,255,0.82)",
+    borderRadius: "20px",
+    padding: "12px",
+    background: "rgba(255,255,255,0.88)",
     border: "1px solid rgba(140, 160, 184, 0.16)",
-    boxShadow: "0 18px 34px rgba(52, 84, 120, 0.06)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.06)",
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
     minHeight: 0,
     position: "sticky",
-    top: "16px",
+    top: "12px",
     alignSelf: "start",
-    maxHeight: "calc(100vh - 32px)",
+    maxHeight: "calc(100vh - 24px)",
   },
   panelHeader: {
     display: "flex",
     justifyContent: "space-between",
     gap: "12px",
     alignItems: "baseline",
-    marginBottom: "14px",
+    marginBottom: "10px",
   },
   panelMeta: {
     fontSize: "13px",
@@ -983,7 +954,7 @@ const matchStyles: Record<string, CSSProperties> = {
     alignItems: "center",
     marginBottom: "12px",
     padding: "10px 12px",
-    borderRadius: "16px",
+    borderRadius: "14px",
     background: "rgba(247, 250, 253, 0.96)",
     border: "1px solid rgba(171, 186, 207, 0.22)",
     flexWrap: "wrap",
@@ -1016,7 +987,7 @@ const matchStyles: Record<string, CSSProperties> = {
     alignItems: "center",
     marginBottom: "12px",
     padding: "10px 12px",
-    borderRadius: "16px",
+    borderRadius: "14px",
     background: "rgba(247, 250, 253, 0.96)",
     border: "1px solid rgba(171, 186, 207, 0.22)",
     flexWrap: "wrap",
@@ -1032,9 +1003,9 @@ const matchStyles: Record<string, CSSProperties> = {
     width: "100%",
   },
   filterButton: {
-    height: "46px",
-    padding: "0 16px",
-    borderRadius: "16px",
+    height: "44px",
+    padding: "0 14px",
+    borderRadius: "14px",
     border: "1px solid rgba(140, 160, 184, 0.20)",
     background: "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(236,245,255,0.95) 54%, rgba(255,236,244,0.92) 100%)",
     color: "#17324f",
@@ -1092,7 +1063,7 @@ const matchStyles: Record<string, CSSProperties> = {
     marginTop: "10px",
     marginBottom: "10px",
     padding: "10px 12px",
-    borderRadius: "16px",
+    borderRadius: "14px",
     background: "rgba(247, 250, 253, 0.84)",
     border: "1px solid rgba(171, 186, 207, 0.18)",
   },
@@ -1125,7 +1096,7 @@ const matchStyles: Record<string, CSSProperties> = {
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: "38px",
+    minHeight: "34px",
     padding: "0 12px",
     borderRadius: "999px",
     border: "1px solid transparent",
@@ -1150,7 +1121,7 @@ const matchStyles: Record<string, CSSProperties> = {
     marginBottom: "12px",
   },
   gridSummaryChip: {
-    borderRadius: "16px",
+    borderRadius: "14px",
     padding: "12px 14px",
     background: "linear-gradient(180deg, rgba(248,250,253,0.98), rgba(239,245,255,0.96))",
     border: "1px solid rgba(171, 186, 207, 0.24)",
@@ -1447,14 +1418,14 @@ const matchStyles: Record<string, CSSProperties> = {
   historyCard: {
     width: "100%",
     textAlign: "left",
-    borderRadius: "18px",
-    padding: "14px",
+    borderRadius: "16px",
+    padding: "12px",
     border: "1px solid rgba(171, 186, 207, 0.28)",
     background: "linear-gradient(180deg, rgba(255,255,255,0.97), rgba(247,249,252,0.94))",
     boxShadow: "0 10px 20px rgba(52, 84, 120, 0.05)",
     cursor: "pointer",
     display: "grid",
-    gap: "10px",
+    gap: "8px",
   },
   inlineCommitButton: {
     minHeight: "38px",
@@ -1480,20 +1451,20 @@ const matchStyles: Record<string, CSSProperties> = {
   },
   previewStack: {
     display: "grid",
-    gap: "14px",
+    gap: "10px",
   },
   previewColumns: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "14px",
+    gap: "10px",
   },
   previewCard: {
-    borderRadius: "22px",
-    padding: "16px",
+    borderRadius: "20px",
+    padding: "12px",
     background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.92) 100%)",
     border: "1px solid rgba(175, 193, 218, 0.22)",
     display: "grid",
-    gap: "12px",
+    gap: "10px",
   },
   previewGrid: {
     display: "grid",
@@ -1511,18 +1482,18 @@ const matchStyles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
   detailCard: {
-    borderRadius: "22px",
-    padding: "16px",
+    borderRadius: "20px",
+    padding: "12px",
     background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.92) 100%)",
     border: "1px solid rgba(175, 193, 218, 0.22)",
   },
   matchedSection: {
-    borderRadius: "22px",
-    padding: "16px",
+    borderRadius: "20px",
+    padding: "12px",
     background: "linear-gradient(135deg, rgba(247, 251, 255, 0.98) 0%, rgba(255, 248, 250, 0.95) 100%)",
     border: "1px solid rgba(175, 193, 218, 0.18)",
     display: "grid",
-    gap: "12px",
+    gap: "10px",
   },
   matchedMeta: {
     fontSize: "13px",
@@ -1545,17 +1516,17 @@ const matchStyles: Record<string, CSSProperties> = {
     gap: "10px",
   },
   matchedCard: {
-    borderRadius: "18px",
-    padding: "14px",
+    borderRadius: "16px",
+    padding: "12px",
     background: "rgba(255,255,255,0.94)",
     border: "1px solid rgba(171, 186, 207, 0.24)",
     boxShadow: "0 10px 20px rgba(52, 84, 120, 0.04)",
     display: "grid",
-    gap: "10px",
+    gap: "8px",
   },
   emptyMatched: {
-    borderRadius: "16px",
-    padding: "14px",
+    borderRadius: "14px",
+    padding: "12px",
     background: "rgba(250, 252, 255, 0.96)",
     border: "1px dashed rgba(171, 186, 207, 0.34)",
     color: "#667a90",
@@ -1563,12 +1534,12 @@ const matchStyles: Record<string, CSSProperties> = {
     lineHeight: 1.5,
   },
   strongHitCard: {
-    borderRadius: "22px",
-    padding: "16px",
+    borderRadius: "20px",
+    padding: "12px",
     background: "linear-gradient(135deg, rgba(238, 248, 241, 0.95) 0%, rgba(255, 250, 241, 0.92) 100%)",
     border: "1px solid rgba(171, 204, 184, 0.26)",
     display: "grid",
-    gap: "12px",
+    gap: "10px",
   },
   detailHeader: {
     fontSize: "15px",
@@ -1611,7 +1582,7 @@ const matchStyles: Record<string, CSSProperties> = {
   },
   candidateColumn: {
     display: "grid",
-    gap: "12px",
+    gap: "10px",
     minWidth: 0,
   },
   candidateHeader: {
@@ -1622,8 +1593,8 @@ const matchStyles: Record<string, CSSProperties> = {
   candidateCard: {
     width: "100%",
     textAlign: "left",
-    borderRadius: "18px",
-    padding: "14px",
+    borderRadius: "16px",
+    padding: "12px",
     border: "1px solid rgba(171, 186, 207, 0.28)",
     background: "rgba(255,255,255,0.94)",
     cursor: "pointer",
@@ -1636,8 +1607,8 @@ const matchStyles: Record<string, CSSProperties> = {
     background: "linear-gradient(180deg, rgba(246, 251, 255, 0.98), rgba(255, 245, 248, 0.96))",
   },
   emptyState: {
-    borderRadius: "18px",
-    padding: "18px",
+    borderRadius: "16px",
+    padding: "14px",
     textAlign: "center",
     color: "#5a6c80",
     background: "rgba(255,255,255,0.9)",
@@ -1645,8 +1616,8 @@ const matchStyles: Record<string, CSSProperties> = {
     lineHeight: 1.6,
   },
   emptyCandidate: {
-    borderRadius: "18px",
-    padding: "16px",
+    borderRadius: "16px",
+    padding: "14px",
     color: "#5a6c80",
     background: "rgba(255,255,255,0.9)",
     border: "1px dashed rgba(171, 186, 207, 0.45)",
@@ -1654,8 +1625,8 @@ const matchStyles: Record<string, CSSProperties> = {
   },
   successBanner: {
     marginBottom: "12px",
-    borderRadius: "16px",
-    padding: "12px 14px",
+    borderRadius: "14px",
+    padding: "10px 12px",
     background: "rgba(220, 242, 228, 0.9)",
     border: "1px solid rgba(136, 193, 150, 0.35)",
     color: "#1e4f2d",
@@ -1663,14 +1634,15 @@ const matchStyles: Record<string, CSSProperties> = {
   },
   errorBanner: {
     marginBottom: "12px",
-    borderRadius: "16px",
-    padding: "12px 14px",
+    borderRadius: "14px",
+    padding: "10px 12px",
     background: "rgba(255, 232, 232, 0.92)",
     border: "1px solid rgba(214, 128, 128, 0.35)",
     color: "#7a1d1d",
     fontWeight: 700,
   },
 };
+
 
 
 

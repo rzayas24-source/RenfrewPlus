@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import {
   approveLockboxStage,
   transformLockboxStage,
@@ -217,48 +217,24 @@ export default function LockboxImportScreen() {
   }, []);
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft lockbox import console for bringing rows into the workflow with the same calm shell as Import.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Lockbox import navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
+    <AdminShell
+      sidebarCopy="A soft lockbox import console for bringing rows into the workflow with the same calm shell as Import."
+      onBack={() => navigate("/import")}
+      backButtonFirst
+      ribbonTitle="Lockbox Import Menu"
+      sidebarMiddleCard={
+        <>
           <div style={adminStyles.sidebarCardLabel}>Last Lockbox</div>
-          <div style={adminStyles.sidebarCardValue}>{lastLockboxDate}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            Pulled from the current banking source summary.
+          <div style={adminStyles.sidebarCardValue}>
+            <strong>{lastLockboxDate}</strong>
           </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>Lockbox import ready</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            The same calm shell keeps lockbox work in the same visual family as the import window.
-          </div>
-        </div>
-      </aside>
-
+          <div style={adminStyles.sidebarCardMeta}>Pulled from the current banking source summary.</div>
+        </>
+      }
+      sidebarCardLabel="Today"
+      sidebarCardValue="Lockbox import ready"
+      sidebarCardMeta="The same calm shell keeps lockbox work in the same visual family as the import window."
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -268,9 +244,6 @@ export default function LockboxImportScreen() {
             </p>
 
             <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/import")}>
-                Open Import
-              </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={openFilePicker} disabled={uploading}>
                 {uploading ? "Uploading..." : "Upload SearchResults.xls"}
               </button>
@@ -597,7 +570,7 @@ export default function LockboxImportScreen() {
           </article>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -774,6 +747,7 @@ const lockboxImportStyles: Record<string, CSSProperties> = {
     outline: "none",
   },
 };
+
 
 
 

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 
 type SiteReviewMetric = {
   label: string;
@@ -77,40 +77,13 @@ export default function SiteReviewScreen() {
   ];
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft pending items console that keeps the new screen in the same visual family as Cash.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Pending items navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>Pending items ready</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            The same calm shell keeps pending-items work aligned with the cash workspace.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="A soft pending items console that keeps the new screen in the same visual family as Cash."
+      onBack={() => navigate("/cash")}
+      sidebarCardLabel="Today"
+      sidebarCardValue="Pending items ready"
+      sidebarCardMeta="The same calm shell keeps pending-items work aligned with the cash workspace."
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -222,7 +195,7 @@ export default function SiteReviewScreen() {
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 

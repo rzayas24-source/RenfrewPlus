@@ -1,7 +1,7 @@
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { WorklistBrandButton } from "../worklist/worklist";
+import { AdminShell } from "../components/AdminShell";
 import {
   clearBalsheet,
   createBalsheetEntry,
@@ -665,7 +665,7 @@ export default function Balsheet() {
       return "↕";
     }
 
-    return sortDirection === "asc" ? "↑" : "↓";
+    return sortDirection === "asc" ? "▲" : "▼";
   }
 
   async function loadRows(date = postingDate) {
@@ -837,97 +837,74 @@ export default function Balsheet() {
   }
 
   return (
-    <main style={styles.shell}>
-      <div style={styles.glowBlue} />
-      <div style={styles.glowPink} />
-
-      <aside style={styles.sidebar}>
-        <div style={styles.brandWrap}>
-          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
+    <AdminShell
+      sidebarCopy=""
+      onBack={() => navigate("/cash")}
+      backButtonFirst
+      sidebarAction={
+        <div style={{ display: "grid", gap: "8px" }}>
+          <div style={styles.sidebarCard}>
+            <div style={styles.sidebarCardLabel}>Posting Day</div>
+            <label style={styles.postingDayLabel}>
+              <span style={styles.postingDayLabelText}>Select posting date</span>
+              <input
+                type="date"
+                value={postingDateIso}
+                style={styles.postingDayInput}
+                onChange={(event) => {
+                  const nextPostingDate = normalizeDisplayDate(event.target.value);
+                  setPostingDate(nextPostingDate);
+                  void loadRows(nextPostingDate);
+                }}
+              />
+            </label>
+            <div style={styles.postingDayBankDay}>Current bank day: {currentBankDay || "Loading..."}</div>
           </div>
-        </div>
 
-        <p style={styles.sidebarCopy}>Read-only balance sheet view for the current posting day.</p>
+          <div style={styles.sidebarTotalsCard}>
+            <div style={styles.sidebarCardLabel}>Totals by Column</div>
+            <div style={styles.sidebarTotalsGrid}>
+              <div style={styles.sidebarTotalsRow}>
+                <span style={styles.sidebarTotalsLabel}>Amount</span>
+                <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.amount)}</span>
+              </div>
+              <div style={styles.sidebarTotalsRow}>
+                <span style={styles.sidebarTotalsLabel}>Nick</span>
+                <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.nick)}</span>
+              </div>
+              <div style={styles.sidebarTotalsRow}>
+                <span style={styles.sidebarTotalsLabel}>Raul</span>
+                <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.raul)}</span>
+              </div>
+              <div style={styles.sidebarTotalsRow}>
+                <span style={styles.sidebarTotalsLabel}>UnPosted</span>
+                <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.unposted)}</span>
+              </div>
+              <div style={styles.sidebarTotalsRow}>
+                <span style={styles.sidebarTotalsLabel}>Misc</span>
+                <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.misc)}</span>
+              </div>
+            </div>
+          </div>
 
-        <nav style={styles.navStack} aria-label="Balance sheet navigation">
-          <button
-            className="sidebar-nav-button"
-            style={styles.navButton}
-            type="button"
-            onClick={() => navigate("/cash")}
-          >
-            <span style={styles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>
-              &gt;
-            </span>
-          </button>
-        </nav>
-
-        <div style={styles.sidebarCard}>
-          <div style={styles.sidebarCardLabel}>Posting Day</div>
-          <label style={styles.postingDayLabel}>
-            <span style={styles.postingDayLabelText}>Select posting date</span>
-            <input
-              type="date"
-              value={postingDateIso}
-              style={styles.postingDayInput}
-              onChange={(event) => {
-                const nextPostingDate = normalizeDisplayDate(event.target.value);
-                setPostingDate(nextPostingDate);
-                void loadRows(nextPostingDate);
-              }}
-            />
-          </label>
-          <div style={styles.postingDayBankDay}>Current bank day: {currentBankDay || "Loading..."}</div>
-        </div>
-
-        <div style={styles.sidebarTotalsCard}>
-          <div style={styles.sidebarCardLabel}>Totals by Column</div>
-          <div style={styles.sidebarTotalsGrid}>
-            <div style={styles.sidebarTotalsRow}>
-              <span style={styles.sidebarTotalsLabel}>Amount</span>
-              <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.amount)}</span>
-            </div>
-            <div style={styles.sidebarTotalsRow}>
-              <span style={styles.sidebarTotalsLabel}>Nick</span>
-              <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.nick)}</span>
-            </div>
-            <div style={styles.sidebarTotalsRow}>
-              <span style={styles.sidebarTotalsLabel}>Raul</span>
-              <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.raul)}</span>
-            </div>
-            <div style={styles.sidebarTotalsRow}>
-              <span style={styles.sidebarTotalsLabel}>UnPosted</span>
-              <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.unposted)}</span>
-            </div>
-            <div style={styles.sidebarTotalsRow}>
-              <span style={styles.sidebarTotalsLabel}>Misc</span>
-              <span style={styles.sidebarTotalsValue}>{formatCurrency(totals.misc)}</span>
+          <div style={styles.sidebarTotalsCard}>
+            <div style={styles.sidebarCardLabel}>Totals by Type</div>
+            <div style={styles.sidebarTotalsGrid}>
+              {typeTotals.length === 0 ? (
+                <div style={styles.sidebarTotalsEmpty}>No type totals available.</div>
+              ) : (
+                typeTotals.map((typeTotal) => (
+                  <div key={typeTotal.type} style={styles.sidebarTotalsRow}>
+                    <span style={styles.sidebarTotalsLabel}>{typeTotal.type}</span>
+                    <span style={styles.sidebarTotalsValue}>{formatCurrency(typeTotal.amount)}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
-
-        <div style={styles.sidebarTotalsCard}>
-          <div style={styles.sidebarCardLabel}>Totals by Type</div>
-          <div style={styles.sidebarTotalsGrid}>
-            {typeTotals.length === 0 ? (
-              <div style={styles.sidebarTotalsEmpty}>No type totals available.</div>
-            ) : (
-              typeTotals.map((typeTotal) => (
-                <div key={typeTotal.type} style={styles.sidebarTotalsRow}>
-                  <span style={styles.sidebarTotalsLabel}>{typeTotal.type}</span>
-                  <span style={styles.sidebarTotalsValue}>{formatCurrency(typeTotal.amount)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      </aside>
-
+      }
+    >
       <section style={styles.content}>
         <section style={styles.heroShell}>
             <div style={styles.heroCopy}>
@@ -1151,7 +1128,7 @@ export default function Balsheet() {
                     return [
                       <tr key={`group-${group.groupKey}`} style={styles.groupHeaderRow}>
                         <td style={styles.groupHeaderCell} colSpan={sheetColumns.length}>
-                          <button type="button" style={styles.groupHeaderButton} onClick={() => toggleGroup(group.groupKey)}>
+                      <button type="button" style={styles.groupHeaderButton} onClick={() => toggleGroup(group.groupKey)}>
                             <span style={styles.groupHeaderGlyph}>{isCollapsed ? "▸" : "▾"}</span>
                             <span style={styles.groupHeaderLabel}>{group.groupKey}</span>
                             <span style={styles.groupHeaderMeta}>
@@ -1169,7 +1146,7 @@ export default function Balsheet() {
           </table>
         </div>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -1319,44 +1296,45 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
   },
   sidebarCard: {
-    marginTop: "18px",
-    padding: "16px",
-    borderRadius: "20px",
+    marginTop: "10px",
+    padding: "10px 12px",
+    borderRadius: "16px",
     background: "linear-gradient(135deg, rgba(235, 245, 255, 0.95) 0%, rgba(255, 234, 243, 0.90) 100%)",
     border: "1px solid rgba(176, 194, 218, 0.22)",
   },
   sidebarTotalsCard: {
-    marginTop: "14px",
-    padding: "14px 16px",
-    borderRadius: "20px",
+    marginTop: "8px",
+    padding: "10px 12px",
+    borderRadius: "16px",
     background: "linear-gradient(135deg, rgba(243, 248, 255, 0.96) 0%, rgba(255, 244, 248, 0.92) 100%)",
     border: "1px solid rgba(176, 194, 218, 0.20)",
   },
   sidebarCardLabel: {
-    fontSize: "12px",
+    fontSize: "8px",
     textTransform: "uppercase",
-    letterSpacing: "0.12em",
+    letterSpacing: "0.1em",
     color: "#6d7f93",
     fontWeight: 800,
-    marginBottom: "8px",
+    marginBottom: "4px",
   },
   sidebarCardValue: {
-    fontSize: "18px",
+    fontSize: "13px",
     fontWeight: 800,
-    marginBottom: "8px",
+    marginBottom: "4px",
+    lineHeight: 1.15,
   },
   sidebarCardMeta: {
-    fontSize: "13px",
-    lineHeight: 1.55,
+    fontSize: "9px",
+    lineHeight: 1.3,
     color: "#5d7187",
   },
   sidebarTotalsGrid: {
     display: "grid",
-    gap: "8px",
+    gap: "4px",
   },
   sidebarTotalsEmpty: {
-    padding: "6px 0 2px",
-    fontSize: "13px",
+    padding: "2px 0 0",
+    fontSize: "9px",
     color: "#5e6f82",
     fontWeight: 600,
   },
@@ -1364,15 +1342,15 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "baseline",
     justifyContent: "space-between",
-    gap: "12px",
+    gap: "8px",
   },
   sidebarTotalsLabel: {
-    fontSize: "13px",
+    fontSize: "9px",
     color: "#5e6f82",
     fontWeight: 700,
   },
   sidebarTotalsValue: {
-    fontSize: "14px",
+    fontSize: "10px",
     color: "#15304f",
     fontWeight: 800,
     whiteSpace: "nowrap",
@@ -1383,6 +1361,7 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     display: "grid",
     gap: "10px",
+    paddingTop: "88px",
   },
   heroShell: {
     display: "grid",
@@ -1423,11 +1402,21 @@ const styles: Record<string, CSSProperties> = {
     color: "#b23361",
   },
   heroActions: {
+    position: "fixed",
+    top: "18px",
+    left: "282px",
+    right: "16px",
+    zIndex: 4,
     display: "flex",
     gap: "8px",
-    flexWrap: "nowrap",
-    marginTop: "14px",
-    alignItems: "stretch",
+    flexWrap: "wrap",
+    alignItems: "center",
+    padding: "10px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
   primaryButton: {
     height: "38px",
@@ -1563,16 +1552,17 @@ const styles: Record<string, CSSProperties> = {
     minHeight: "36px",
   },
   selectionBar: {
-    display: "grid",
-    gridTemplateColumns: "110px 40px minmax(0, 1fr)",
+    display: "flex",
     gap: "10px",
     alignItems: "stretch",
+    flexWrap: "nowrap",
   },
   selectionNavCluster: {
     display: "grid",
     gridTemplateColumns: "34px 34px 34px",
     gap: "4px",
     alignItems: "stretch",
+    flex: "0 0 auto",
   },
   selectionNavButton: {
     minHeight: "40px",
@@ -1603,6 +1593,7 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
   },
   selectionLockButton: {
     minHeight: "40px",
@@ -1621,6 +1612,7 @@ const styles: Record<string, CSSProperties> = {
     letterSpacing: "0",
     cursor: "pointer",
     boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
   },
   selectionLockButtonUnlocked: {
     background: "rgba(235, 247, 255, 0.96)",
@@ -1645,6 +1637,8 @@ const styles: Record<string, CSSProperties> = {
   selectionInputWrap: {
     display: "grid",
     gap: "6px",
+    minWidth: 0,
+    flex: "1 1 auto",
   },
   selectionInputRow: {
     display: "grid",
@@ -1736,7 +1730,7 @@ const styles: Record<string, CSSProperties> = {
     gap: "6px",
   },
   postingDayLabelText: {
-    fontSize: "14px",
+    fontSize: "11px",
     fontWeight: 700,
     color: "#34506d",
   },
@@ -1745,13 +1739,13 @@ const styles: Record<string, CSSProperties> = {
     borderRadius: "12px",
     border: "1px solid rgba(140, 160, 184, 0.22)",
     padding: "0 12px",
-    fontSize: "14px",
+    fontSize: "12px",
     color: "#17324f",
     background: "#fff",
   },
   postingDayBankDay: {
     marginTop: "6px",
-    fontSize: "13px",
+    fontSize: "11px",
     fontWeight: 700,
     color: "#35506d",
   },

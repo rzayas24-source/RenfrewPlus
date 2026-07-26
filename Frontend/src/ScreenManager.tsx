@@ -12,6 +12,7 @@ import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
 import CalendarScreen from "./Screens/calendarscreen";
 import CashScreen from "./Screens/cashscreen";
+import CollectionsScreen from "./Screens/collectionsscreen";
 import ERAConvertScreen from "./Screens/eraconvertscreen";
 import HTMLConvertScreen from "./Screens/htmlconvertscreen";
 import ImportScreen from "./Screens/importscreen";
@@ -28,12 +29,15 @@ import SiteReviewScreen from "./Screens/sitereviewscreen";
 import SnapshotGeneratorScreen from "./Screens/snapshotgeneratorscreen";
 import MainScreen from "./Screens/mainscreen";
 import AdminScreen from "./Screens/adminscreen";
+import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
+import AdminUserScreen from "./Screens/adminuserscreen";
 import WorklistEditorScreen from "./Screens/worklisteditor";
 import NextLoader from "./Screens/nextloader";
 import Queue from "./Screens/queue";
 import RejectList from "./Screens/rejectlist";
 import SitesScreen from "./Screens/sitescreen";
+import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
 
 function parseAmount(value: unknown) {
   const parsed = Number.parseFloat(String(value || "").replace(/[$,]/g, ""));
@@ -172,9 +176,15 @@ export default function ScreenManager() {
         <Route path="/" element={<MainScreen />} />
         <Route path="/home" element={<MainScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
+        <Route path="/admin/menus" element={<AdminMenuScreen />} />
         <Route path="/admin/tables" element={<AdminTableScreen />} />
+        <Route path="/admin/users" element={<AdminUserScreen />} />
         <Route path="/calendar" element={<CalendarScreen />} />
         <Route path="/cash" element={<CashScreen />} />
+        <Route path="/aux-posting" element={<SectionPlaceholderScreen title="Aux Posting" description="Aux Posting tools will live here." />} />
+        <Route path="/collections" element={<CollectionsScreen />} />
+        <Route path="/check-search" element={<SectionPlaceholderScreen title="Check Search" description="Check Search tools will live here." />} />
+        <Route path="/view-images" element={<SectionPlaceholderScreen title="View Images" description="View Images tools will live here." />} />
         <Route path="/era-convert" element={<ERAConvertScreen />} />
         <Route path="/html-convert" element={<HTMLConvertScreen />} />
         <Route path="/otherday" element={<OtherDayScreen />} />
@@ -200,6 +210,11 @@ export default function ScreenManager() {
         <Route path="/itemization" element={<Itemization />} />
         <Route path="/nextloader" element={<NextLoaderScreen />} />
         <Route path="/site" element={<IntroScreen />} />
+        <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
+        <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />
+        <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />
+        <Route path="/finance" element={<SectionPlaceholderScreen title="Finance" description="Finance tools will live here." />} />
+        <Route path="/business" element={<SectionPlaceholderScreen title="Business" description="Business tools will live here." />} />
         <Route path="/queue" element={<QueueScreen />} />
         <Route path="/rejectlist" element={<RejectListScreen />} />
         <Route path="/sites" element={<SitesScreen />} />

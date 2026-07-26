@@ -582,12 +582,10 @@ export function WorklistShade() {
     width: isExpanded ? "min(720px, calc(100vw - 36px))" : dockedWidth,
     height: isExpanded ? "min(82vh, calc(100vh - 36px))" : "min(78vh, calc(100vh - 36px))",
     opacity: isOpen ? 1 : 0,
-    transform: isOpen ? "translateY(0) scaleY(1)" : "translateY(-28px) scaleY(0.02)",
+    transform: isOpen ? "translateY(0)" : "translateY(-102%)",
     filter: isOpen ? "blur(0)" : "blur(2px)",
     boxShadow: isOpen ? "0 30px 72px rgba(52, 84, 120, 0.18)" : "0 12px 28px rgba(52, 84, 120, 0.08)",
-    transition: isOpen
-      ? "transform 1350ms cubic-bezier(0.16, 0.84, 0.24, 1), opacity 420ms ease, filter 540ms ease, box-shadow 1350ms ease"
-      : "transform 560ms cubic-bezier(0.12, 0.84, 0.22, 1), opacity 320ms ease, filter 420ms ease, box-shadow 560ms ease",
+    transition: "transform 320ms ease, opacity 240ms ease, filter 240ms ease, box-shadow 320ms ease",
   };
 
   return createPortal(
@@ -597,7 +595,6 @@ export function WorklistShade() {
         role="dialog"
         aria-label="Work list"
       >
-        <div style={styles.shadeRail} />
         <div style={styles.shadeHeader}>
           <div style={styles.headerRow}>
             <button
@@ -824,7 +821,7 @@ const styles: Record<string, CSSProperties> = {
   },
   shade: {
     position: "fixed",
-    top: "98px",
+    top: "138px",
     left: "18px",
     maxWidth: "calc(100vw - 36px)",
     boxSizing: "border-box",
@@ -838,11 +835,7 @@ const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     backdropFilter: "blur(20px)",
-    transformOrigin: "top left",
-  },
-  shadeRail: {
-    height: "6px",
-    background: "linear-gradient(90deg, rgba(118, 186, 255, 0.98), rgba(79, 145, 232, 0.98))",
+    transformOrigin: "top center",
   },
   shadeHeader: {
     display: "grid",

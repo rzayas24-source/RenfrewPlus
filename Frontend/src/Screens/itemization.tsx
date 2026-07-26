@@ -791,9 +791,6 @@ export default function Itemization() {
               Spreadsheet-style review with the control row you preferred, replacing the old vertical entry inputs.
             </p>
             <div style={styles.headerActions}>
-              <button style={buttonStyle} type="button" onClick={() => navigate(-1)}>
-                Back to Keyproof
-              </button>
               <button style={buttonStyle} type="button" onClick={openOriginalPdf} disabled={!attachmentId}>
                 Original PDF
               </button>

@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import { getOtherDaySpreadsheet, type OtherDaySpreadsheetResponse, type OtherDayRow } from "../api/otherday_api";
 
 type OtherDayMetric = {
@@ -80,54 +80,20 @@ export default function OtherDayScreen() {
   const todayFilenamesWithMissing = data?.filenamesWithMissing ?? 0;
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft workspace for other-day check review and count comparison.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Other day navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/tools")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Current Work Day</div>
-          <div style={adminStyles.sidebarCardValue}>{data?.currentWorkDay || "Loading..."}</div>
-          <div style={adminStyles.sidebarCardMeta}>Mapped bank day: {data?.bankDay || "Loading..."}</div>
-        </div>
-      </aside>
-
-      <section style={adminStyles.content}>
+    <AdminShell
+      sidebarCopy="A soft workspace for other-day check review and count comparison."
+      onBack={() => navigate("/tools")}
+      sidebarCardLabel="Current Work Day"
+      sidebarCardValue={data?.currentWorkDay || "Loading..."}
+      sidebarCardMeta={`Mapped bank day: ${data?.bankDay || "Loading..."}`}
+    >
+      <section style={{ ...adminStyles.content, paddingTop: "0" }}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Other Day Check</div>
             <p style={adminStyles.subtitle}>
               Spreadsheet view of the current bank day, filename counts, and any filenames with missing rows.
             </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/tools")}>
-                Back to Tools
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
-                Open Banking
-              </button>
-            </div>
           </div>
 
           <div style={adminStyles.heroArt}>
@@ -288,7 +254,7 @@ export default function OtherDayScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -443,6 +409,7 @@ const otherDayStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
 };
+
 
 
 

@@ -1,6 +1,7 @@
 import type { ChangeEvent, CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import {
   getNextAttachment,
   getPendingAttachment,
@@ -12,29 +13,6 @@ import type { PendingAttachment } from "../api/attachmentreview_api";
 import { fetchPendingByDay } from "../api/introscreen_api";
 import { getSites, type SiteOption } from "../api/keyproof_api";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
-
-function formatDay(day: string | null) {
-  if (!day) {
-    return "All pending";
-  }
-
-  if (day === "Unknown") {
-    return "Unknown date";
-  }
-
-  const parsed = new Date(`${day}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return day;
-  }
-
-  return parsed.toLocaleDateString(undefined, {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
 
 const snapshotUrl = (id: number) => `http://localhost:8000/attachments/${id}/snapshot`;
 
@@ -52,7 +30,6 @@ export default function AttachmentReviewScreen() {
   const [error, setError] = useState<string | null>(null);
   const [siteError, setSiteError] = useState<string | null>(null);
   const [savingSite, setSavingSite] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     getSites()
@@ -108,14 +85,6 @@ export default function AttachmentReviewScreen() {
 
   function resetZoom() {
     setZoom(1);
-  }
-
-  function toggleMenu() {
-    setMenuOpen((current) => !current);
-  }
-
-  function closeMenu() {
-    setMenuOpen(false);
   }
 
   async function saveSite(nextSite: string, currentId: number) {
@@ -196,74 +165,31 @@ export default function AttachmentReviewScreen() {
   }
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
+    <AdminShell
+      sidebarCopy="Review each pending attachment, assign its site, and carry the selected site forward."
+      onBack={() => navigate("/site")}
+      sidebarAction={
+        <div style={attachmentStyles.sidebarField}>
+          <span style={attachmentStyles.fieldLabel}>Choose site</span>
+          <select
+            style={attachmentStyles.select}
+            value={site}
+            onChange={(event) => void handleSiteChange(event)}
+            disabled={loadingSites || savingSite}
+          >
+            <option value="">Select site</option>
+            {siteOptions.map((item) => (
+              <option key={item.id} value={item.name}>
+                {item.name}
+              </option>
+            ))}
+          </select>
         </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          Review each pending attachment, assign its site, and carry the selected site forward.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Attachment review navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site")}>
-            <span style={adminStyles.navButtonLabel}>Pending</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
-            <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>
-            {day ? `Working day: ${formatDay(day)}` : "Working all pending items."}
-          </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Site</div>
-          <div style={attachmentStyles.sidebarField}>
-            <span style={attachmentStyles.fieldLabel}>Choose site</span>
-            <select
-              style={attachmentStyles.select}
-              value={site}
-              onChange={(event) => void handleSiteChange(event)}
-              disabled={loadingSites || savingSite}
-            >
-              <option value="">Select site</option>
-              {siteOptions.map((item) => (
-                <option key={item.id} value={item.name}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div style={adminStyles.sidebarCardMeta}>
-            {site ? "Stored on the import row and carried forward." : "Site is required before review."}
-          </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Batch items</div>
-          <div style={adminStyles.sidebarCardValue}>{batchCount ?? "..."}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            {day ? "Counted from the current batch day." : "Counted from all pending items."}
-          </div>
-        </div>
-      </aside>
-
+      }
+      sidebarCardLabel="Batch items"
+      sidebarCardValue={String(batchCount ?? "...")}
+      sidebarCardMeta={day ? "Counted from the current batch day." : "Counted from all pending items."}
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -301,70 +227,11 @@ export default function AttachmentReviewScreen() {
                   <button
                     style={attachmentStyles.heroMenuButton}
                     type="button"
-                    onClick={toggleMenu}
-                    aria-label="More review actions"
-                    aria-expanded={menuOpen}
+                    onClick={resetZoom}
+                    aria-label="Reset zoom"
                   >
                     ...
                   </button>
-                  {menuOpen && (
-                    <div style={attachmentStyles.heroMenuDropdown}>
-                      <button
-                        type="button"
-                        style={attachmentStyles.heroMenuItem}
-                        onClick={() => {
-                          resetZoom();
-                          closeMenu();
-                        }}
-                      >
-                        Reset zoom
-                      </button>
-                      <button
-                        type="button"
-                        style={attachmentStyles.heroMenuItem}
-                        onClick={() => {
-                          navigate("/sites");
-                          closeMenu();
-                        }}
-                      >
-                        Sites
-                      </button>
-                      <button
-                        type="button"
-                        style={attachmentStyles.heroMenuItem}
-                        onClick={() => {
-                          if (attachment) {
-                            void moveToPrevious(attachment.id);
-                          }
-                          closeMenu();
-                        }}
-                      >
-                        Previous
-                      </button>
-                      <button
-                        type="button"
-                        style={attachmentStyles.heroMenuItem}
-                        onClick={() => {
-                          if (attachment) {
-                            void moveToNext(attachment.id);
-                          }
-                          closeMenu();
-                        }}
-                      >
-                        Next
-                      </button>
-                      <button
-                        type="button"
-                        style={attachmentStyles.heroMenuItem}
-                        onClick={() => {
-                          navigate("/site");
-                          closeMenu();
-                        }}
-                      >
-                        Back to pending
-                      </button>
-                    </div>
-                  )}
                 </div>
               </div>
               <div style={adminStyles.heroStatusTitle}>
@@ -461,7 +328,7 @@ export default function AttachmentReviewScreen() {
         </section>
       </section>
 
-    </main>
+    </AdminShell>
   );
 }
 

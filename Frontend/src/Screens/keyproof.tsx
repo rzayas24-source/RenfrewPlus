@@ -140,16 +140,6 @@ export default function Keyproof() {
     [form]
   );
 
-  function goBackToReview() {
-    const params = new URLSearchParams();
-
-    if (day) {
-      params.set("day", day);
-    }
-
-    navigate(`/attachments${params.toString() ? `?${params.toString()}` : ""}`);
-  }
-
   function goToDefineSites() {
     const params = new URLSearchParams();
 
@@ -271,9 +261,6 @@ export default function Keyproof() {
         <section className="keyproof-empty">
           <h1 className="keyproof-title">Keyproof</h1>
           <p>No attachment selected.</p>
-          <button className="keyproof-btn" onClick={goBackToReview}>
-            Back
-          </button>
         </section>
       </main>
     );
@@ -307,11 +294,6 @@ export default function Keyproof() {
           />
         </div>
 
-        <div className="keyproof-buttons">
-          <button className="keyproof-btn cancel" onClick={goBackToReview}>
-            Back
-          </button>
-        </div>
       </section>
 
       <section className="keyproof-right">

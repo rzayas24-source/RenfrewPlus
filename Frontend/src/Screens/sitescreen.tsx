@@ -2,8 +2,8 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 
 const API_BASE = "http://127.0.0.1:8000";
 
@@ -148,60 +148,23 @@ export default function SitesScreen() {
       return;
     }
 
-    navigate(-1);
+    navigate("/admin");
   };
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          Maintain the site list used by review dropdowns and carry those names into the review flow.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Sites navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/admin")}>
-            <span style={adminStyles.navButtonLabel}>Admin</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
-            <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>{loading ? "Loading sites..." : `${stats.total} site(s)`}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            Active and inactive site names stay in one place so the review screens can pull from a single list.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="Maintain the site list used by review dropdowns and carry those names into the review flow."
+      onBack={goBack}
+      ribbonTitle="Sites Menu"
+      useGlobalMenuFallback={false}
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Sites management</div>
-            <p style={adminStyles.subtitle}>
-              Add, edit, activate, and remove site names used by the review dropdowns and saved back to each attachment.
-            </p>
+            <p style={adminStyles.subtitle}>Add, edit, activate, and remove site names used by the review dropdowns and saved back to each attachment.</p>
 
             <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={goBack}>
-                Back
-              </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => void loadSites()} disabled={saving}>
                 Refresh
               </button>
@@ -393,7 +356,7 @@ export default function SitesScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 

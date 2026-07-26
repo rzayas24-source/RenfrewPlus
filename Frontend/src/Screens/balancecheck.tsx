@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
-import { WorklistBrandButton } from "../worklist/worklist";
+import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 
 interface Props {
   keyproofTotal: number;
@@ -16,45 +17,24 @@ export default function BalanceCheck({
   onEditItemization,
   onAccept,
 }: Props) {
+  const navigate = useNavigate();
   const matches = keyproofTotal === itemizationTotal;
 
   return (
-    <main style={styles.shell}>
-      <div style={styles.glowBlue} />
-      <div style={styles.glowPink} />
-
-      <aside style={styles.sidebar}>
-        <div style={styles.brandWrap}>
-          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={styles.brandTitleBlock}>
-            <div style={styles.brandKicker}>Balance Check</div>
-            <div style={styles.brandTitle}>Workflow step</div>
-          </div>
-        </div>
-
-        <p style={styles.sidebarCopy}>
-          Compare the two totals before moving forward.
-        </p>
-
-        <div style={styles.sidebarCard}>
-          <div style={styles.sidebarCardLabel}>Status</div>
-          <div style={styles.sidebarCardValue}>{matches ? "Balanced" : "Needs review"}</div>
-          <div style={styles.sidebarCardMeta}>
-            Keep the check step visually consistent with the rest of the balance sheet section.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="Compare the two totals before moving forward."
+      sidebarCardLabel="Status"
+      sidebarCardValue={matches ? "Balanced" : "Needs review"}
+      sidebarCardMeta="Keep the check step visually consistent with the rest of the balance sheet section."
+      onBack={() => navigate(-1)}
+      ribbonTitle="Balance Check Menu"
+    >
       <section style={styles.content}>
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
             <div style={styles.kicker}>Balance Check</div>
             <h1 style={styles.title}>Review totals</h1>
-            <p style={styles.subtitle}>
-              Keyproof and itemization should line up before you continue.
-            </p>
+            <p style={styles.subtitle}>Keyproof and itemization should line up before you continue.</p>
             <div style={styles.heroActions}>
               {matches ? (
                 <button onClick={onAccept} style={styles.primaryButton} type="button">
@@ -79,9 +59,7 @@ export default function BalanceCheck({
                 <span style={styles.statusPill}>Balance status</span>
                 <span style={styles.statusDot} />
               </div>
-              <div style={styles.heroStatusTitle}>
-                {matches ? "Aligned totals" : "Out of balance"}
-              </div>
+              <div style={styles.heroStatusTitle}>{matches ? "Aligned totals" : "Out of balance"}</div>
               <div style={styles.heroStatusText}>
                 Keyproof Total: ${keyproofTotal.toFixed(2)}
                 <br />
@@ -93,137 +71,16 @@ export default function BalanceCheck({
 
         {!matches && <div style={styles.error}>Batch does not balance.</div>}
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
 const styles: Record<string, CSSProperties> = {
-  shell: {
-    minHeight: "100vh",
-    padding: "18px",
-    display: "grid",
-    gridTemplateColumns: "250px minmax(0, 1fr)",
-    gap: "18px",
-    position: "relative",
-    overflow: "hidden",
-    color: "#16304d",
-    fontFamily: "Inter, Segoe UI, Arial, sans-serif",
-    textAlign: "left",
-    background: "#f6f7f9",
-  },
-  glowBlue: {
-    position: "absolute",
-    top: "-120px",
-    left: "-120px",
-    width: "360px",
-    height: "360px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(146, 198, 255, 0.45) 0%, rgba(146, 198, 255, 0) 70%)",
-    filter: "blur(10px)",
-    pointerEvents: "none",
-  },
-  glowPink: {
-    position: "absolute",
-    right: "-100px",
-    top: "110px",
-    width: "320px",
-    height: "320px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255, 186, 213, 0.42) 0%, rgba(255, 186, 213, 0) 72%)",
-    filter: "blur(10px)",
-    pointerEvents: "none",
-  },
-  sidebar: {
-    position: "relative",
-    zIndex: 1,
-    padding: "18px 16px",
-    borderRadius: "28px",
-    border: "1px solid rgba(140, 160, 184, 0.22)",
-    background: "rgba(255, 255, 255, 0.72)",
-    backdropFilter: "blur(18px)",
-    boxShadow: "0 24px 60px rgba(52, 84, 120, 0.10)",
-  },
-  brandWrap: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    justifyContent: "flex-start",
-    paddingBottom: "14px",
-    marginBottom: "16px",
-    borderBottom: "1px solid rgba(140, 160, 184, 0.18)",
-  },
-  brandMark: {
-    width: "52px",
-    height: "52px",
-    borderRadius: "14px",
-    display: "grid",
-    placeItems: "center",
-    background: "rgba(255,255,255,0.76)",
-    border: "1px solid rgba(140, 160, 184, 0.14)",
-    boxShadow: "0 12px 22px rgba(95, 128, 172, 0.08)",
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  brandMarkImage: {
-    width: "88%",
-    height: "88%",
-    objectFit: "contain",
-    objectPosition: "center",
-  },
-  brandTitleBlock: {
-    minWidth: 0,
-  },
-  brandKicker: {
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-    fontSize: "11px",
-    color: "#74879c",
-    fontWeight: 800,
-    marginBottom: "4px",
-  },
-  brandTitle: {
-    fontSize: "16px",
-    lineHeight: 1.2,
-    fontWeight: 800,
-    color: "#16304d",
-  },
-  sidebarCopy: {
-    margin: "0 0 16px",
-    fontSize: "14px",
-    lineHeight: 1.6,
-    color: "#516579",
-  },
-  sidebarCard: {
-    marginTop: "18px",
-    padding: "16px",
-    borderRadius: "20px",
-    background: "linear-gradient(135deg, rgba(235, 245, 255, 0.95) 0%, rgba(255, 234, 243, 0.90) 100%)",
-    border: "1px solid rgba(176, 194, 218, 0.22)",
-  },
-  sidebarCardLabel: {
-    fontSize: "12px",
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-    color: "#6d7f93",
-    fontWeight: 800,
-    marginBottom: "8px",
-  },
-  sidebarCardValue: {
-    fontSize: "18px",
-    fontWeight: 800,
-    marginBottom: "8px",
-  },
-  sidebarCardMeta: {
-    fontSize: "13px",
-    lineHeight: 1.55,
-    color: "#5d7187",
-  },
   content: {
-    position: "relative",
-    zIndex: 1,
-    minWidth: 0,
     display: "grid",
     gap: "18px",
+    minWidth: 0,
+    paddingTop: "88px",
   },
   heroShell: {
     display: "grid",
@@ -264,10 +121,21 @@ const styles: Record<string, CSSProperties> = {
     color: "#536579",
   },
   heroActions: {
+    position: "fixed",
+    top: "18px",
+    left: "282px",
+    right: "16px",
+    zIndex: 4,
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
-    marginTop: "20px",
+    alignItems: "center",
+    padding: "10px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
   primaryButton: {
     height: "44px",
@@ -348,5 +216,3 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 700,
   },
 };
-
-

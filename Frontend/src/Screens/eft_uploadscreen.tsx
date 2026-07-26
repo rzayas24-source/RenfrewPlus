@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent, type CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import {
   approveEftStage,
   transformEftStage,
@@ -226,48 +226,24 @@ export default function EFTUploadScreen() {
   };
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          EFT upload workspace in the same shell family as Import.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="EFT upload navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/import")}>
-            <span style={adminStyles.navButtonLabel}>Back</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
+    <AdminShell
+      sidebarCopy="EFT upload workspace in the same shell family as Import."
+      onBack={() => navigate("/import")}
+      backButtonFirst
+      ribbonTitle="EFT Upload Menu"
+      sidebarMiddleCard={
+        <>
           <div style={adminStyles.sidebarCardLabel}>Last EFT</div>
-          <div style={adminStyles.sidebarCardValue}>{lastEftDate}</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            Pulled from the current EFT table summary.
+          <div style={adminStyles.sidebarCardValue}>
+            <strong>{lastEftDate}</strong>
           </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>EFT upload ready</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            This screen is ready for upload logic, but for now it stays focused on layout and navigation.
-          </div>
-        </div>
-      </aside>
-
+          <div style={adminStyles.sidebarCardMeta}>Pulled from the current EFT table summary.</div>
+        </>
+      }
+      sidebarCardLabel="Today"
+      sidebarCardValue="EFT upload ready"
+      sidebarCardMeta="This screen is ready for upload logic, but for now it stays focused on layout and navigation."
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -280,9 +256,6 @@ export default function EFTUploadScreen() {
             <div style={adminStyles.heroActions}>
               <button style={adminStyles.primaryButton} type="button" onClick={runStage} disabled={staging}>
                 {staging ? "Staging..." : "Load to Staging"}
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/import")}>
-                Back to Import
               </button>
             </div>
           </div>
@@ -641,7 +614,7 @@ export default function EFTUploadScreen() {
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -827,6 +800,7 @@ const styles: Record<string, CSSProperties> = {
     color: "#31455d",
   },
 };
+
 
 
 

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { getApprovedList } from "../api/approvedlist_api";
 import type { ApprovedBatch } from "../api/approvedlist_api";
 
@@ -33,6 +34,7 @@ const styles: Record<string, CSSProperties> = {
     gap: "18px",
     maxWidth: "1280px",
     margin: "0 auto",
+    paddingTop: "88px",
   },
   heroShell: {
     display: "grid",
@@ -68,10 +70,21 @@ const styles: Record<string, CSSProperties> = {
     color: "#536579",
   },
   heroActions: {
+    position: "fixed",
+    top: "18px",
+    left: "282px",
+    right: "16px",
+    zIndex: 4,
     display: "flex",
     gap: "12px",
     flexWrap: "wrap",
-    marginTop: "20px",
+    alignItems: "center",
+    padding: "10px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.88)",
+    backdropFilter: "blur(18px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
   heroArt: {
     display: "grid",
@@ -154,7 +167,11 @@ const ApprovedList = () => {
   }, []);
 
   return (
-    <main style={styles.shell}>
+    <AdminShell
+      sidebarCopy="Approved batches live here after review, so you can check the results without leaving the shared shell."
+      onBack={() => navigate("/site-review")}
+      ribbonTitle="Approved Menu"
+    >
       <section style={styles.content}>
         <section style={styles.heroShell}>
           <div>
@@ -218,7 +235,7 @@ const ApprovedList = () => {
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 };
 
