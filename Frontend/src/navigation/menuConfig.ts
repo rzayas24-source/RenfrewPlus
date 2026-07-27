@@ -2,6 +2,12 @@ import axios from "axios";
 import type { AppConfig } from "../config/appConfig";
 import { API_BASE } from "../config/apiBase";
 
+const MENU_REQUEST_TIMEOUT_MS = 15000;
+const menuApi = axios.create({
+  baseURL: API_BASE,
+  timeout: MENU_REQUEST_TIMEOUT_MS,
+});
+
 export type MenuOption = {
   id: string;
   label: string;
@@ -169,12 +175,12 @@ function selectionToPayload(selection: MenuSelectionEntry[]) {
 }
 
 export async function loadMenuSelection(menuId: string) {
-  const response = await axios.get<MenuRow[]>(`${API_BASE}/menu/${encodeURIComponent(menuId)}`);
+  const response = await menuApi.get<MenuRow[]>(`/menu/${encodeURIComponent(menuId)}`);
   return normalizeSelectionEntries(response.data.map((row) => rowToSelectionEntry(row)).filter(Boolean) as MenuSelectionEntry[]);
 }
 
 export async function loadAllMenuSelections() {
-  const response = await axios.get<MenuRow[]>(`${API_BASE}/menu`);
+  const response = await menuApi.get<MenuRow[]>("/menu");
   return response.data.reduce<Record<string, MenuSelectionEntry[]>>((accumulator, row) => {
     const selection = rowToSelectionEntry(row);
     if (!selection) {
@@ -191,7 +197,7 @@ export async function loadAllMenuSelections() {
 }
 
 export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
-  const response = await axios.put<MenuRow[]>(`${API_BASE}/menu/${encodeURIComponent(menuId)}`, {
+  const response = await menuApi.put<MenuRow[]>(`/menu/${encodeURIComponent(menuId)}`, {
     selection: selectionToPayload(selection),
   });
   if (typeof window !== "undefined") {
@@ -201,14 +207,14 @@ export async function saveMenuSelection(menuId: string, selection: MenuSelection
 }
 
 export async function clearMenuSelection(menuId: string) {
-  await axios.delete(`${API_BASE}/menu/${encodeURIComponent(menuId)}`);
+  await menuApi.delete(`/menu/${encodeURIComponent(menuId)}`);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("renfrew:menu-config-updated"));
   }
 }
 
 export async function clearAllMenuSelections() {
-  await axios.delete(`${API_BASE}/menu`);
+  await menuApi.delete("/menu");
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("renfrew:menu-config-updated"));
   }

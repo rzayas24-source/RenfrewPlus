@@ -44,6 +44,7 @@ export default function AdminMenuScreen() {
   const [selectedEntries, setSelectedEntries] = useState<MenuSelectionEntry[]>([]);
   const [menuSelections, setMenuSelections] = useState<Record<string, MenuSelectionEntry[]>>({});
   const [loadingMenus, setLoadingMenus] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
   const menuOptions = useMemo(() => getMenuOptions(appConfig ?? undefined), [appConfig]);
   const menuTargets = useMemo(
@@ -62,6 +63,7 @@ export default function AdminMenuScreen() {
 
     const loadMenus = async () => {
       setLoadingMenus(true);
+      setLoadError(null);
       try {
         const nextMenuSelections = await loadAllMenuSelections();
         if (!active) {
@@ -71,6 +73,10 @@ export default function AdminMenuScreen() {
         setMenuSelections(nextMenuSelections);
         setSelectedEntries(nextMenuSelections[menuId] ?? []);
         setIsDirty(false);
+      } catch (error) {
+        if (active) {
+          setLoadError(error instanceof Error ? error.message : "Failed to load menus");
+        }
       } finally {
         if (active) {
           setLoadingMenus(false);
@@ -196,6 +202,8 @@ export default function AdminMenuScreen() {
             Clear all menus
           </button>
         </section>
+
+        {loadError && <div style={menuStyles.loadErrorBanner}>{loadError}</div>}
 
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -593,5 +601,16 @@ const menuStyles: Record<string, CSSProperties> = {
   emptyHint: {
     color: "#5b6f84",
     fontSize: "13px",
+  },
+  loadErrorBanner: {
+    marginTop: "2px",
+    padding: "12px 14px",
+    borderRadius: "14px",
+    border: "1px solid rgba(212, 161, 161, 0.34)",
+    background: "rgba(255, 244, 244, 0.96)",
+    color: "#9d3a3a",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1.45,
   },
 };

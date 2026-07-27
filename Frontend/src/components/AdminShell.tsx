@@ -6,6 +6,7 @@ import type { AppConfig } from "../config/appConfig";
 import { WorklistBrandButton } from "../worklist/worklist";
 import {
   GAZEBO_MENU_ID,
+  getMenuOptions,
   loadMenuSelection,
   saveMenuSelection,
   resolveMenuSelection,
@@ -252,6 +253,7 @@ export function AdminShell({
   backButtonFirst,
   hideSidebarBackMenu,
   hideSidebarBackStyles,
+  useGlobalMenuFallback = true,
   onBack,
   ribbonTitle = "Favorites",
 }: AdminShellProps) {
@@ -268,13 +270,22 @@ export function AdminShell({
   const [isGazeboLoaded, setIsGazeboLoaded] = useState(false);
   const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>([]);
   const isFavorite = gazeboSelection.some((item) => item.id === currentScreen.path);
+  const globalMenuSelection = useMemo(
+    () =>
+      getMenuOptions(appConfig ?? undefined)
+        .filter((option) => option.kind !== "menu")
+        .map((option) => ({ id: option.id })),
+    [appConfig]
+  );
+  const effectiveMenuSelection =
+    menuSelection.length > 0 || useGlobalMenuFallback === false ? menuSelection : globalMenuSelection;
   const favoriteScreens = useMemo(
     () => gazeboSelection.map((item) => resolveScreen(item.id, appConfig)).slice(0, MAX_FAVORITES),
     [appConfig, gazeboSelection]
   );
   const navItems = useMemo(
     () => {
-      const resolvedItems = menuSelection
+      const resolvedItems = effectiveMenuSelection
         .map((entry) => {
           const resolved = resolveMenuSelection(entry.id, entry, appConfig ?? undefined);
           if (!resolved) {
@@ -303,7 +314,7 @@ export function AdminShell({
 
       return resolvedItems.sort((left, right) => compareNavLabels(left.label, right.label));
     },
-    [appConfig, hideSidebarBackMenu, hideSidebarBackStyles, menuSelection, navigate]
+    [appConfig, effectiveMenuSelection, hideSidebarBackMenu, hideSidebarBackStyles, navigate]
   );
   const priorityNavItems = navItems.slice(0, 2);
   const remainingNavItems = navItems.slice(2);

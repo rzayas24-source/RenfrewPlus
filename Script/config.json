@@ -1,12 +1,12 @@
 {
   "workflow_root": "..",
-  "db_path": "../database.db",
-  "emails_folder": "../4.Emails",
-  "snapshots_folder": "../snapshots",
-  "flywire_storage_root": "../Import_Flywire",
-  "trn_folder": "../1.TRN",
-  "era_folder": "../2.ERA",
-  "html_folder": "../3.HTML",
+  "db_path": "database.db",
+  "emails_folder": "4.Emails",
+  "snapshots_folder": "snapshots",
+  "flywire_storage_root": "Import_Flywire",
+  "trn_folder": "1.TRN",
+  "era_folder": "2.ERA",
+  "html_folder": "3.HTML",
   "tooling": {
     "poppler_bins": [
       "poppler/Library/bin"

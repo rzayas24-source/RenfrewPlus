@@ -62,12 +62,20 @@ def ensure_match_indexes(conn=None):
         close_conn = True
 
     cur = conn.cursor()
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_edi_matchstatus_check ON EDI(matchstatus, check_number)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_edi_check_amount ON EDI(check_number, check_amount)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_eft_matchstatus_check ON EFT(matchstatus, CheckNumber)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_eft_check_amount ON EFT(CheckNumber, Amount)')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_lockbox_matchstatus_check ON Lockbox(matchstatus, "Check Number")')
-    cur.execute('CREATE INDEX IF NOT EXISTS idx_lockbox_check_amount ON Lockbox("Check Number", "Check Amount")')
+    existing_tables = {
+        row[0]
+        for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+
+    if "EDI" in existing_tables:
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_edi_matchstatus_check ON EDI(matchstatus, check_number)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_edi_check_amount ON EDI(check_number, check_amount)')
+    if "EFT" in existing_tables:
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_eft_matchstatus_check ON EFT(matchstatus, CheckNumber)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_eft_check_amount ON EFT(CheckNumber, Amount)')
+    if "Lockbox" in existing_tables:
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_lockbox_matchstatus_check ON Lockbox(matchstatus, "Check Number")')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_lockbox_check_amount ON Lockbox("Check Number", "Check Amount")')
     conn.commit()
 
     if close_conn:
@@ -76,6 +84,14 @@ def ensure_match_indexes(conn=None):
 
 def _quote_identifier(name):
     return '"' + str(name).replace('"', '""') + '"'
+
+
+def _existing_tables(conn):
+    cur = conn.cursor()
+    return {
+        row[0]
+        for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
 
 
 def _fetch_rows(conn, table_name, columns, where_clause=""):
@@ -236,16 +252,21 @@ def _queue_snapshot(conn):
     cur = conn.cursor()
     summary = {}
     revision_parts = []
+    existing_tables = _existing_tables(conn)
     for table_name, summary_key in (("EDI", "ediUnmatched"), ("EFT", "eftUnmatched"), ("Lockbox", "lockboxUnmatched")):
-        row = cur.execute(
-            f"""
-            SELECT COUNT(*) AS row_count, COALESCE(MAX(rowid), 0) AS max_rowid
-            FROM {table_name}
-            WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED'
-            """
-        ).fetchone()
-        summary[summary_key] = int(row[0] or 0)
-        revision_parts.append(f"{int(row[0] or 0)}:{int(row[1] or 0)}")
+        if table_name in existing_tables:
+            row = cur.execute(
+                f"""
+                SELECT COUNT(*) AS row_count, COALESCE(MAX(rowid), 0) AS max_rowid
+                FROM {table_name}
+                WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED'
+                """
+            ).fetchone()
+            summary[summary_key] = int(row[0] or 0)
+            revision_parts.append(f"{int(row[0] or 0)}:{int(row[1] or 0)}")
+        else:
+            summary[summary_key] = 0
+            revision_parts.append("0:0")
     summary["strongCandidates"] = 0
     return summary, "|".join(revision_parts)
 
@@ -269,9 +290,10 @@ def build_match_dashboard(
 
     conn = get_conn()
     conn.row_factory = sqlite3.Row
+    existing_tables = _existing_tables(conn)
     ensure_match_indexes(conn)
     queue_summary, current_revision = _queue_snapshot(conn)
-    latest_year = _latest_edi_year(conn)
+    latest_year = _latest_edi_year(conn) if "EDI" in existing_tables else None
     visibility_where = _build_edi_visibility_where(
         show_matched=show_matched,
         show_unmatched=show_unmatched,
@@ -279,103 +301,110 @@ def build_match_dashboard(
         latest_year=latest_year,
     )
 
-    edi_rows = _fetch_rows(
-        conn,
-        "EDI",
-        [
-            "check_date",
-            "check_number",
-            "check_amount",
-            "filename",
-            "batchnum",
-            "transnum",
-            "timestamp",
-            "matchstatus",
-        ],
-        f"{visibility_where} ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
-    )
+    edi_rows = []
+    eft_rows = []
+    lockbox_rows = []
+    matched_eft_rows = []
+    matched_lockbox_rows = []
 
-    eft_rows = _fetch_rows(
-        conn,
-        "EFT",
-        [
-            "Date",
-            "Amount",
-            "CheckNumber",
-            "Payer",
-            "batchnum",
-            "transnum",
-            "timestamp",
-            "matchstatus",
-        ],
-        "WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED' ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
-    )
+    if "EDI" in existing_tables:
+        edi_rows = _fetch_rows(
+            conn,
+            "EDI",
+            [
+                "check_date",
+                "check_number",
+                "check_amount",
+                "filename",
+                "batchnum",
+                "transnum",
+                "timestamp",
+                "matchstatus",
+            ],
+            f"{visibility_where} ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
+        )
 
-    lockbox_rows = _fetch_rows(
-        conn,
-        "Lockbox",
-        [
-            "Transaction Number",
-            "Status",
-            "Note",
-            "Transaction Total",
-            "Deposit Date",
-            "Batch Number",
-            "Check Number",
-            "Check Amount",
-            "Site",
+    if "EFT" in existing_tables:
+        eft_rows = _fetch_rows(
+            conn,
+            "EFT",
+            [
+                "Date",
+                "Amount",
+                "CheckNumber",
+                "Payer",
+                "batchnum",
+                "transnum",
+                "timestamp",
+                "matchstatus",
+            ],
+            "WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED' ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
+        )
+        matched_eft_rows = _fetch_rows(
+            conn,
+            "EFT",
+            [
+                "Date",
+                "Amount",
+                "CheckNumber",
+                "Payer",
+                "batchnum",
+                "transnum",
+                "timestamp",
+                "matchstatus",
+            ],
+            "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND CheckNumber IS NOT NULL AND TRIM(CheckNumber) != ''",
+        )
+
+    if "Lockbox" in existing_tables:
+        lockbox_rows = _fetch_rows(
+            conn,
             "Lockbox",
-            "Payor",
-            "Sequence",
-            "Number of Items",
-            "batchnum",
-            "transnum",
-            "timestamp",
-            "matchstatus",
-        ],
-        "WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED' ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
-    )
-
-    matched_eft_rows = _fetch_rows(
-        conn,
-        "EFT",
-        [
-            "Date",
-            "Amount",
-            "CheckNumber",
-            "Payer",
-            "batchnum",
-            "transnum",
-            "timestamp",
-            "matchstatus",
-        ],
-        "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND CheckNumber IS NOT NULL AND TRIM(CheckNumber) != ''",
-    )
-
-    matched_lockbox_rows = _fetch_rows(
-        conn,
-        "Lockbox",
-        [
-            "Transaction Number",
-            "Status",
-            "Note",
-            "Transaction Total",
-            "Deposit Date",
-            "Batch Number",
-            "Check Number",
-            "Check Amount",
-            "Site",
+            [
+                "Transaction Number",
+                "Status",
+                "Note",
+                "Transaction Total",
+                "Deposit Date",
+                "Batch Number",
+                "Check Number",
+                "Check Amount",
+                "Site",
+                "Lockbox",
+                "Payor",
+                "Sequence",
+                "Number of Items",
+                "batchnum",
+                "transnum",
+                "timestamp",
+                "matchstatus",
+            ],
+            "WHERE COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED' ORDER BY CAST(COALESCE(batchnum, '0') AS INTEGER) ASC, id ASC",
+        )
+        matched_lockbox_rows = _fetch_rows(
+            conn,
             "Lockbox",
-            "Payor",
-            "Sequence",
-            "Number of Items",
-            "batchnum",
-            "transnum",
-            "timestamp",
-            "matchstatus",
-        ],
-        "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND \"Check Number\" IS NOT NULL AND TRIM(\"Check Number\") != ''",
-    )
+            [
+                "Transaction Number",
+                "Status",
+                "Note",
+                "Transaction Total",
+                "Deposit Date",
+                "Batch Number",
+                "Check Number",
+                "Check Amount",
+                "Site",
+                "Lockbox",
+                "Payor",
+                "Sequence",
+                "Number of Items",
+                "batchnum",
+                "transnum",
+                "timestamp",
+                "matchstatus",
+            ],
+            "WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%' AND \"Check Number\" IS NOT NULL AND TRIM(\"Check Number\") != ''",
+        )
 
     eft_index = defaultdict(list)
     lockbox_index = defaultdict(list)
@@ -483,7 +512,12 @@ def build_match_dashboard(
 def get_match_detail(edi_id):
     conn = get_conn()
     conn.row_factory = sqlite3.Row
+    existing_tables = _existing_tables(conn)
     ensure_match_indexes(conn)
+
+    if "EDI" not in existing_tables:
+        conn.close()
+        return None
 
     edi_row = conn.execute(
         """
@@ -502,28 +536,32 @@ def get_match_detail(edi_id):
     edi_norm = _row_common_payload(dict(edi_row), "EDI")
     check_norm = edi_norm["checkNumberNorm"]
 
-    eft_rows = conn.execute(
-        """
-        SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
-        FROM EFT
-        WHERE (COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')
-          AND CheckNumber IS NOT NULL
-          AND TRIM(CheckNumber) != ''
-        """,
-    ).fetchall()
+    eft_rows = []
+    lockbox_rows = []
+    if "EFT" in existing_tables:
+        eft_rows = conn.execute(
+            """
+            SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
+            FROM EFT
+            WHERE (COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')
+              AND CheckNumber IS NOT NULL
+              AND TRIM(CheckNumber) != ''
+            """,
+        ).fetchall()
 
-    lockbox_rows = conn.execute(
-        """
-        SELECT rowid AS id, "Transaction Number", Status, Note, "Transaction Total",
-               "Deposit Date", "Batch Number", "Check Number", "Check Amount",
-               Site, Lockbox, Payor, Sequence, "Number of Items",
-               batchnum, transnum, timestamp, matchstatus
-        FROM Lockbox
-        WHERE (COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')
-          AND "Check Number" IS NOT NULL
-          AND TRIM("Check Number") != ''
-        """,
-    ).fetchall()
+    if "Lockbox" in existing_tables:
+        lockbox_rows = conn.execute(
+            """
+            SELECT rowid AS id, "Transaction Number", Status, Note, "Transaction Total",
+                   "Deposit Date", "Batch Number", "Check Number", "Check Amount",
+                   Site, Lockbox, Payor, Sequence, "Number of Items",
+                   batchnum, transnum, timestamp, matchstatus
+            FROM Lockbox
+            WHERE (COALESCE(TRIM(matchstatus), '') = '' OR UPPER(TRIM(matchstatus)) = 'UNMATCHED')
+              AND "Check Number" IS NOT NULL
+              AND TRIM("Check Number") != ''
+            """,
+        ).fetchall()
 
     eft_candidates = []
     for row in eft_rows:
@@ -537,28 +575,32 @@ def get_match_detail(edi_id):
         if candidate["score"] > 0:
             lockbox_candidates.append(candidate)
 
-    matched_eft_rows = conn.execute(
-        """
-        SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
-        FROM EFT
-        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
-          AND CheckNumber IS NOT NULL
-          AND TRIM(CheckNumber) != ''
-        """,
-    ).fetchall()
+    matched_eft_rows = []
+    matched_lockbox_rows = []
+    if "EFT" in existing_tables:
+        matched_eft_rows = conn.execute(
+            """
+            SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
+            FROM EFT
+            WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
+              AND CheckNumber IS NOT NULL
+              AND TRIM(CheckNumber) != ''
+            """,
+        ).fetchall()
 
-    matched_lockbox_rows = conn.execute(
-        """
-        SELECT rowid AS id, "Transaction Number", Status, Note, "Transaction Total",
-               "Deposit Date", "Batch Number", "Check Number", "Check Amount",
-               Site, Lockbox, Payor, Sequence, "Number of Items",
-               batchnum, transnum, timestamp, matchstatus
-        FROM Lockbox
-        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
-          AND "Check Number" IS NOT NULL
-          AND TRIM("Check Number") != ''
-        """,
-    ).fetchall()
+    if "Lockbox" in existing_tables:
+        matched_lockbox_rows = conn.execute(
+            """
+            SELECT rowid AS id, "Transaction Number", Status, Note, "Transaction Total",
+                   "Deposit Date", "Batch Number", "Check Number", "Check Amount",
+                   Site, Lockbox, Payor, Sequence, "Number of Items",
+                   batchnum, transnum, timestamp, matchstatus
+            FROM Lockbox
+            WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
+              AND "Check Number" IS NOT NULL
+              AND TRIM("Check Number") != ''
+            """,
+        ).fetchall()
 
     matched_eft = []
     for row in matched_eft_rows:
@@ -595,7 +637,15 @@ def build_match_history(limit=100):
     safe_limit = max(1, min(int(limit or 100), 500))
     conn = get_conn()
     conn.row_factory = sqlite3.Row
+    existing_tables = _existing_tables(conn)
     ensure_match_indexes(conn)
+
+    if "EDI" not in existing_tables:
+        conn.close()
+        return {
+            "rows": [],
+            "count": 0,
+        }
 
     matched_edi_rows = conn.execute(
         """
@@ -609,28 +659,32 @@ def build_match_history(limit=100):
         (safe_limit,),
     ).fetchall()
 
-    matched_eft_rows = conn.execute(
-        """
-        SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
-        FROM EFT
-        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
-          AND CheckNumber IS NOT NULL
-          AND TRIM(CheckNumber) != ''
-        """,
-    ).fetchall()
+    matched_eft_rows = []
+    matched_lockbox_rows = []
+    if "EFT" in existing_tables:
+        matched_eft_rows = conn.execute(
+            """
+            SELECT rowid AS id, Date, Amount, CheckNumber, Payer, batchnum, transnum, timestamp, matchstatus
+            FROM EFT
+            WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
+              AND CheckNumber IS NOT NULL
+              AND TRIM(CheckNumber) != ''
+            """,
+        ).fetchall()
 
-    matched_lockbox_rows = conn.execute(
-        """
-        SELECT rowid AS id, "Transaction Number", Status, Note, "Transaction Total",
-               "Deposit Date", "Batch Number", "Check Number", "Check Amount",
-               Site, Lockbox, Payor, Sequence, "Number of Items",
-               batchnum, transnum, timestamp, matchstatus
-        FROM Lockbox
-        WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
-          AND "Check Number" IS NOT NULL
-          AND TRIM("Check Number") != ''
-        """,
-    ).fetchall()
+    if "Lockbox" in existing_tables:
+        matched_lockbox_rows = conn.execute(
+            """
+            SELECT rowid AS id, "Transaction Number", Status, Note, "Transaction Total",
+                   "Deposit Date", "Batch Number", "Check Number", "Check Amount",
+                   Site, Lockbox, Payor, Sequence, "Number of Items",
+                   batchnum, transnum, timestamp, matchstatus
+            FROM Lockbox
+            WHERE UPPER(TRIM(matchstatus)) LIKE 'MATCHED%'
+              AND "Check Number" IS NOT NULL
+              AND TRIM("Check Number") != ''
+            """,
+        ).fetchall()
 
     rows = []
     for row in matched_edi_rows:

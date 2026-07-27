@@ -19,7 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from openpyxl import load_workbook
 
-from config_manager import load_config, resolve_path, save_config
+from config_manager import CONFIG_PATH, load_config, resolve_path, save_config
 from system_calendar_core import (
     add_days,
     advance_current_work_day,
@@ -97,6 +97,7 @@ def refresh_runtime_config(config: dict | None = None):
 
 
 refresh_runtime_config(BACKEND_CONFIG)
+print(f"[startup] pid={os.getpid()} db_path={DB_PATH} workflow_root={WORKFLOW_ROOT}", flush=True)
 
 app = FastAPI()
 
@@ -146,6 +147,16 @@ def put_config(payload: dict):
     saved = save_config(payload)
     refresh_runtime_config(saved)
     return saved
+
+
+@app.get("/health")
+def get_health():
+    return {
+        "status": "ok",
+        "pid": os.getpid(),
+        "db_path": DB_PATH,
+        "workflow_root": WORKFLOW_ROOT,
+    }
 
 
 def _quote_identifier(name: str) -> str:
