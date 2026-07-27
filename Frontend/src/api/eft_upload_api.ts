@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface EftUploadResponse {
   status: string;
@@ -61,7 +61,7 @@ export async function uploadEftWorkbook(file: File): Promise<EftUploadResponse> 
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API}/eft/upload-stage`, {
+  const response = await fetch(`${API_BASE}/eft/upload-stage`, {
     method: "POST",
     body: formData,
   });
@@ -75,7 +75,7 @@ export async function uploadEftWorkbook(file: File): Promise<EftUploadResponse> 
 }
 
 export async function transformEftStage(): Promise<EftTransformResponse> {
-  const response = await fetch(`${API}/eft/transform-stage`, {
+  const response = await fetch(`${API_BASE}/eft/transform-stage`, {
     method: "POST",
   });
 
@@ -88,7 +88,7 @@ export async function transformEftStage(): Promise<EftTransformResponse> {
 }
 
 export async function vetEftStage(): Promise<EftVetResponse> {
-  const response = await fetch(`${API}/eft/vet-stage`, {
+  const response = await fetch(`${API_BASE}/eft/vet-stage`, {
     method: "POST",
   });
 
@@ -101,7 +101,7 @@ export async function vetEftStage(): Promise<EftVetResponse> {
 }
 
 export async function approveEftStage(decision: "approve" | "approve_partial" | "deny"): Promise<EftApprovalResponse> {
-  const response = await fetch(`${API}/eft/approval-stage`, {
+  const response = await fetch(`${API_BASE}/eft/approval-stage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -116,3 +116,4 @@ export async function approveEftStage(decision: "approve" | "approve_partial" | 
 
   return await response.json();
 }
+

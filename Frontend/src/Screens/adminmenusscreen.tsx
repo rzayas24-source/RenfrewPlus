@@ -1,22 +1,18 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAppConfig } from "../config/appConfig";
 import { AdminShell } from "../components/AdminShell";
 import {
-  ALL_MENU_OPTIONS,
-  GLOBAL_MENU_ID,
+  GAZEBO_MENU_OPTION,
   clearAllMenuSelections,
   getMenuOption,
-  loadMenuSelection,
+  getMenuOptions,
+  loadAllMenuSelections,
   saveMenuSelection,
   type MenuSelectionEntry,
 } from "../navigation/menuConfig";
 import { styles as adminStyles } from "./adminscreen";
-
-const MENU_TARGETS = ALL_MENU_OPTIONS.filter((option) => option.kind === "screen").sort((left, right) =>
-  left.label.localeCompare(right.label)
-);
-const MENU_OPTIONS = [...ALL_MENU_OPTIONS].sort((left, right) => left.label.localeCompare(right.label));
 
 function compareMenuLabels(left: string, right: string) {
   const priority = (value: string) => {
@@ -43,33 +39,75 @@ function createSelectionEntry(optionId: string, current?: MenuSelectionEntry) {
 
 export default function AdminMenuScreen() {
   const navigate = useNavigate();
-  const [menuId, setMenuId] = useState<string>(GLOBAL_MENU_ID);
-  const [selectedEntries, setSelectedEntries] = useState<MenuSelectionEntry[]>(() => loadMenuSelection(GLOBAL_MENU_ID, []));
+  const appConfig = useAppConfig();
+  const [menuId, setMenuId] = useState<string>("/admin");
+  const [selectedEntries, setSelectedEntries] = useState<MenuSelectionEntry[]>([]);
+  const [menuSelections, setMenuSelections] = useState<Record<string, MenuSelectionEntry[]>>({});
+  const [loadingMenus, setLoadingMenus] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
+  const menuOptions = useMemo(() => getMenuOptions(appConfig ?? undefined), [appConfig]);
+  const menuTargets = useMemo(
+    () => [GAZEBO_MENU_OPTION, ...menuOptions.filter((option) => option.kind === "screen")].sort((left, right) =>
+      left.label.localeCompare(right.label)
+    ),
+    [menuOptions]
+  );
+  const menuChoiceOptions = useMemo(
+    () => menuOptions.filter((option) => option.kind !== "menu").sort((left, right) => left.label.localeCompare(right.label)),
+    [menuOptions]
+  );
 
   useEffect(() => {
-    setSelectedEntries(loadMenuSelection(menuId, loadMenuSelection(GLOBAL_MENU_ID, [])));
+    let active = true;
+
+    const loadMenus = async () => {
+      setLoadingMenus(true);
+      try {
+        const nextMenuSelections = await loadAllMenuSelections();
+        if (!active) {
+          return;
+        }
+
+        setMenuSelections(nextMenuSelections);
+        setSelectedEntries(nextMenuSelections[menuId] ?? []);
+        setIsDirty(false);
+      } finally {
+        if (active) {
+          setLoadingMenus(false);
+        }
+      }
+    };
+
+    void loadMenus();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    setSelectedEntries(menuSelections[menuId] ?? []);
     setIsDirty(false);
-  }, [menuId]);
+  }, [menuId, menuSelections]);
 
   const selectedOptions = useMemo(
     () =>
       selectedEntries
-        .map((entry) => ({ entry, option: getMenuOption(entry.id) }))
+        .map((entry) => ({ entry, option: getMenuOption(entry.id, appConfig ?? undefined) }))
         .filter(
           (item): item is { entry: MenuSelectionEntry; option: NonNullable<ReturnType<typeof getMenuOption>> } =>
             Boolean(item.option)
         ),
-    [selectedEntries]
+    [appConfig, selectedEntries]
   );
 
-  const selectedMenu = getMenuOption(menuId);
+  const selectedMenu = getMenuOption(menuId, appConfig ?? undefined);
   const menuTargetSummaries = useMemo(
     () =>
-      MENU_TARGETS.map((option) => {
-        const effectiveSelection = loadMenuSelection(option.id, loadMenuSelection(GLOBAL_MENU_ID, []));
+      menuTargets.map((option) => {
+        const effectiveSelection = menuSelections[option.id] ?? [];
         const labels = effectiveSelection
-          .map((entry) => getMenuOption(entry.id))
+          .map((entry) => getMenuOption(entry.id, appConfig ?? undefined))
           .filter((item): item is NonNullable<ReturnType<typeof getMenuOption>> => Boolean(item))
           .map((item) => item.label);
 
@@ -78,7 +116,7 @@ export default function AdminMenuScreen() {
           labels,
         };
       }),
-    []
+    [appConfig, menuSelections, menuTargets]
   );
 
   const toggleOption = (optionId: string) => {
@@ -126,27 +164,30 @@ export default function AdminMenuScreen() {
     setIsDirty(true);
   };
 
-  const clearEverything = () => {
-    clearAllMenuSelections();
+  const clearEverything = async () => {
+    await clearAllMenuSelections();
+    setMenuSelections({});
     setSelectedEntries([]);
     setIsDirty(false);
   };
 
-  const applyChanges = () => {
-    saveMenuSelection(menuId, selectedEntries);
+  const applyChanges = async () => {
+    const savedSelection = await saveMenuSelection(menuId, selectedEntries);
+    setMenuSelections((current) => ({ ...current, [menuId]: savedSelection }));
+    setSelectedEntries(savedSelection);
     setIsDirty(false);
   };
 
   return (
     <AdminShell
-      sidebarCopy="Set the sidebar menu for the screen you are editing. Global settings are used as the fallback."
+      sidebarCopy="Set the sidebar menu for the screen you are editing. This reads and writes the shared database menu."
       onBack={() => navigate("/admin")}
       hideBackButton
     >
       <section style={menuStyles.page}>
         <section style={menuStyles.heroActionsSticky}>
           <button type="button" style={adminStyles.primaryButton} onClick={applyChanges} disabled={!isDirty}>
-            {isDirty ? "Apply changes" : "Saved"}
+            {loadingMenus ? "Loading..." : isDirty ? "Apply changes" : "Saved"}
           </button>
           <button type="button" style={adminStyles.secondaryButton} onClick={clearMenu}>
             Clear menu
@@ -225,7 +266,7 @@ export default function AdminMenuScreen() {
             </div>
 
             <div style={menuStyles.optionListScroll}>
-              {MENU_OPTIONS.map((option) => {
+              {menuChoiceOptions.map((option) => {
                 const activeEntry = selectedEntries.find((item) => item.id === option.id);
                 const active = Boolean(activeEntry);
                 const isBackStyle = activeEntry?.back === true || activeEntry?.darken === true;

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface HtmlSpreadsheetRow {
   source: "EFT" | "Lockbox";
@@ -35,7 +35,8 @@ export interface HtmlConvertResponse {
 }
 
 export const getHtmlSpreadsheet = (work_day: string) =>
-  axios.get<HtmlSpreadsheetResponse>(`${API}/html/spreadsheet`, { params: { work_day } });
+  axios.get<HtmlSpreadsheetResponse>(`${API_BASE}/html/spreadsheet`, { params: { work_day } });
 
 export const convertHtmlFiles = (work_day: string) =>
-  axios.post<HtmlConvertResponse>(`${API}/html/convert`, { work_day });
+  axios.post<HtmlConvertResponse>(`${API_BASE}/html/convert`, { work_day });
+

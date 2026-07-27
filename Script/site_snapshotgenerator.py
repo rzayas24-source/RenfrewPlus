@@ -8,18 +8,24 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
+from config_manager import load_config, resolve_path
 from db import get_conn
-from pdf2image import convert_from_path
 from PIL import Image, ImageDraw, ImageFont
 import xlrd
 from openpyxl import load_workbook
 
-EMAIL_FOLDER = r"C:\Renfrew\Workflow\4.Emails"
-SNAPSHOT_FOLDER = r"C:\Renfrew\Workflow\snapshots"
-POPPLER_CANDIDATES = [
-    r"C:\Tools\poppler\Library\bin",
-    r"C:\poppler\Library\bin",
-]
+try:
+    from pdf2image import convert_from_path
+except Exception:  # pragma: no cover - optional external dependency
+    convert_from_path = None
+
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG = load_config()
+WORKFLOW_ROOT = Path(resolve_path(CONFIG, "workflow_root", BASE_DIR.parent, relative_to=BASE_DIR))
+EMAIL_FOLDER = Path(resolve_path(CONFIG, "emails_folder", WORKFLOW_ROOT / "4.Emails", relative_to=WORKFLOW_ROOT))
+SNAPSHOT_FOLDER = Path(resolve_path(CONFIG, "snapshots_folder", WORKFLOW_ROOT / "snapshots", relative_to=WORKFLOW_ROOT))
+TOOLING = CONFIG.get("tooling") if isinstance(CONFIG.get("tooling"), dict) else {}
+FONT_CONFIG = TOOLING.get("fonts") if isinstance(TOOLING.get("fonts"), dict) else {}
 BATCH_PREFIX_RE = re.compile(r"^(?P<batch_id>\d{2}\.\d{2}\.\d{2})-")
 
 os.makedirs(EMAIL_FOLDER, exist_ok=True)
@@ -32,14 +38,43 @@ if hasattr(sys.stderr, "reconfigure"):
 
 
 def _poppler_path():
-    for candidate in POPPLER_CANDIDATES:
-        if os.path.exists(candidate):
-            return candidate
+    seen: set[str] = set()
+
+    def _check(candidate: Path | str) -> str | None:
+        path = Path(candidate).expanduser()
+        if not path.is_absolute():
+            path = (WORKFLOW_ROOT / path).resolve()
+        normalized = str(path)
+        if normalized in seen:
+            return None
+        seen.add(normalized)
+        if path.exists():
+            return normalized
+        return None
+
+    config_candidates = [
+        candidate
+        for candidate in (TOOLING.get("poppler_bins") or [])
+        if isinstance(candidate, str) and candidate.strip()
+    ]
+    bundled_candidates = [
+        BASE_DIR / "poppler" / "Library" / "bin",
+        WORKFLOW_ROOT / "poppler" / "Library" / "bin",
+        Path(r"C:\Tools\poppler\Library\bin"),
+        Path(r"C:\poppler\Library\bin"),
+    ]
+
+    for candidate in (*config_candidates, *bundled_candidates):
+        resolved = _check(candidate)
+        if resolved:
+            return resolved
     return None
 
 
 def _safe_font(size: int):
     candidates = [
+        FONT_CONFIG.get("regular"),
+        FONT_CONFIG.get("alternate"),
         r"C:\Windows\Fonts\arial.ttf",
         r"C:\Windows\Fonts\segoeui.ttf",
     ]
@@ -133,6 +168,19 @@ def _image_snapshot(image_path, out_path):
 
 def _pdf_snapshot(pdf_path, out_path):
     poppler_path = _poppler_path()
+    if convert_from_path is None or not poppler_path:
+        return _draw_text_snapshot(
+            [
+                f"Filename: {Path(pdf_path).name}",
+                "",
+                "PDF preview unavailable on this machine.",
+                "Install Poppler or provide a configured poppler path to render PDF snapshots.",
+            ],
+            out_path,
+            title="PDF attachment preview",
+            subtitle="Fallback snapshot",
+        )
+
     pages = convert_from_path(
         pdf_path,
         dpi=150,

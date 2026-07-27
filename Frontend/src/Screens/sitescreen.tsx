@@ -5,7 +5,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
 
-const API_BASE = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 type SiteRow = {
   id: number;
@@ -506,3 +506,4 @@ const siteStyles: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
 };
+

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface BalsheetEntry {
   entry_id?: string;
@@ -45,20 +45,20 @@ export interface BalsheetWorkday {
 
 export function getBalsheet(postingDate?: string) {
   const params = postingDate ? { posting_date: postingDate } : undefined;
-  return axios.get<BalsheetEntry[]>(`${API}/balsheet`, { params });
+  return axios.get<BalsheetEntry[]>(`${API_BASE}/balsheet`, { params });
 }
 
 export function getBalsheetNotes(postDate?: string) {
   const params = postDate ? { post_date: postDate } : undefined;
-  return axios.get<BalsheetNote[]>(`${API}/balsheet/notes`, { params });
+  return axios.get<BalsheetNote[]>(`${API_BASE}/balsheet/notes`, { params });
 }
 
 export function createBalsheetNote(payload: BalsheetNotePayload) {
-  return axios.post<BalsheetNote>(`${API}/balsheet/notes`, payload);
+  return axios.post<BalsheetNote>(`${API_BASE}/balsheet/notes`, payload);
 }
 
 export function updateBalsheetNote(rowid: number, payload: BalsheetNotePayload) {
-  return axios.put<BalsheetNote>(`${API}/balsheet/notes/${rowid}`, payload);
+  return axios.put<BalsheetNote>(`${API_BASE}/balsheet/notes/${rowid}`, payload);
 }
 
 export async function upsertBalsheetNoteText(postDate: string, notes: string) {
@@ -98,12 +98,12 @@ export async function upsertBalsheetNoteMessage(postDate: string, message: strin
 }
 
 export function getBalsheetWorkday() {
-  return axios.get<BalsheetWorkday>(`${API}/balsheet/workday`);
+  return axios.get<BalsheetWorkday>(`${API_BASE}/balsheet/workday`);
 }
 
 export function importBalsheetFromBanking(postingDate: string, bankDay: string) {
   return axios.post<{ status: string; postingDate: string; rowsImported: number; rowsRemoved: number }>(
-    `${API}/balsheet/import-banking`,
+    `${API_BASE}/balsheet/import-banking`,
     {
       posting_date: postingDate,
       bank_day: bankDay,
@@ -112,25 +112,26 @@ export function importBalsheetFromBanking(postingDate: string, bankDay: string) 
 }
 
 export function clearBalsheet(postingDate: string) {
-  return axios.delete<{ status: string; postingDate: string; rowsDeleted: number }>(`${API}/balsheet`, {
+  return axios.delete<{ status: string; postingDate: string; rowsDeleted: number }>(`${API_BASE}/balsheet`, {
     params: { posting_date: postingDate },
   });
 }
 
 export function saveBalsheetEntries(entries: BalsheetEntry[]) {
-  return axios.post<{ status: string; rowsImported: number; sourceAttachmentId?: string }>(`${API}/balsheet/bulk`, {
+  return axios.post<{ status: string; rowsImported: number; sourceAttachmentId?: string }>(`${API_BASE}/balsheet/bulk`, {
     entries,
   });
 }
 
 export function updateBalsheetEntry(entryId: string, entry: BalsheetEntry) {
-  return axios.put<BalsheetEntry>(`${API}/balsheet/${entryId}`, entry);
+  return axios.put<BalsheetEntry>(`${API_BASE}/balsheet/${entryId}`, entry);
 }
 
 export function createBalsheetEntry(entry: BalsheetEntry) {
-  return axios.post<BalsheetEntry>(`${API}/balsheet`, entry);
+  return axios.post<BalsheetEntry>(`${API_BASE}/balsheet`, entry);
 }
 
 export function deleteBalsheetEntry(entryId: string) {
-  return axios.delete<{ status: string; entry_id: string }>(`${API}/balsheet/${entryId}`);
+  return axios.delete<{ status: string; entry_id: string }>(`${API_BASE}/balsheet/${entryId}`);
 }
+

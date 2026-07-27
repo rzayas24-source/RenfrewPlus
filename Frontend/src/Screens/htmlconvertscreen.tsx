@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 import { getBankingSpreadsheet, type BankingSpreadsheetResponse } from "../api/banking_api";
 import { getCalendarStatus, type CalendarStatus } from "../api/calendar_api";
 import {
@@ -72,7 +72,6 @@ function compareChecks(left: string, right: string) {
 
 export default function HTMLConvertScreen() {
   const navigate = useNavigate();
-  const [isRibbonOpen, setIsRibbonOpen] = useState(false);
   const [calendarStatus, setCalendarStatus] = useState<CalendarStatus | null>(null);
   const [bankingData, setBankingData] = useState<BankingSpreadsheetResponse | null>(null);
   const [htmlData, setHtmlData] = useState<HtmlSpreadsheetResponse | null>(null);
@@ -203,7 +202,7 @@ export default function HTMLConvertScreen() {
 
   const convertStatusTag = converting ? "CONVERTING" : convertResult?.statusTag || "READY";
   const convertStatusMessage = converting
-    ? "Renaming HTML files and moving them to C:\\Renfrew\\Workflow\\3.HTML\\Renamed..."
+    ? "Renaming HTML files and moving them to the renamed HTML folder..."
     : convertResult?.message || "Ready to rename the current day's HTML files.";
 
   const handleConvert = async () => {
@@ -255,57 +254,19 @@ export default function HTMLConvertScreen() {
     {
       label: "HTML Hits",
       value: String(htmlData?.matchedFiles ?? 0),
-      detail: "HTML files found in C:\\Renfrew\\Workflow\\3.HTML for the selected bank day.",
+      detail: "HTML files found in the configured HTML workspace for the selected bank day.",
     },
   ];
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <button
-            type="button"
-            onClick={() => setIsRibbonOpen((current) => !current)}
-            style={adminStyles.brandWomenMark}
-            aria-label={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
-            aria-expanded={isRibbonOpen}
-            title={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
-          >
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </button>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A soft HTML workspace focused on check numbers from the 3.HTML folder.
-        </p>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Source</div>
-          <div
-            style={{
-              ...adminStyles.sidebarCardValue,
-              fontSize: "11px",
-              lineHeight: 1.2,
-              whiteSpace: "normal",
-              overflowWrap: "anywhere",
-              wordBreak: "break-word",
-              maxWidth: "100%",
-            }}
-          >
-            C:\Renfrew\Workflow\3.HTML
-          </div>
-          <div style={adminStyles.sidebarCardMeta}>
-            This screen is built around check numbers first. We can add conversion work after the initial tables settle.
-          </div>
-        </div>
-
-        <div style={adminStyles.sidebarCard}>
+    <AdminShell
+      sidebarCopy="A soft HTML workspace focused on check numbers from the configured HTML folder."
+      onBack={() => navigate("/tools")}
+      hideBackButton
+      backButtonFirst
+      ribbonTitle="Gazebo Menu"
+      sidebarTopCard={
+        <div>
           <div style={adminStyles.sidebarCardLabel}>Posting Day</div>
           <label style={htmlStyles.dateField}>
             <span style={htmlStyles.dateFieldLabel}>Select date</span>
@@ -320,49 +281,16 @@ export default function HTMLConvertScreen() {
             {activeBankDay ? `Bank day: ${activeBankDay}` : "No bank day mapped yet."}
           </div>
         </div>
-      </aside>
-
-      <section
-        style={{
-          ...adminStyles.ribbonShell,
-          ...(isRibbonOpen ? adminStyles.ribbonShellOpen : adminStyles.ribbonShellClosed),
-        }}
-        aria-hidden={!isRibbonOpen}
-      >
-        <div style={adminStyles.ribbonHeader}>
-          <div>
-            <div style={adminStyles.ribbonKicker}>Gazebo Menu</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsRibbonOpen(false)}
-            style={adminStyles.ribbonCloseButton}
-            aria-label="Close gazebo menu"
-          >
-            X
-          </button>
-        </div>
-
-        <div style={adminStyles.ribbonBody}>
-          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/tools")}>
-            <div style={adminStyles.ribbonButtonTitle}>Tools</div>
-            <div style={adminStyles.ribbonButtonMeta}>Return to tools hub</div>
-          </button>
-          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/era-convert")}>
-            <div style={adminStyles.ribbonButtonTitle}>ERA Convert</div>
-            <div style={adminStyles.ribbonButtonMeta}>Sibling workflow</div>
-          </button>
-          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/otherday")}>
-            <div style={adminStyles.ribbonButtonTitle}>Other Day Check</div>
-            <div style={adminStyles.ribbonButtonMeta}>Missing row review</div>
-          </button>
-          <button type="button" style={adminStyles.ribbonButton} onClick={() => navigate("/duplicatecheck")}>
-            <div style={adminStyles.ribbonButtonTitle}>Duplicate Check</div>
-            <div style={adminStyles.ribbonButtonMeta}>Duplicate review</div>
-          </button>
-        </div>
-      </section>
-
+      }
+      sidebarCardLabel="Source"
+      sidebarCardValue="Configured HTML workspace"
+      sidebarCardValueStyle={{
+        fontSize: "13px",
+        lineHeight: 1.35,
+        fontWeight: 700,
+        wordBreak: "break-word",
+      }}
+    >
       <section style={htmlPageStyles.content}>
         <section style={htmlPageStyles.heroShell}>
           <div style={htmlPageStyles.heroCopy}>
@@ -399,13 +327,12 @@ export default function HTMLConvertScreen() {
           <div style={htmlStyles.convertCardTop}>
             <div>
               <div style={htmlPageStyles.sectionKicker}>Convert</div>
-              <h2 style={htmlPageStyles.sectionTitle}>Rename the HTML files in 3.HTML</h2>
+              <h2 style={htmlPageStyles.sectionTitle}>Rename the HTML files in the HTML workspace</h2>
             </div>
             <div style={htmlStyles.statusChip}>{convertStatusTag}</div>
           </div>
           <div style={htmlPageStyles.sectionMeta}>
-            Rename matched HTML files using the selected posting day, then move them to
-            <span style={htmlStyles.inlineCode}>3.HTML/Renamed</span>.
+            Rename matched HTML files using the selected posting day, then move them to the renamed HTML folder.
           </div>
           <div style={htmlStyles.convertActions}>
             <button style={htmlPageStyles.primaryButton} type="button" onClick={() => void handleConvert()} disabled={converting}>
@@ -491,7 +418,7 @@ export default function HTMLConvertScreen() {
           <div style={htmlStyles.tableHeader}>
             <button type="button" style={htmlStyles.sectionHeaderButton} onClick={() => setHtmlTableCollapsed((current) => !current)}>
               <div style={htmlStyles.sectionHeaderCopy}>
-                <div style={htmlPageStyles.sectionKicker}>3.HTML spreadsheet</div>
+                <div style={htmlPageStyles.sectionKicker}>HTML spreadsheet</div>
                 <h2 style={{ ...htmlPageStyles.sectionTitle, ...htmlStyles.singleLineTitle }}>
                   Matched HTML files for the selected bank day
                 </h2>
@@ -501,7 +428,7 @@ export default function HTMLConvertScreen() {
             <div style={htmlStyles.sectionMetaWrap}>
               <div style={htmlPageStyles.sectionMeta}>
                 {loadingHtml
-                  ? "Searching files in C:\\Renfrew\\Workflow\\3.HTML..."
+                  ? "Searching files in the HTML workspace..."
                   : htmlData?.bankDay
                     ? `${htmlData.matchedFiles} file hit(s) across ${htmlData.matchedChecks} check number(s).`
                     : "No HTML file matches yet."}
@@ -521,7 +448,7 @@ export default function HTMLConvertScreen() {
 
           {!error && !loadingHtml && !htmlTableCollapsed && htmlData && htmlData.rows.length === 0 && (
             <div style={htmlStyles.emptyState}>
-              No files in C:\Renfrew\Workflow\3.HTML matched the selected bank day.
+              No files in the configured HTML workspace matched the selected bank day.
             </div>
           )}
 
@@ -551,7 +478,7 @@ export default function HTMLConvertScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -961,6 +888,7 @@ const htmlStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
 };
+
 
 
 

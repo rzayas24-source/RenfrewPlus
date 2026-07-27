@@ -1,6 +1,6 @@
 import axios from "axios";
-
-const API = "http://127.0.0.1:8000";
+import type { AppConfig } from "../config/appConfig";
+import { API_BASE } from "../config/apiBase";
 
 export type MenuOption = {
   id: string;
@@ -50,6 +50,7 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   GAZEBO_MENU_OPTION,
   { id: "/", label: "Main", meta: "Main workspace.", kind: "screen", path: "/" },
   { id: "/admin", label: "Admin", meta: "Admin console.", kind: "screen", path: "/admin" },
+  { id: "/admin/config", label: "Config", meta: "App config editor.", kind: "screen", path: "/admin/config" },
   { id: "/admin/tables", label: "Tables", meta: "Database browser.", kind: "screen", path: "/admin/tables" },
   { id: "/admin/users", label: "Users", meta: "Access control.", kind: "screen", path: "/admin/users" },
   { id: "/admin/menus", label: "Menu Builder", meta: "Define sidebar navigation.", kind: "screen", path: "/admin/menus" },
@@ -70,7 +71,6 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/site-review", label: "Site Review", meta: "Site review.", kind: "screen", path: "/site-review" },
   { id: "/email-downloader", label: "Email Downloader", meta: "Email review.", kind: "screen", path: "/email-downloader" },
   { id: "/snapshot-generator", label: "Snapshot Generator", meta: "Snapshot review.", kind: "screen", path: "/snapshot-generator" },
-  { id: "/approved", label: "Approved", meta: "Approved items.", kind: "screen", path: "/approved" },
   { id: "/worklist-editor", label: "Daily Worklist", meta: "Worklist editor.", kind: "screen", path: "/worklist-editor" },
   { id: "/attachments", label: "Pending", meta: "Pending queue.", kind: "screen", path: "/attachments" },
   { id: "/balancecheck", label: "Balance Check", meta: "Balance review.", kind: "screen", path: "/balancecheck" },
@@ -83,9 +83,35 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/research", label: "Research", meta: "Research tools.", kind: "screen", path: "/research" },
   { id: "/finance", label: "Finance", meta: "Finance tools.", kind: "screen", path: "/finance" },
   { id: "/business", label: "Business", meta: "Business tools.", kind: "screen", path: "/business" },
-  { id: "/rejectlist", label: "Reject List", meta: "Reject list.", kind: "screen", path: "/rejectlist" },
   { id: "/sites", label: "Sites", meta: "Sites browser.", kind: "screen", path: "/sites" },
 ];
+
+function getLabelOverrides(config?: AppConfig) {
+  return {
+    attachments: config?.ui?.navigation?.attachments?.label ?? "Pending",
+    batches: config?.ui?.navigation?.batches?.label ?? "Batches",
+    siteReview: config?.ui?.navigation?.site_review?.label ?? "Site Review",
+    attachmentsMeta: config?.ui?.navigation?.attachments?.meta ?? "Pending queue",
+    batchesMeta: config?.ui?.navigation?.batches?.meta ?? "Batch workspace",
+    siteReviewMeta: config?.ui?.navigation?.site_review?.meta ?? "Site review",
+  };
+}
+
+export function getMenuOptions(config?: AppConfig) {
+  const labels = getLabelOverrides(config);
+  return ALL_MENU_OPTIONS.map((option) => {
+    if (option.id === "/attachments") {
+      return { ...option, label: labels.attachments, meta: labels.attachmentsMeta };
+    }
+    if (option.id === "/batches") {
+      return { ...option, label: labels.batches, meta: labels.batchesMeta };
+    }
+    if (option.id === "/site-review") {
+      return { ...option, label: labels.siteReview, meta: labels.siteReviewMeta };
+    }
+    return option;
+  });
+}
 
 export type MenuRow = {
   id: number;
@@ -143,12 +169,12 @@ function selectionToPayload(selection: MenuSelectionEntry[]) {
 }
 
 export async function loadMenuSelection(menuId: string) {
-  const response = await axios.get<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`);
+  const response = await axios.get<MenuRow[]>(`${API_BASE}/menu/${encodeURIComponent(menuId)}`);
   return normalizeSelectionEntries(response.data.map((row) => rowToSelectionEntry(row)).filter(Boolean) as MenuSelectionEntry[]);
 }
 
 export async function loadAllMenuSelections() {
-  const response = await axios.get<MenuRow[]>(`${API}/menu`);
+  const response = await axios.get<MenuRow[]>(`${API_BASE}/menu`);
   return response.data.reduce<Record<string, MenuSelectionEntry[]>>((accumulator, row) => {
     const selection = rowToSelectionEntry(row);
     if (!selection) {
@@ -165,7 +191,7 @@ export async function loadAllMenuSelections() {
 }
 
 export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
-  const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+  const response = await axios.put<MenuRow[]>(`${API_BASE}/menu/${encodeURIComponent(menuId)}`, {
     selection: selectionToPayload(selection),
   });
   if (typeof window !== "undefined") {
@@ -175,25 +201,25 @@ export async function saveMenuSelection(menuId: string, selection: MenuSelection
 }
 
 export async function clearMenuSelection(menuId: string) {
-  await axios.delete(`${API}/menu/${encodeURIComponent(menuId)}`);
+  await axios.delete(`${API_BASE}/menu/${encodeURIComponent(menuId)}`);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("renfrew:menu-config-updated"));
   }
 }
 
 export async function clearAllMenuSelections() {
-  await axios.delete(`${API}/menu`);
+  await axios.delete(`${API_BASE}/menu`);
   if (typeof window !== "undefined") {
     window.dispatchEvent(new Event("renfrew:menu-config-updated"));
   }
 }
 
-export function getMenuOption(optionId: string) {
-  return ALL_MENU_OPTIONS.find((item) => item.id === optionId);
+export function getMenuOption(optionId: string, config?: AppConfig) {
+  return getMenuOptions(config).find((item) => item.id === optionId);
 }
 
-export function resolveMenuSelection(optionId: string, entry?: MenuSelectionEntry): ResolvedMenuSelection | null {
-  const option = getMenuOption(optionId);
+export function resolveMenuSelection(optionId: string, entry?: MenuSelectionEntry, config?: AppConfig): ResolvedMenuSelection | null {
+  const option = getMenuOption(optionId, config);
   if (!option || option.id === FIXED_MENU_ID) {
     return null;
   }

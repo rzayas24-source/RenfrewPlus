@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface DuplicateCheckRow {
   filename: string;
@@ -21,4 +21,5 @@ export interface DuplicateCheckSpreadsheetResponse {
 }
 
 export const getDuplicateCheckSpreadsheet = () =>
-  axios.get<DuplicateCheckSpreadsheetResponse>(`${API}/duplicatecheck/spreadsheet`);
+  axios.get<DuplicateCheckSpreadsheetResponse>(`${API_BASE}/duplicatecheck/spreadsheet`);
+

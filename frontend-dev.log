@@ -26531,3 +26531,1088 @@ Visit https://react.dev/link/error-boundaries to learn more about error boundari
 [2m10:10:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/duplicatecheckscreen.tsx[22m
 [2m10:11:25 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/otherdayscreen.tsx[22m
 [2m10:15:02 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/eraconvertscreen.tsx[22m
+[2m6:59:11 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/menu" 
+[2m6:59:11 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/menu" 
+[2m7:00:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m7:00:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:00:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:00:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:00:18 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:00:32 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:05:03 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m7:05:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:05:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:05:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:05:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:05:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:05:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminmenusscreen.tsx[22m
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:10:54 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:11:34 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:00 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:00 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:00 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:20 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:20 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:20 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:45 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:45 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:12:45 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:14:07 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/admintablescreen.tsx[22m
+[2m7:15:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminuserscreen.tsx[22m
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:15:08 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:18:27 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:19:44 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:20:06 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:20:06 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:20:06 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:20:16 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m7:20:16 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:16 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: effectiveSelection.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064816786:49:37
+ > src/Screens/adminmenusscreen.tsx?t=1785064816786:47:57
+ > updateMemo node_modules/react-dom/cjs/react-dom-client.development.js:8795:18
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26484:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064816786:47:30
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+
+[2m7:20:17 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:17 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064816786:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064816786:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:17 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064816786:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064816786:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:17 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:22 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064816786:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064816786:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:22 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:22 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:22 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:22 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:22 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:36 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m7:20:36 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:36 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:20:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064836480:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064836480:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:36 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:37 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064836480:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064836480:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:37 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064836480:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064836480:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:37 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064836480:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064836480:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:38 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m7:20:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:20:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m7:20:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:20:51 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064850671:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064850671:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:51 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064850671:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064850671:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:51 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:53 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064850671:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064850671:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:20:53 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:20:53 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:53 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:53 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:20:53 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:21:13 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled error] [1mTypeError[22m: selectedEntries.map is not a function
+[39m > src/Screens/adminmenusscreen.tsx?t=1785064850671:42:56
+ > mountMemo node_modules/react-dom/cjs/react-dom-client.development.js:8777:22
+ > Object.useMemo node_modules/react-dom/cjs/react-dom-client.development.js:26216:17
+ > exports.useMemo node_modules/react/cjs/react.development.js:1251:33
+ > AdminMenuScreen src/Screens/adminmenusscreen.tsx?t=1785064850671:42:26
+ > Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:25904:19
+ > renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:7662:21
+ > updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:10166:18
+ > beginWork node_modules/react-dom/cjs/react-dom-client.development.js:11778:17
+ > runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:871:29
+
+[2m7:21:13 AM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mAn error occurred in the <AdminMenuScreen> component.
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://react.dev/link/error-boundaries to learn more about error boundaries.
+
+[2m7:21:13 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:21:13 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:21:13 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:21:13 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+
+[2m7:21:17 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminmenusscreen.tsx[22m
+[2m7:21:34 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminmenusscreen.tsx[22m
+[2m7:22:43 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:23:14 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:23:16 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:23:19 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:23:19 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:23:23 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:23:43 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:24:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:24:39 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:156:19
+    154 |  
+    155 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    156 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    157 |      selection: selectionToPayload(selection),
+    158 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:25:47 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m7:25:48 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:25:48 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:25:48 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:160:19
+    158 |  
+    159 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    160 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    161 |      selection: selectionToPayload(selection),
+    162 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx?t=1785065147963:123:26
+
+[2m7:25:48 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:25:48 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:26:11 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m7:26:11 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:26:11 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 9 more[22m
+[2m7:26:11 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m7:26:11 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m7:26:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:160:19
+    158 |  
+    159 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    160 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    161 |      selection: selectionToPayload(selection),
+    162 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:26:51 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:160:19
+    158 |  
+    159 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    160 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    161 |      selection: selectionToPayload(selection),
+    162 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:27:12 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [31m[Unhandled rejection] [1mAxiosError[22m: Request failed with status code 404
+[39m > settle node_modules/axios/lib/core/settle.js:19:11
+ > XMLHttpRequest.onloadend node_modules/axios/lib/adapters/xhr.js:63:8
+ > Axios$1.request node_modules/axios/lib/core/Axios.js:46:40
+ > saveMenuSelection src/navigation/menuConfig.ts:160:19
+    158 |  
+    159 |  export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+    160 |    const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+        |                     ^
+    161 |      selection: selectionToPayload(selection),
+    162 |    });
+ > applyChanges src/Screens/adminmenusscreen.tsx:166:27
+
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:29:56 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:11 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:58 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:58 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:31:58 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:32:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:32:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:32:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:32:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:32:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:32:38 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:33:19 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:33:19 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:33:19 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:33:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:33:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:33:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:34:37 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/toolsscreen.tsx[22m
+[2m7:35:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:35:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:35:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:35:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:35:17 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:32 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:37 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:57 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:57 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:37:57 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:38:18 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:38:18 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:38:18 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:38:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:38:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:38:36 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:39:00 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:39:00 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:39:00 AM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m7:40:33 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m5:12:31 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:12:34 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:04 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:30 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:30 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:30 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:13:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:20 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:58 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:58 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:16:58 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:17:10 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:17:10 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:17:10 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:17:26 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:17:26 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:17:26 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:20:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:22:52 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:23:44 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:25:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:27:20 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:27:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:29:38 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:29:38 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:29:38 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:29:39 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:29:39 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m5:29:39 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:29:39 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:29:49 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:32:30 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:32:30 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:32:30 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:32:30 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:32:31 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:32:31 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m5:32:31 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:32:31 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:33:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m5:35:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:35:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:35:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:35:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:35:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m5:35:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:35:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:35:52 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:35:52 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:35:52 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:35:53 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:35:53 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:37:48 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:37:55 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:37:55 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:37:55 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:37:56 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:37:56 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m5:37:56 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:37:56 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:38:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:38:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:38:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:38:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:38:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:38:10 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/mainscreen.tsx[22m
+[2m5:38:10 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/mainscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:38:10 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:38:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx[22m
+[2m5:38:22 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m5:39:23 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:39:23 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:39:23 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 10 more[22m
+[2m5:39:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:39:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:11 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:40:25 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m5:42:45 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:44:50 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:45:27 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:46:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:48:02 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:59:17 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:03:59 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m6:04:00 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:04:00 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m6:04:01 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:04:01 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:04:04 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:06:33 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:08:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:08:45 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:08:45 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:09:09 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:24:43 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:26:27 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:32:45 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/completionlabel.tsx[22m
+[2m6:32:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/completionlabel.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m6:32:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/completionlabel.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m6:33:03 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:33:04 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/completionlabel" 
+[2m6:33:04 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/completionlabel" 
+[2m6:33:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m6:33:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:33:14 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m6:33:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:33:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m6:33:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:33:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:33:16 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/completionlabel" 
+[2m6:33:16 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/completionlabel" 
+[2m6:33:17 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m6:33:17 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:33:17 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m6:33:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:33:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:33:19 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/completionlabel" 
+[2m6:33:19 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/completionlabel" 
+[2m6:36:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/queue.tsx[22m
+[2m6:36:24 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/queue.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m6:36:24 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/queue.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m6:36:32 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:36:34 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/queue" 
+[2m6:36:34 PM[22m [33m[1m[vite][22m[39m [33m[2m(client)[22m[39m [2m[console.warn] [22mNo routes matched location "/queue" 
+[2m6:36:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m6:36:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:36:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m6:36:37 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:36:37 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m6:36:37 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:36:37 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:36:40 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m6:36:40 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:36:40 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m6:36:41 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:36:41 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:38:40 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/approvedlist.tsx[22m
+[2m6:38:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:38:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:38:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:38:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:38:46 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:39:08 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:39:08 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:39:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/approvedlist.tsx[22m
+[2m6:39:36 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:39:39 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:05 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:05 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:05 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:05 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:29 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:29 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:40:29 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:41:51 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:44:31 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:44:31 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:45:13 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx[22m
+[2m6:45:13 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx[22m
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:46:48 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m6:47:21 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx[22m
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:21:50 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:24:58 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mRemoving a style property during rerender (borderColor) when a conflicting property is set (border) can lead to styling bugs. To avoid this, don't mix shorthand and non-shorthand properties for the same value; instead, replace the shorthand with separate values.
+[2m8:32:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m8:32:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:32:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m8:32:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:32:36 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m8:33:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m8:33:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:33:18 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m8:33:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:33:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m8:33:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:33:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m8:33:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminmenusscreen.tsx[22m
+[2m8:35:25 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m8:35:25 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:35:25 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m8:35:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:35:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m8:35:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:35:26 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m8:50:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx, /src/Screens/keyproof.tsx[22m
+[2m8:50:48 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:51:08 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:51:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:51:32 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:51:54 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:52:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:52:37 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.css[22m
+[2m8:53:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:53:19 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:53:45 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:56:46 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:57:06 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m8:58:32 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:00:08 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:03:15 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:03:42 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:03:48 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:04:05 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:04:11 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:04:41 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:10:55 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx, /src/Screens/keyproof.tsx[22m
+[2m9:11:11 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:11:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.css[22m
+[2m9:17:16 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m9:17:23 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m9:17:23 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:17:23 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m9:17:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:17:24 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m9:17:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m9:17:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/components/AdminShell.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:17:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/collectionsscreen.tsx, /src/Screens/adminscreen.tsx, /src/Screens/adminuserscreen.tsx, /src/Screens/admintablescreen.tsx, /src/Screens/toolsscreen.tsx, /src/Screens/cashscreen.tsx, /src/Screens/sitescreen.tsx, /src/Screens/worklisteditor.tsx, /src/Screens/835matchscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/otherdayscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/attachmentreview.tsx and 11 more[22m
+[2m9:17:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/adminscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:17:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx, /src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx, /src/Screens/emaildownloaderscreen.tsx, /src/Screens/importscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/duplicatecheckscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/sitereviewscreen.tsx, /src/Screens/snapshotgeneratorscreen.tsx, /src/Screens/otherdayscreen.tsx and 7 more[22m
+[2m9:17:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/Screens/cashscreen.tsx[22m Could not Fast Refresh ("styles" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:17:35 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m9:17:39 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/nextloader.tsx[22m
+[2m9:17:39 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/nextloader.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m9:17:57 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/nextloader.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m9:18:00 PM[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22m[vite] Failed to reload /src/Screens/nextloader.tsx. This could be due to syntax errors or importing non-existent modules. (see errors above)
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/835uploadscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminuserscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/approvedlist.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/admintablescreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/balsheet.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx, /src/Screens/keyproof.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx, /src/Screens/835uploadscreen.tsx, /src/Screens/eft_uploadscreen.tsx, /src/Screens/lockbox_importscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/eraconvertscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/worklist/worklist.tsx, /src/Screens/calendarscreen.tsx, /src/Screens/htmlconvertscreen.tsx, /src/Screens/bankingscreen.tsx, /src/Screens/eraconvertscreen.tsx, /src/Screens/toolsscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/duplicatecheckscreen.tsx, /src/Screens/toolsscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/eft_uploadscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/emaildownloaderscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/eraconvertscreen.tsx, /src/Screens/toolsscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx, /src/Screens/toolsscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx, /src/Screens/keyproof.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/lockbox_importscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/835matchscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/otherdayscreen.tsx, /src/Screens/toolsscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/rejectlist.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/snapshotgeneratorscreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/worklist/worklist.tsx, /src/Screens/worklisteditor.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitescreen.tsx[22m
+[2m9:27:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/itemization.tsx[22m
+[2m9:27:47 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx[22m
+[2m9:27:48 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m9:27:48 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/itemization.tsx[22m
+[2m9:27:49 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx, /src/Screens/introscreen.tsx[22m
+[2m9:28:12 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m9:41:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/eraconvertscreen.tsx[22m
+[2m9:41:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m9:41:34 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/snapshotgeneratorscreen.tsx[22m
+[2m5:29:56 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:29:56 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:29:57 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:29:58 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:29:59 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:30:00 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx[22m
+[2m5:30:00 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/mainscreen.tsx[22m
+[2m5:30:36 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:30:37 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:33:37 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:33:38 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:33:39 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:36:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:36:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx[22m
+[2m5:36:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:36:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m5:36:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m5:36:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/mainscreen.tsx[22m
+[2m5:41:43 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m5:50:53 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m5:52:11 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m5:52:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m5:54:39 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m5:54:40 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m5:54:59 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/approvedlist.tsx[22m
+[2m5:55:00 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/rejectlist.tsx[22m
+[2m5:55:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/api/approvedlist_api.ts[22m
+[2m5:55:02 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2msrc/api/rejectlist_api.ts[22m
+[2m5:55:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:04:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:06:17 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:08:15 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:10:42 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:17:13 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:18:53 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:29:38 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:32:08 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:35:03 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:35:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m6:35:05 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m6:35:05 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/mainscreen.tsx[22m
+[2m6:48:26 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m6:48:43 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m6:48:58 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m6:49:21 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m6:49:34 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminmenusscreen.tsx[22m
+[2m6:49:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/adminmenusscreen.tsx[22m
+[2m6:50:04 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:50:17 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/introscreen.tsx[22m
+[2m6:50:41 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:51:13 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/sitereviewscreen.tsx[22m
+[2m6:51:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/attachmentreview.tsx[22m
+[2m6:51:55 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/worklisteditor.tsx[22m
+[2m6:52:24 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx, /src/Screens/adminmenusscreen.tsx[22m
+[2m6:52:25 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/components/AdminShell.tsx[22m
+[2m6:52:54 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/ScreenManager.tsx[22m
+[2m6:53:58 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/worklisteditor.tsx[22m
+[2m7:02:43 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/835uploadscreen.tsx[22m
+[2m7:02:44 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/eraconvertscreen.tsx[22m
+[2m7:02:44 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/htmlconvertscreen.tsx[22m
+[2m7:02:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/snapshotgeneratorscreen.tsx[22m
+[2m7:02:46 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/Screens/keyproof.tsx[22m
+[2m7:14:34 AM[22m [36m[1m[vite][22m[39m [32mvite.config.js changed, restarting server...[39m
+[2m7:14:34 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because vite config has changed
+[2m7:14:34 AM[22m [36m[1m[vite][22m[39m server restarted.

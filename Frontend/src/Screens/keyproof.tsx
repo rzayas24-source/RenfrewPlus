@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { approveAttachment, updateAttachmentSite } from "../api/attachmentreview_api";
 import { autofindFlywire, getSites, loadFlywire, uploadFlywire } from "../api/keyproof_api";
 import type { FlywirePayload, FlywireRow, KeyproofDraft, SiteOption } from "../api/keyproof_api";
+import { API_BASE } from "../config/apiBase";
 import "./keyproof.css";
 
-const snapshotUrl = (id: string) => `http://localhost:8000/attachments/${id}/snapshot`;
+const snapshotUrl = (id: string) => `${API_BASE}/attachments/${id}/snapshot`;
 
 const emptyForm: Omit<KeyproofDraft, "attachmentId"> = {
   site: "",
@@ -326,7 +327,7 @@ export default function Keyproof() {
     setFlywireAutofindMatched(false);
     setFlywireStatus({
       kind: "idle",
-      text: "Searching 4.Emails for the matching Fly Wire workbook...",
+      text: "Searching the email download folder for the matching Fly Wire workbook...",
     });
 
     try {
@@ -787,3 +788,4 @@ function MoneyField({ id, label, value, onChange }: MoneyFieldProps) {
     </div>
   );
 }
+

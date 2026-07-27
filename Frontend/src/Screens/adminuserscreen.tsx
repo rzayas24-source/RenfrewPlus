@@ -229,12 +229,6 @@ export default function AdminUserScreen() {
       sidebarCardMeta={`${roleStats.active} active roles, ${userStats.total} users total.`}
       onBack={() => navigate("/admin")}
       hideBackButton
-      ribbonItems={[
-        { title: "Tables", meta: "Database browser", onClick: () => navigate("/admin/tables") },
-        { title: "Users", meta: "Access control", onClick: () => navigate("/admin/users") },
-        { title: "Tools", meta: "Utilities panel", onClick: () => navigate("/tools") },
-        { title: "Cash", meta: "Financial view", onClick: () => navigate("/cash") },
-      ]}
     >      <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>

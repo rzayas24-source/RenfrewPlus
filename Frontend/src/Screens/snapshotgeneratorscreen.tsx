@@ -107,12 +107,12 @@ export default function SnapshotGeneratorScreen() {
         <section style={adminStyles.statsGrid}>
           <article style={adminStyles.statCard}>
             <div style={adminStyles.statLabel}>Source</div>
-            <div style={adminStyles.statValue}>C:\Renfrew\Workflow\4.Emails</div>
+            <div style={adminStyles.statValue}>Email download folder</div>
             <div style={adminStyles.statDetail}>The same folder the downloader writes to.</div>
           </article>
           <article style={adminStyles.statCard}>
             <div style={adminStyles.statLabel}>Target</div>
-            <div style={adminStyles.statValue}>C:\Renfrew\Workflow\snapshots</div>
+            <div style={adminStyles.statValue}>snapshots</div>
             <div style={adminStyles.statDetail}>Snapshot images are written here by file id.</div>
           </article>
           <article style={adminStyles.statCard}>
@@ -234,3 +234,4 @@ const snapshotStyles: Record<string, CSSProperties> = {
     color: "#1f2933",
   },
 };
+

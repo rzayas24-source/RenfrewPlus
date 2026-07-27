@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface EraSpreadsheetRow {
   source: "EFT" | "Lockbox";
@@ -37,7 +37,8 @@ export interface EraConvertResponse {
 }
 
 export const getEraSpreadsheet = (work_day: string) =>
-  axios.get<EraSpreadsheetResponse>(`${API}/era/spreadsheet`, { params: { work_day } });
+  axios.get<EraSpreadsheetResponse>(`${API_BASE}/era/spreadsheet`, { params: { work_day } });
 
 export const convertEraFiles = (work_day: string) =>
-  axios.post<EraConvertResponse>(`${API}/era/convert`, { work_day });
+  axios.post<EraConvertResponse>(`${API_BASE}/era/convert`, { work_day });
+

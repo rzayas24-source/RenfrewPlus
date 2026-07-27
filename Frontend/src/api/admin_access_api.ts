@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface AdminRole {
   id: number;
@@ -40,16 +40,17 @@ export interface AdminUserPayload {
   active?: boolean;
 }
 
-export const getAdminRoles = () => axios.get<AdminRole[]>(`${API}/auth/roles`);
+export const getAdminRoles = () => axios.get<AdminRole[]>(`${API_BASE}/auth/roles`);
 
-export const createAdminRole = (payload: AdminRolePayload) => axios.post<AdminRole>(`${API}/auth/roles`, payload);
+export const createAdminRole = (payload: AdminRolePayload) => axios.post<AdminRole>(`${API_BASE}/auth/roles`, payload);
 
 export const updateAdminRole = (roleId: number, payload: AdminRolePayload) =>
-  axios.put<AdminRole>(`${API}/auth/roles/${roleId}`, payload);
+  axios.put<AdminRole>(`${API_BASE}/auth/roles/${roleId}`, payload);
 
-export const getAdminUsers = () => axios.get<AdminUser[]>(`${API}/auth/users`);
+export const getAdminUsers = () => axios.get<AdminUser[]>(`${API_BASE}/auth/users`);
 
-export const createAdminUser = (payload: AdminUserPayload) => axios.post<AdminUser>(`${API}/auth/users`, payload);
+export const createAdminUser = (payload: AdminUserPayload) => axios.post<AdminUser>(`${API_BASE}/auth/users`, payload);
 
 export const updateAdminUser = (userId: number, payload: AdminUserPayload) =>
-  axios.put<AdminUser>(`${API}/auth/users/${userId}`, payload);
+  axios.put<AdminUser>(`${API_BASE}/auth/users/${userId}`, payload);
+

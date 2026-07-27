@@ -40,7 +40,7 @@ export default function Upload835Screen() {
     text: string;
   }>({
     kind: "idle",
-    text: "Choose the associated zip files to load into 1.TRN, 2.ERA, and 3.HTML.",
+    text: "Choose the associated zip files to load into the TRN, ERA, and HTML workflow folders.",
   });
   const [zipSummary, setZipSummary] = useState<Upload835ZipResponse | null>(null);
   const [loadingTrn, setLoadingTrn] = useState(false);
@@ -49,7 +49,7 @@ export default function Upload835Screen() {
     text: string;
   }>({
     kind: "idle",
-    text: "Load the TRN files from the 1.TRN folder into EDILoad.",
+    text: "Load the TRN files from the TRN workflow folder into EDILoad.",
   });
   const [trnSummary, setTrnSummary] = useState<Load835TrnResponse | null>(null);
   const [loadingStage, setLoadingStage] = useState(false);
@@ -100,7 +100,7 @@ export default function Upload835Screen() {
     setVetSummary(null);
     setTrnStatus({
       kind: "idle",
-      text: "Load the TRN files from the 1.TRN folder into EDILoad.",
+      text: "Load the TRN files from the TRN workflow folder into EDILoad.",
     });
     setStageStatus({
       kind: "idle",
@@ -145,8 +145,8 @@ export default function Upload835Screen() {
         kind: totalBlocked > 0 ? "error" : "success",
         text:
           totalBlocked > 0
-            ? `Loaded ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s). ${totalBlocked} duplicate member(s) were blocked.`
-            : `Loaded ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s).`,
+            ? `Loaded ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s) from the workflow folders. ${totalBlocked} duplicate member(s) were blocked.`
+            : `Loaded ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s) from the workflow folders.`,
       });
     } catch (error) {
       setZipStatus({
@@ -163,7 +163,7 @@ export default function Upload835Screen() {
     setTrnSummary(null);
     setTrnStatus({
       kind: "idle",
-      text: "Loading TRN files from 1.TRN...",
+      text: "Loading TRN files from the TRN workflow folder...",
     });
 
     try {
@@ -275,7 +275,7 @@ export default function Upload835Screen() {
   const openZipPicker = async () => {
     setZipStatus({
       kind: "idle",
-      text: "Choose the associated zip files to load into 1.TRN, 2.ERA, and 3.HTML.",
+      text: "Choose the associated zip files to load into the TRN, ERA, and HTML workflow folders.",
     });
 
     const pickerWindow = window as Window & {
@@ -478,7 +478,7 @@ export default function Upload835Screen() {
                 {zipSummary && (
                   <>
                     <div style={{ marginTop: "12px", fontSize: "0.92rem", color: "#5d6a7a" }}>
-                      Routed to: 1.TRN, 2.ERA, 3.HTML
+                      Routed to: TRN, ERA, HTML workflow folders
                     </div>
                     <div style={{ marginTop: "6px", fontSize: "0.92rem", color: "#5d6a7a" }}>
                       Duplicate files are blocked before overwrite.

@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export type TaskRecord = {
   id: string;
@@ -39,22 +39,22 @@ export type TaskDraft = {
 };
 
 export async function getTasks(taskList = "live") {
-  const response = await axios.get<TaskRecord[]>(`${API}/tasks`, { params: { task_list: taskList } });
+  const response = await axios.get<TaskRecord[]>(`${API_BASE}/tasks`, { params: { task_list: taskList } });
   return response.data;
 }
 
 export async function getTemplateTasks() {
-  const response = await axios.get<TaskRecord[]>(`${API}/tasks/template`);
+  const response = await axios.get<TaskRecord[]>(`${API_BASE}/tasks/template`);
   return response.data;
 }
 
 export async function createTask(task: TaskDraft) {
-  const response = await axios.post<TaskRecord>(`${API}/tasks`, task);
+  const response = await axios.post<TaskRecord>(`${API_BASE}/tasks`, task);
   return response.data;
 }
 
 export async function replaceTasks(taskList: string, tasks: TaskDraft[]) {
-  const response = await axios.post<{ status: string; task_list: string; rows: number }>(`${API}/tasks/bulk-replace`, {
+  const response = await axios.post<{ status: string; task_list: string; rows: number }>(`${API_BASE}/tasks/bulk-replace`, {
     task_list: taskList,
     tasks,
   });
@@ -63,7 +63,7 @@ export async function replaceTasks(taskList: string, tasks: TaskDraft[]) {
 
 export async function importTemplateToLive(sourceList = "template", targetList = "live") {
   const response = await axios.post<{ status: string; source_list: string; target_list: string; rows: number }>(
-    `${API}/tasks/import-template`,
+    `${API_BASE}/tasks/import-template`,
     {
       source_list: sourceList,
       target_list: targetList,
@@ -73,11 +73,12 @@ export async function importTemplateToLive(sourceList = "template", targetList =
 }
 
 export async function updateTask(taskId: string, task: TaskDraft) {
-  const response = await axios.put<TaskRecord>(`${API}/tasks/${encodeURIComponent(taskId)}`, task);
+  const response = await axios.put<TaskRecord>(`${API_BASE}/tasks/${encodeURIComponent(taskId)}`, task);
   return response.data;
 }
 
 export async function deleteTask(taskId: string) {
-  const response = await axios.delete<{ status: string; task_id: string }>(`${API}/tasks/${encodeURIComponent(taskId)}`);
+  const response = await axios.delete<{ status: string; task_id: string }>(`${API_BASE}/tasks/${encodeURIComponent(taskId)}`);
   return response.data;
 }
+

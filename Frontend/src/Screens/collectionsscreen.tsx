@@ -72,39 +72,23 @@ export default function CollectionsScreen() {
       action: "Open Business",
       path: "/business",
     },
-    {
-      title: "Workspace Home",
-      meta: "Return to the main dashboard whenever you need the full menu.",
-      tone: "pearl",
-      action: "Back to Main",
-      path: "/",
-    },
   ];
 
   return (
     <AdminShell
       ribbonTitle="Collections Menu"
       sidebarCopy="A soft collections console for follow-up, recovery, and receivables work."
-      sidebarCardLabel="Today"
-      sidebarCardValue="Collections workspace ready"
-      sidebarCardMeta="Follow-up, recovery, and tracking stay in one calm shell."
       onBack={() => navigate("/")}
-      ribbonItems={[
-        { title: "Statements", meta: "Statement review", onClick: () => navigate("/statements") },
-        { title: "Requests", meta: "Follow-up queue", onClick: () => navigate("/request") },
-        { title: "Research", meta: "Investigation tools", onClick: () => navigate("/research") },
-        { title: "Finance", meta: "Finance tasks", onClick: () => navigate("/finance") },
-      ]}
     >
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
+      <section style={collectionsStyles.content}>
+        <section style={collectionsStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Collections screen</div>
             <p style={adminStyles.subtitle}>
               A calm workspace for collections follow-up, statements, requests, and research tracking.
             </p>
 
-            <div style={adminStyles.heroActions}>
+            <div style={collectionsStyles.heroActions}>
               <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/statements")}>
                 Open Statements
               </button>
@@ -192,6 +176,33 @@ const collectionsToneStyles: Record<CollectionsShortcut["tone"], CSSProperties> 
   },
   pearl: {
     background: "linear-gradient(145deg, rgba(248, 244, 239, 0.96), rgba(255, 255, 255, 0.92))",
+  },
+};
+
+const collectionsStyles: Record<string, CSSProperties> = {
+  content: {
+    ...adminStyles.content,
+    paddingTop: "0",
+  },
+  heroShell: {
+    ...adminStyles.heroShell,
+    position: "relative",
+    top: "auto",
+    zIndex: 1,
+  },
+  heroActions: {
+    ...adminStyles.heroActions,
+    position: "static",
+    top: "auto",
+    left: "auto",
+    right: "auto",
+    zIndex: "auto",
+    marginTop: "8px",
+    padding: 0,
+    border: "0",
+    background: "transparent",
+    backdropFilter: "none",
+    boxShadow: "none",
   },
 };
 

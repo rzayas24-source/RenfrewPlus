@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface OtherDayRow {
   filename: string;
@@ -22,4 +22,5 @@ export interface OtherDaySpreadsheetResponse {
 }
 
 export const getOtherDaySpreadsheet = () =>
-  axios.get<OtherDaySpreadsheetResponse>(`${API}/otherday/spreadsheet`);
+  axios.get<OtherDaySpreadsheetResponse>(`${API_BASE}/otherday/spreadsheet`);
+

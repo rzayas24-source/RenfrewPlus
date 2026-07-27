@@ -1,6 +1,6 @@
-﻿// src/api/attachmentreview_api.ts
+// src/api/attachmentreview_api.ts
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface PendingAttachment {
   id: number;
@@ -22,7 +22,7 @@ function dayQuery(day?: string | null) {
 }
 
 export async function getPendingAttachment(day?: string | null): Promise<PendingResponse> {
-  const response = await fetch(`${API}/attachments/pending${dayQuery(day)}`);
+  const response = await fetch(`${API_BASE}/attachments/pending${dayQuery(day)}`);
 
   if (!response.ok) {
     throw new Error("Failed to load pending attachment");
@@ -32,7 +32,7 @@ export async function getPendingAttachment(day?: string | null): Promise<Pending
 }
 
 export async function getNextAttachment(id: number, day?: string | null): Promise<PendingResponse> {
-  const response = await fetch(`${API}/attachments/${id}/next${dayQuery(day)}`);
+  const response = await fetch(`${API_BASE}/attachments/${id}/next${dayQuery(day)}`);
 
   if (!response.ok) {
     throw new Error("Failed to load next attachment");
@@ -42,7 +42,7 @@ export async function getNextAttachment(id: number, day?: string | null): Promis
 }
 
 export async function getPreviousAttachment(id: number, day?: string | null): Promise<PendingResponse> {
-  const response = await fetch(`${API}/attachments/${id}/previous${dayQuery(day)}`);
+  const response = await fetch(`${API_BASE}/attachments/${id}/previous${dayQuery(day)}`);
 
   if (!response.ok) {
     throw new Error("Failed to load previous attachment");
@@ -52,7 +52,7 @@ export async function getPreviousAttachment(id: number, day?: string | null): Pr
 }
 
 export async function updateAttachmentSite(id: number, site: string) {
-  const response = await fetch(`${API}/attachments/${id}/site`, {
+  const response = await fetch(`${API_BASE}/attachments/${id}/site`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -68,7 +68,7 @@ export async function updateAttachmentSite(id: number, site: string) {
 }
 
 export async function approveAttachment(id: number) {
-  const response = await fetch(`${API}/attachments/${id}/approve`, { method: "POST" });
+  const response = await fetch(`${API_BASE}/attachments/${id}/approve`, { method: "POST" });
 
   if (!response.ok) {
     throw new Error("Failed to approve attachment");
@@ -78,7 +78,7 @@ export async function approveAttachment(id: number) {
 }
 
 export async function rejectAttachment(id: number) {
-  const response = await fetch(`${API}/attachments/${id}/reject`, { method: "POST" });
+  const response = await fetch(`${API_BASE}/attachments/${id}/reject`, { method: "POST" });
 
   if (!response.ok) {
     throw new Error("Failed to reject attachment");
@@ -86,3 +86,4 @@ export async function rejectAttachment(id: number) {
 
   return await response.json();
 }
+

@@ -2,6 +2,7 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ItemizationGrid, { type ItemizationField } from "./itemizationgrid";
+import { API_BASE } from "../config/apiBase";
 
 type ItemizationForm = Record<ItemizationField, string | number>;
 
@@ -954,7 +955,7 @@ export default function Itemization() {
                     }}
                   >
                     <iframe
-                      src={`http://localhost:8000/attachments/${attachmentId}/original`}
+                      src={`${API_BASE}/attachments/${attachmentId}/original`}
                       title={`Original PDF ${attachmentId}`}
                       style={styles.pdfFrame}
                     />
@@ -969,3 +970,4 @@ export default function Itemization() {
     </main>
   );
 }
+

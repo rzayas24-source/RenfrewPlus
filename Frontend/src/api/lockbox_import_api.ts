@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface LockboxUploadResponse {
   status: string;
@@ -56,7 +56,7 @@ export async function uploadLockboxSearchResults(file: File): Promise<LockboxUpl
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API}/lockbox/upload-stage`, {
+  const response = await fetch(`${API_BASE}/lockbox/upload-stage`, {
     method: "POST",
     body: formData,
   });
@@ -70,7 +70,7 @@ export async function uploadLockboxSearchResults(file: File): Promise<LockboxUpl
 }
 
 export async function transformLockboxStage(): Promise<LockboxTransformResponse> {
-  const response = await fetch(`${API}/lockbox/transform-stage`, {
+  const response = await fetch(`${API_BASE}/lockbox/transform-stage`, {
     method: "POST",
   });
 
@@ -83,7 +83,7 @@ export async function transformLockboxStage(): Promise<LockboxTransformResponse>
 }
 
 export async function vetLockboxStage(decision?: "partial" | "reject"): Promise<LockboxVetResponse> {
-  const response = await fetch(`${API}/lockbox/vet-stage`, {
+  const response = await fetch(`${API_BASE}/lockbox/vet-stage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -100,7 +100,7 @@ export async function vetLockboxStage(decision?: "partial" | "reject"): Promise<
 }
 
 export async function approveLockboxStage(decision: "approve" | "deny"): Promise<LockboxApprovalResponse> {
-  const response = await fetch(`${API}/lockbox/approval-stage`, {
+  const response = await fetch(`${API_BASE}/lockbox/approval-stage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -115,3 +115,4 @@ export async function approveLockboxStage(decision: "approve" | "deny"): Promise
 
   return await response.json();
 }
+

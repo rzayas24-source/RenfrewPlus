@@ -161,12 +161,6 @@ export default function AdminTableScreen() {
     <AdminShell
       sidebarCopy="Browse every database table, inspect columns, and preview live rows without leaving the admin shell."
       onBack={() => navigate("/admin")}
-      ribbonItems={[
-        { title: "Users", meta: "Role management", onClick: () => navigate("/admin/users") },
-        { title: "Tables", meta: "Database browser", onClick: () => navigate("/admin/tables") },
-        { title: "Tools", meta: "Utilities panel", onClick: () => navigate("/tools") },
-        { title: "Cash", meta: "Financial view", onClick: () => navigate("/cash") },
-      ]}
     >
       <section style={styles.content}>
         <section style={styles.heroShell}>

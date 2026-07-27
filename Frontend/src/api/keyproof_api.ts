@@ -1,5 +1,5 @@
 import axios from "axios";
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface KeyproofDraft {
   attachmentId: number;
@@ -77,20 +77,20 @@ export interface FlywirePayload {
   rows: FlywireRow[];
 }
 
-export const getKeyproof = () => axios.get(`${API}/keyproof`);
-export const addKeyproof = (data: KeyproofDraft) => axios.post(`${API}/keyproof`, data);
-export const updateKeyproof = (id: number, data: KeyproofDraft) => axios.put(`${API}/keyproof/${id}`, data);
-export const deleteKeyproof = (id: number) => axios.delete(`${API}/keyproof/${id}`);
-export const getSites = () => axios.get<SiteOption[]>(`${API}/sites`);
-export const loadFlywire = (attachmentId: number) => axios.get<FlywirePayload>(`${API}/keyproof/flywire/${attachmentId}`);
+export const getKeyproof = () => axios.get(`${API_BASE}/keyproof`);
+export const addKeyproof = (data: KeyproofDraft) => axios.post(`${API_BASE}/keyproof`, data);
+export const updateKeyproof = (id: number, data: KeyproofDraft) => axios.put(`${API_BASE}/keyproof/${id}`, data);
+export const deleteKeyproof = (id: number) => axios.delete(`${API_BASE}/keyproof/${id}`);
+export const getSites = () => axios.get<SiteOption[]>(`${API_BASE}/sites`);
+export const loadFlywire = (attachmentId: number) => axios.get<FlywirePayload>(`${API_BASE}/keyproof/flywire/${attachmentId}`);
 export const autofindFlywire = (attachmentId: number) =>
-  axios.post<FlywirePayload>(`${API}/keyproof/flywire/${attachmentId}/autofind`);
+  axios.post<FlywirePayload>(`${API_BASE}/keyproof/flywire/${attachmentId}/autofind`);
 
 export async function uploadFlywire(attachmentId: number, file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await axios.post<FlywirePayload>(`${API}/keyproof/flywire/${attachmentId}`, formData, {
+  const response = await axios.post<FlywirePayload>(`${API_BASE}/keyproof/flywire/${attachmentId}`, formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
@@ -99,4 +99,5 @@ export async function uploadFlywire(attachmentId: number, file: File) {
   return response.data;
 }
 
-export const deleteFlywire = (attachmentId: number) => axios.delete(`${API}/keyproof/flywire/${attachmentId}`);
+export const deleteFlywire = (attachmentId: number) => axios.delete(`${API_BASE}/keyproof/flywire/${attachmentId}`);
+

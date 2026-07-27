@@ -227,8 +227,8 @@ export default function ERAConvertScreen() {
     : convertResult?.statusTag || (convertResult ? "READY" : "READY");
 
   const convertStatusMessage = converting
-    ? "Renaming ERA files and moving them to 2.ERA/Renamed..."
-    : convertResult?.message || "Ready to rename the current day’s ERA files.";
+    ? "Renaming ERA files and moving them to the renamed folder..."
+    : convertResult?.message || "Ready to rename the current day's ERA files.";
 
   const handleConvert = async () => {
     if (!selectedDayIso) {
@@ -278,7 +278,7 @@ export default function ERAConvertScreen() {
     {
       label: "ERA Hits",
       value: String(eraData?.matchedFiles ?? 0),
-      detail: "ERA files found in the 2.ERA folder for the selected bank day.",
+      detail: "ERA files found in the configured ERA workspace for the selected bank day.",
     },
   ];
 
@@ -302,10 +302,10 @@ export default function ERAConvertScreen() {
               maxWidth: "100%",
             }}
           >
-            C:\Renfrew\Workflow\2.ERA
+            ERA workspace
           </div>
           <div style={adminStyles.sidebarCardMeta}>
-            ERA files are read from the 2.ERA folder, then renamed and moved into the completed folder for the selected posting day.
+            ERA files are read from the configured ERA workspace, then renamed and moved into the completed folder for the selected posting day.
           </div>
         </div>
       }
@@ -343,7 +343,7 @@ export default function ERAConvertScreen() {
               <div style={eraPageStyles.heroStatusTitle}>EDI by bank day</div>
               <div style={eraPageStyles.heroStatusText}>
                 This page filters the banking spreadsheet down to rows that have EDI available for the selected posting day,
-                then shows matching files from the 2.ERA folder below.
+                then shows matching files from the configured ERA workspace below.
               </div>
             </div>
           </div>
@@ -353,13 +353,12 @@ export default function ERAConvertScreen() {
           <div style={eraStyles.convertCardTop}>
             <div>
               <div style={eraPageStyles.sectionKicker}>Convert</div>
-              <h2 style={eraPageStyles.sectionTitle}>Rename the ERA files in 2.ERA</h2>
+              <h2 style={eraPageStyles.sectionTitle}>Rename the ERA files in the ERA workspace</h2>
             </div>
             <div style={eraStyles.statusChip}>{convertStatusTag}</div>
           </div>
           <div style={eraPageStyles.sectionMeta}>
-            Rename every matched ERA file using the selected posting day, then move the results to
-            <span style={eraStyles.inlineCode}>2.ERA/Renamed</span>.
+            Rename every matched ERA file using the selected posting day, then move the results to the renamed ERA folder.
           </div>
           <div style={eraStyles.convertActions}>
             <button style={eraPageStyles.primaryButton} type="button" onClick={() => void handleConvert()} disabled={converting}>
@@ -459,7 +458,7 @@ export default function ERAConvertScreen() {
           <div style={eraStyles.tableHeader}>
             <button type="button" style={eraStyles.sectionHeaderButton} onClick={() => setEraTableCollapsed((current) => !current)}>
               <div style={eraStyles.sectionHeaderCopy}>
-                <div style={eraPageStyles.sectionKicker}>2.ERA spreadsheet</div>
+                <div style={eraPageStyles.sectionKicker}>ERA spreadsheet</div>
                 <h2 style={{ ...eraPageStyles.sectionTitle, ...eraStyles.singleLineTitle }}>
                   Matched ERA files for the selected bank day
                 </h2>
@@ -469,7 +468,7 @@ export default function ERAConvertScreen() {
             <div style={eraStyles.sectionMetaWrap}>
               <div style={eraPageStyles.sectionMeta}>
                 {loadingEra
-                  ? "Searching files in 2.ERA..."
+                  ? "Searching files in the ERA workspace..."
                   : eraData?.bankDay
                     ? `${eraData.matchedFiles} file hit(s) across ${eraData.matchedChecks} check number(s).`
                     : "No ERA file matches yet."}
@@ -493,7 +492,7 @@ export default function ERAConvertScreen() {
 
           {!error && !loadingEra && !eraTableCollapsed && eraData && eraData.rows.length === 0 && (
             <div style={eraStyles.emptyState}>
-              No files in 2.ERA matched the selected bank day.
+              No files in the ERA workspace matched the selected bank day.
             </div>
           )}
 
@@ -947,6 +946,7 @@ const eraStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
   },
 };
+
 
 
 

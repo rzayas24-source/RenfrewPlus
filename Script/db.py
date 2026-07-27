@@ -1,44 +1,19 @@
 import os
 import sqlite3
-import json
 import sys
+from pathlib import Path
 
-# -----------------------------------------
-# Determine base directory dynamically
-# -----------------------------------------
+from config_manager import load_config, resolve_path
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# -----------------------------------------
-# Load config.json if it exists
-# -----------------------------------------
-CONFIG_PATH = os.path.join(BASE_DIR, "config.json")
+config = load_config()
+WORKFLOW_ROOT = resolve_path(config, "workflow_root", Path(BASE_DIR).parent, relative_to=Path(BASE_DIR))
+DB_PATH = resolve_path(config, "db_path", Path(WORKFLOW_ROOT) / "database.db", relative_to=Path(WORKFLOW_ROOT))
 
-if os.path.exists(CONFIG_PATH):
-    try:
-        with open(CONFIG_PATH, "r") as f:
-            config = json.load(f)
-        DB_PATH = config.get("db_path")
-    except:
-        DB_PATH = None
-else:
-    DB_PATH = None
 
-# -----------------------------------------
-# Fallback: look for database.db in folder
-# -----------------------------------------
-if not DB_PATH:
-    fallback = os.path.join(BASE_DIR, "database.db")
-    if os.path.exists(fallback):
-        DB_PATH = fallback
-    else:
-        print("ERROR: No database path found.")
-        sys.exit(1)
-
-# -----------------------------------------
-# Connection function used everywhere
-# -----------------------------------------
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
-    conn.row_factory = sqlite3.Row   # ⭐ REQUIRED ⭐
+    conn.row_factory = sqlite3.Row
     return conn

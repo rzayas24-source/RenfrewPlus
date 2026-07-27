@@ -12,9 +12,10 @@ import {
 import type { PendingAttachment } from "../api/attachmentreview_api";
 import { fetchPendingByDay } from "../api/introscreen_api";
 import { getSites, type SiteOption } from "../api/keyproof_api";
+import { API_BASE } from "../config/apiBase";
 import { styles as adminStyles } from "./adminscreen";
 
-const snapshotUrl = (id: number) => `http://localhost:8000/attachments/${id}/snapshot`;
+const snapshotUrl = (id: number) => `${API_BASE}/attachments/${id}/snapshot`;
 
 export default function AttachmentReviewScreen() {
   const navigate = useNavigate();

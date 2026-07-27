@@ -1,3 +1,88 @@
 {
-    "db_path": "C:\\Renfrew\\Workflow\\database.db"
+  "workflow_root": "..",
+  "db_path": "../database.db",
+  "emails_folder": "../4.Emails",
+  "snapshots_folder": "../snapshots",
+  "flywire_storage_root": "../Import_Flywire",
+  "trn_folder": "../1.TRN",
+  "era_folder": "../2.ERA",
+  "html_folder": "../3.HTML",
+  "tooling": {
+    "poppler_bins": [
+      "poppler/Library/bin"
+    ],
+    "fonts": {
+      "regular": "",
+      "alternate": ""
+    }
+  },
+  "ui": {
+    "navigation": {
+      "attachments": {
+        "label": "Pending",
+        "meta": "Pending queue"
+      },
+      "batches": {
+        "label": "Batches",
+        "meta": "Batch workspace"
+      },
+      "site_review": {
+        "label": "Site Review",
+        "meta": "Site review"
+      }
+    },
+    "batches": {
+      "sidebarCopy": "A calm pending-items console for moving through day-based review batches.",
+      "heroKicker": "Batches",
+      "heroSubtitle": "Review the day groups, open a batch, and step straight into the attachment flow.",
+      "statusPill": "Review batches",
+      "statusTitle": "One day, one bundle",
+      "statusText": "Each day group opens the matching attachment queue and stays tied to that batch.",
+      "sidebarCardLabel": "Today",
+      "sidebarCardMeta": "No pending work found."
+    },
+    "siteReview": {
+      "sidebarCopy": "A unified history workspace for approved, rejected, and complete batch views.",
+      "heroKicker": "Site review",
+      "views": {
+        "approved": {
+          "label": "Approved",
+          "detail": "Rows that were approved and sent forward."
+        },
+        "rejected": {
+          "label": "Rejected",
+          "detail": "Rows that were rejected with notes."
+        },
+        "complete": {
+          "label": "Complete",
+          "detail": "The full batch history in the order it came together."
+        }
+      },
+      "heroSubtitle": {
+        "approved": "Review only the approved records while keeping the same shell and layout.",
+        "rejected": "Review only the rejected records while keeping the same shell and layout.",
+        "complete": "Review the full batch history from first arrival to final outcome, all in one place."
+      },
+      "heroStatusTitle": {
+        "approved": "approved record",
+        "rejected": "rejected record",
+        "complete": "records in history"
+      },
+      "heroStatusText": {
+        "approved": "The table below shows only approved records, using the same structure as the other views.",
+        "rejected": "The table below shows only rejected records, using the same structure as the other views.",
+        "complete": "The timeline below groups records by batch so you can see how each file moved through the workflow."
+      },
+      "sectionTitle": {
+        "approved": "See only approved rows",
+        "rejected": "See only rejected rows",
+        "complete": "See the full batch timeline"
+      },
+      "sectionMeta": {
+        "approved": "The same layout stays in place while the rows are filtered by status.",
+        "rejected": "The same layout stays in place while the rows are filtered by status.",
+        "complete": "Rows stay grouped by batch so you can trace the full path of each file."
+      }
+    }
+  }
 }

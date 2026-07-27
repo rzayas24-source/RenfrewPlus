@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface AdminTableColumn {
   name: string;
@@ -24,7 +24,7 @@ export interface AdminTableDetail {
   rows: Array<Record<string, unknown>>;
 }
 
-export const getAdminTables = () => axios.get<AdminTableSummary[]>(`${API}/admin/tables`);
+export const getAdminTables = () => axios.get<AdminTableSummary[]>(`${API_BASE}/admin/tables`);
 
 export const getAdminTable = (
   tableName: string,
@@ -34,5 +34,6 @@ export const getAdminTable = (
   sortDirection: "asc" | "desc" = "asc"
 ) =>
   axios.get<AdminTableDetail>(
-    `${API}/admin/tables/${encodeURIComponent(tableName)}?limit=${limit}&offset=${offset}&sort_by=${encodeURIComponent(sortBy)}&sort_direction=${sortDirection}`
+    `${API_BASE}/admin/tables/${encodeURIComponent(tableName)}?limit=${limit}&offset=${offset}&sort_by=${encodeURIComponent(sortBy)}&sort_direction=${sortDirection}`
   );
+

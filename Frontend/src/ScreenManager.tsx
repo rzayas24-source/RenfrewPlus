@@ -2,7 +2,6 @@
 import type { CSSProperties } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from "react-router-dom";
 
-import ApprovedList from "./Screens/approvedlist";
 import AttachmentReviewScreen from "./Screens/attachmentreview";
 import BalanceCheck from "./Screens/balancecheck";
 import Balsheet from "./Screens/balsheet";
@@ -31,8 +30,8 @@ import AdminScreen from "./Screens/adminscreen";
 import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
+import AdminConfigScreen from "./Screens/adminconfigscreen";
 import WorklistEditorScreen from "./Screens/worklisteditor";
-import RejectList from "./Screens/rejectlist";
 import SitesScreen from "./Screens/sitescreen";
 import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
 
@@ -92,10 +91,6 @@ function buildReviewParams(attachmentId: string | null, day: string | null, site
   return params;
 }
 
-function RejectListScreen() {
-  return <RejectList />;
-}
-
 function BalanceCheckScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -133,6 +128,7 @@ export default function ScreenManager() {
         <Route path="/" element={<MainScreen />} />
         <Route path="/home" element={<MainScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
+        <Route path="/admin/config" element={<AdminConfigScreen />} />
         <Route path="/admin/menus" element={<AdminMenuScreen />} />
         <Route path="/admin/tables" element={<AdminTableScreen />} />
         <Route path="/admin/users" element={<AdminUserScreen />} />
@@ -156,7 +152,6 @@ export default function ScreenManager() {
         <Route path="/site-review" element={<SiteReviewScreen />} />
         <Route path="/email-downloader" element={<EmailDownloaderScreen />} />
         <Route path="/snapshot-generator" element={<SnapshotGeneratorScreen />} />
-        <Route path="/approved" element={<ApprovedList />} />
         <Route path="/worklist-editor" element={<WorklistEditorScreen />} />
         <Route path="/attachments" element={<AttachmentReviewScreen />} />
         <Route path="/balancecheck" element={<BalanceCheckScreen />} />
@@ -170,7 +165,6 @@ export default function ScreenManager() {
         <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />
         <Route path="/finance" element={<SectionPlaceholderScreen title="Finance" description="Finance tools will live here." />} />
         <Route path="/business" element={<SectionPlaceholderScreen title="Business" description="Business tools will live here." />} />
-        <Route path="/rejectlist" element={<RejectListScreen />} />
         <Route path="/sites" element={<SitesScreen />} />
       </Routes>
     </BrowserRouter>

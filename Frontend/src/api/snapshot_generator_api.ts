@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface SnapshotGeneratorResult {
   processed_count: number;
@@ -8,7 +8,7 @@ export interface SnapshotGeneratorResult {
 }
 
 export async function runSnapshotGenerator() {
-  const response = await fetch(`${API}/snapshot-generator/run`, {
+  const response = await fetch(`${API_BASE}/snapshot-generator/run`, {
     method: "POST",
   });
 
@@ -18,3 +18,4 @@ export async function runSnapshotGenerator() {
 
   return (await response.json()) as SnapshotGeneratorResult;
 }
+

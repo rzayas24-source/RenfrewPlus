@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAppConfig } from "../config/appConfig";
+import { AdminShell } from "../components/AdminShell";
 import { fetchPendingByDay } from "../api/introscreen_api";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 
 interface PendingItem {
   id: number;
@@ -34,9 +35,18 @@ function formatDay(day: string) {
 
 export default function IntroScreen() {
   const navigate = useNavigate();
+  const appConfig = useAppConfig();
   const [pending, setPending] = useState<PendingByDay>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const batchesUi = appConfig?.ui?.batches;
+  const sidebarCopy = batchesUi?.sidebarCopy ?? "A calm pending-items console for moving through day-based review batches.";
+  const ribbonTitle = batchesUi?.heroKicker ?? "Batches Menu";
+  const heroSubtitle = batchesUi?.heroSubtitle ?? "Review the day groups, open a batch, and step straight into the attachment flow.";
+  const heroStatusPill = batchesUi?.statusPill ?? "Review batches";
+  const heroStatusTitle = batchesUi?.statusTitle ?? "One day, one bundle";
+  const heroStatusText = batchesUi?.statusText ?? "Each day group opens the matching attachment queue and stays tied to that batch.";
+  const sidebarCardLabel = batchesUi?.sidebarCardLabel ?? "Today";
 
   useEffect(() => {
     fetchPendingByDay()
@@ -58,84 +68,48 @@ export default function IntroScreen() {
     () => days.reduce((total, day) => total + pending[day].length, 0),
     [days, pending]
   );
+  const sidebarCardMeta =
+    batchesUi?.sidebarCardMeta ??
+    (days.length > 0 ? `${days.length} day group${days.length === 1 ? "" : "s"} ready to review.` : "No pending work found.");
 
   if (loading) {
     return (
-      <main style={adminStyles.shell}>
-        <div style={adminStyles.glowBlue} />
-        <div style={adminStyles.glowPink} />
+      <AdminShell
+        sidebarCopy={sidebarCopy}
+        onBack={() => navigate("/cash")}
+        hideBackButton
+        ribbonTitle={ribbonTitle}
+      >
         <div style={introStyles.loadingState}>Loading pending items...</div>
-      </main>
+      </AdminShell>
     );
   }
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A calm pending-items console for moving through day-based review batches.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Pending navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
-            <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/approved")}>
-            <span style={adminStyles.navButtonLabel}>Approved</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>{totalPending} pending</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            {days.length > 0 ? `${days.length} day group${days.length === 1 ? "" : "s"} ready to review.` : "No pending work found."}
-          </div>
-        </div>
-      </aside>
-
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
+    <AdminShell
+      sidebarCopy={sidebarCopy}
+      onBack={() => navigate("/cash")}
+      hideBackButton
+      ribbonTitle={ribbonTitle}
+      sidebarCardLabel={sidebarCardLabel}
+      sidebarCardValue={`${totalPending} pending`}
+      sidebarCardMeta={sidebarCardMeta}
+    >
+      <section style={{ ...adminStyles.content, ...batchesStyles.content }}>
+        <section style={{ ...adminStyles.heroShell, ...batchesStyles.heroShell }}>
           <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>Pending items</div>
-            <p style={adminStyles.subtitle}>
-              Review the day groups, open a batch, and step straight into the attachment flow.
-            </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/site-review")}>
-                Open Site Review
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/attachments")}>
-                Open Queue
-              </button>
-            </div>
+            <div style={adminStyles.kicker}>{batchesUi?.heroKicker ?? "Batches"}</div>
+            <p style={adminStyles.subtitle}>{heroSubtitle}</p>
           </div>
 
           <div style={adminStyles.heroArt}>
             <div style={adminStyles.heroStatusCard}>
               <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>Review batches</span>
+                <span style={adminStyles.statusPill}>{heroStatusPill}</span>
                 <span style={adminStyles.statusDot} />
               </div>
-              <div style={adminStyles.heroStatusTitle}>One day, one bundle</div>
-              <div style={adminStyles.heroStatusText}>
-                Each day group opens the matching attachment queue and stays tied to that batch.
-              </div>
+              <div style={adminStyles.heroStatusTitle}>{heroStatusTitle}</div>
+              <div style={adminStyles.heroStatusText}>{heroStatusText}</div>
             </div>
           </div>
         </section>
@@ -210,7 +184,7 @@ export default function IntroScreen() {
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
@@ -308,5 +282,14 @@ const introStyles: Record<string, CSSProperties> = {
     display: "flex",
     justifyContent: "flex-end",
     marginTop: "16px",
+  },
+};
+
+const batchesStyles: Record<string, CSSProperties> = {
+  content: {
+    paddingTop: 0,
+  },
+  heroShell: {
+    position: "static",
   },
 };

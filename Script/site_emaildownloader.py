@@ -7,12 +7,21 @@ from datetime import datetime
 from pathlib import Path
 import sys
 
-import win32com.client
+try:
+    import win32com.client
+except Exception:  # pragma: no cover - optional Windows dependency
+    win32com = None
 
+from config_manager import load_config, resolve_path
 from db import get_conn   # dynamic DB connection
 
-DOWNLOAD_DIR = r"C:\Renfrew\Workflow\4.Emails"
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG = load_config()
+WORKFLOW_ROOT = Path(resolve_path(CONFIG, "workflow_root", BASE_DIR.parent, relative_to=BASE_DIR))
+DOWNLOAD_DIR = Path(resolve_path(CONFIG, "emails_folder", WORKFLOW_ROOT / "4.Emails", relative_to=WORKFLOW_ROOT))
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+OUTLOOK_AVAILABLE = win32com is not None
 
 
 def normalize_outlook_datetime(dt):
@@ -76,6 +85,8 @@ def insert_into_db(email_id, original_filename, saved_name, saved_path, note, ba
 
 
 def get_outlook_namespace():
+    if not OUTLOOK_AVAILABLE:
+        raise RuntimeError("Outlook COM automation is not available on this machine.")
     return win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
 
 
@@ -286,16 +297,25 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.command == "folders":
+        if not OUTLOOK_AVAILABLE:
+            print("Outlook COM automation is not available on this machine.", file=sys.stderr)
+            return 2
         _write_json(args.output, list_inbox_folders())
         return 0
 
     if args.command == "dates":
+        if not OUTLOOK_AVAILABLE:
+            print("Outlook COM automation is not available on this machine.", file=sys.stderr)
+            return 2
         outlook = get_outlook_namespace()
         folder = get_inbox_folder(outlook, args.folder_index)
         _write_json(args.output, list_dates_in_folder(folder))
         return 0
 
     if args.command == "run":
+        if not OUTLOOK_AVAILABLE:
+            print("Outlook COM automation is not available on this machine.", file=sys.stderr)
+            return 2
         result = download_emails(
             folder_index=args.folder_index,
             date_value=args.date_value,
@@ -305,6 +325,10 @@ def main(argv=None):
         result.pop("processed_entry_ids", None)
         _write_json(args.output, result)
         return 0
+
+    if not OUTLOOK_AVAILABLE:
+        print("Outlook COM automation is not available on this machine.", file=sys.stderr)
+        return 2
 
     download_emails_cli()
     return 0

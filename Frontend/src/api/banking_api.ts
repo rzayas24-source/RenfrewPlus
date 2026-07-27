@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface BankingSpreadsheetRow {
   id: number;
@@ -29,4 +29,5 @@ export interface BankingSpreadsheetResponse {
   groups: BankingSpreadsheetGroup[];
 }
 
-export const getBankingSpreadsheet = () => axios.get<BankingSpreadsheetResponse>(`${API}/banking/spreadsheet`);
+export const getBankingSpreadsheet = () => axios.get<BankingSpreadsheetResponse>(`${API_BASE}/banking/spreadsheet`);
+

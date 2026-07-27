@@ -79,7 +79,7 @@ export default function MainScreen() {
       meta: "Check completed files, confirmations, and review history.",
       tone: "pearl",
       action: "Open Approved",
-      path: "/approved",
+      path: "/site-review?view=approved",
       footnote: "Review complete",
     },
     {

@@ -1,7 +1,8 @@
 // src/api/introscreen_api.ts
+import { API_BASE } from "../config/apiBase";
 
 export async function fetchPendingByDay() {
-  const response = await fetch("http://127.0.0.1:8000/pending/by-day");
+  const response = await fetch(`${API_BASE}/pending/by-day`);
 
   if (!response.ok) {
     throw new Error("Failed to load pending items");
@@ -9,3 +10,4 @@ export async function fetchPendingByDay() {
 
   return await response.json();
 }
+

@@ -1,6 +1,7 @@
 import axios from "axios";
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
-export const getBalanceCheck = () => axios.get(`${API}/balancecheck`);
+export const getBalanceCheck = () => axios.get(`${API_BASE}/balancecheck`);
 export const updateBalanceCheck = (id: string | number, data: unknown) =>
-  axios.put(`${API}/balancecheck/${id}`, data);
+  axios.put(`${API_BASE}/balancecheck/${id}`, data);
+

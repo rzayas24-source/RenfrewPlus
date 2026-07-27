@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface CalendarStatus {
   today: string;
@@ -40,28 +40,29 @@ export interface CalendarWorkDayLookup {
   bankDay: string | null;
 }
 
-export const getCalendarStatus = () => axios.get<CalendarStatus>(`${API}/calendar/status`);
+export const getCalendarStatus = () => axios.get<CalendarStatus>(`${API_BASE}/calendar/status`);
 
 export const lookupCalendarBankDay = (work_day: string) =>
-  axios.get<CalendarWorkDayLookup>(`${API}/calendar/work-day/lookup`, { params: { work_day } });
+  axios.get<CalendarWorkDayLookup>(`${API_BASE}/calendar/work-day/lookup`, { params: { work_day } });
 
 export const getCalendarRange = (start: string, end: string) =>
-  axios.get<CalendarRange>(`${API}/calendar/range`, { params: { start, end } });
+  axios.get<CalendarRange>(`${API_BASE}/calendar/range`, { params: { start, end } });
 
 export const setupCalendar = (start_date: string) =>
-  axios.post<CalendarStatus>(`${API}/calendar/setup`, { start_date });
+  axios.post<CalendarStatus>(`${API_BASE}/calendar/setup`, { start_date });
 
 export const addCalendarDays = (days: number) =>
-  axios.post<CalendarStatus>(`${API}/calendar/add`, { days });
+  axios.post<CalendarStatus>(`${API_BASE}/calendar/add`, { days });
 
 export const buildCalendarFrom = (start_date: string, days: number) =>
-  axios.post<CalendarStatus>(`${API}/calendar/build-from`, { start_date, days });
+  axios.post<CalendarStatus>(`${API_BASE}/calendar/build-from`, { start_date, days });
 
 export const deleteCalendarDays = (from_date: string, to_date: string) =>
-  axios.delete<CalendarStatus>(`${API}/calendar/days`, { params: { from_date, to_date } });
+  axios.delete<CalendarStatus>(`${API_BASE}/calendar/days`, { params: { from_date, to_date } });
 
 export const setCalendarWorkDay = (work_day: string) =>
-  axios.post<CalendarStatus>(`${API}/calendar/work-day/set`, { work_day });
+  axios.post<CalendarStatus>(`${API_BASE}/calendar/work-day/set`, { work_day });
 
 export const advanceCalendarWorkDay = () =>
-  axios.post<CalendarStatus>(`${API}/calendar/work-day/advance`);
+  axios.post<CalendarStatus>(`${API_BASE}/calendar/work-day/advance`);
+

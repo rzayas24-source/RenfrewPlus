@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface SourceMatchSummary {
   ediRows: number;
@@ -119,7 +119,7 @@ export const getSourceMatchWorklist = (
   showUnmatched = true,
   latestYearOnly = false,
 ) =>
-  axios.get<SourceMatchWorklistResponse>(`${API}/match/worklist`, {
+  axios.get<SourceMatchWorklistResponse>(`${API_BASE}/match/worklist`, {
     params: {
       limit,
       ...(revision ? { revision } : {}),
@@ -133,13 +133,14 @@ export const getSourceMatchWorklist = (
   });
 
 export const getSourceMatchDetail = (ediId: number) =>
-  axios.get<SourceMatchDetail>(`${API}/match/${ediId}`);
+  axios.get<SourceMatchDetail>(`${API_BASE}/match/${ediId}`);
 
 export const getSourceMatchHistory = (limit = 100) =>
-  axios.get<SourceMatchHistoryResponse>(`${API}/match/matches`, { params: { limit } });
+  axios.get<SourceMatchHistoryResponse>(`${API_BASE}/match/matches`, { params: { limit } });
 
 export const commitSourceMatch = (payload: SourceMatchCommitRequest) =>
-  axios.post<SourceMatchCommitResponse>(`${API}/match/commit`, payload);
+  axios.post<SourceMatchCommitResponse>(`${API_BASE}/match/commit`, payload);
 
 export const commitAllExactMatches = () =>
-  axios.post<SourceMatchBulkCommitResponse>(`${API}/match/commit-exact-hits`);
+  axios.post<SourceMatchBulkCommitResponse>(`${API_BASE}/match/commit-exact-hits`);
+

@@ -13,11 +13,13 @@ import secrets
 from io import BytesIO
 from datetime import datetime
 from collections import defaultdict
+from pathlib import Path
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from openpyxl import load_workbook
 
+from config_manager import load_config, resolve_path, save_config
 from system_calendar_core import (
     add_days,
     advance_current_work_day,
@@ -35,17 +37,66 @@ from system_source_match_core import build_match_dashboard, build_match_history,
 from system_banking_core import build_banking_spreadsheet
 import pandas as pd
 
-DB_PATH = r"C:\Renfrew\Workflow\database.db"
-WORKFLOW_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-ZIP_835_TRN_FOLDER = os.path.join(WORKFLOW_ROOT, "1.TRN")
-ZIP_835_ERA_FOLDER = os.path.join(WORKFLOW_ROOT, "2.ERA")
-ZIP_835_HTML_FOLDER = os.path.join(WORKFLOW_ROOT, "3.HTML")
-ZIP_835_TRN_ARCHIVE_FOLDER = os.path.join(ZIP_835_TRN_FOLDER, "Loaded")
-FLYWIRE_STORAGE_ROOT = os.path.join(WORKFLOW_ROOT, "Import_Flywire")
-FLYWIRE_UPLOAD_FOLDER = os.path.join(FLYWIRE_STORAGE_ROOT, "Uploads")
-EMAIL_DOWNLOADER_SCRIPT = os.path.join(os.path.dirname(__file__), "site_emaildownloader.py")
-SNAPSHOT_GENERATOR_SCRIPT = os.path.join(os.path.dirname(__file__), "site_snapshotgenerator.py")
-PYTHONW_EXE = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_CONFIG = load_config()
+WORKFLOW_ROOT = ""
+DB_PATH = ""
+ZIP_835_TRN_FOLDER = ""
+ZIP_835_ERA_FOLDER = ""
+ZIP_835_HTML_FOLDER = ""
+ZIP_835_TRN_ARCHIVE_FOLDER = ""
+FLYWIRE_STORAGE_ROOT = ""
+FLYWIRE_UPLOAD_FOLDER = ""
+EMAILS_FOLDER = ""
+SNAPSHOTS_FOLDER = ""
+EMAIL_DOWNLOADER_SCRIPT = os.path.join(BASE_DIR, "site_emaildownloader.py")
+SNAPSHOT_GENERATOR_SCRIPT = os.path.join(BASE_DIR, "site_snapshotgenerator.py")
+PYTHON_EXECUTABLE = sys.executable
+
+
+def refresh_runtime_config(config: dict | None = None):
+    global BACKEND_CONFIG
+    global WORKFLOW_ROOT
+    global DB_PATH
+    global ZIP_835_TRN_FOLDER
+    global ZIP_835_ERA_FOLDER
+    global ZIP_835_HTML_FOLDER
+    global ZIP_835_TRN_ARCHIVE_FOLDER
+    global FLYWIRE_STORAGE_ROOT
+    global FLYWIRE_UPLOAD_FOLDER
+    global EMAILS_FOLDER
+    global SNAPSHOTS_FOLDER
+
+    BACKEND_CONFIG = config or load_config(force=True)
+    config_dir = Path(CONFIG_PATH).resolve().parent
+    workflow_root = resolve_path(BACKEND_CONFIG, "workflow_root", Path(BASE_DIR).parent, relative_to=config_dir)
+    WORKFLOW_ROOT = workflow_root
+    DB_PATH = resolve_path(BACKEND_CONFIG, "db_path", Path(WORKFLOW_ROOT) / "database.db", relative_to=Path(WORKFLOW_ROOT))
+    ZIP_835_TRN_FOLDER = resolve_path(BACKEND_CONFIG, "trn_folder", Path(WORKFLOW_ROOT) / "1.TRN", relative_to=Path(WORKFLOW_ROOT))
+    ZIP_835_ERA_FOLDER = resolve_path(BACKEND_CONFIG, "era_folder", Path(WORKFLOW_ROOT) / "2.ERA", relative_to=Path(WORKFLOW_ROOT))
+    ZIP_835_HTML_FOLDER = resolve_path(BACKEND_CONFIG, "html_folder", Path(WORKFLOW_ROOT) / "3.HTML", relative_to=Path(WORKFLOW_ROOT))
+    ZIP_835_TRN_ARCHIVE_FOLDER = os.path.join(ZIP_835_TRN_FOLDER, "Loaded")
+    FLYWIRE_STORAGE_ROOT = resolve_path(
+        BACKEND_CONFIG,
+        "flywire_storage_root",
+        Path(WORKFLOW_ROOT) / "Import_Flywire",
+        relative_to=Path(WORKFLOW_ROOT),
+    )
+    FLYWIRE_UPLOAD_FOLDER = os.path.join(FLYWIRE_STORAGE_ROOT, "Uploads")
+    EMAILS_FOLDER = resolve_path(BACKEND_CONFIG, "emails_folder", Path(WORKFLOW_ROOT) / "4.Emails", relative_to=Path(WORKFLOW_ROOT))
+    SNAPSHOTS_FOLDER = resolve_path(
+        BACKEND_CONFIG,
+        "snapshots_folder",
+        Path(WORKFLOW_ROOT) / "snapshots",
+        relative_to=Path(WORKFLOW_ROOT),
+    )
+
+    for path in [WORKFLOW_ROOT, DB_PATH, ZIP_835_TRN_FOLDER, ZIP_835_ERA_FOLDER, ZIP_835_HTML_FOLDER, FLYWIRE_STORAGE_ROOT, EMAILS_FOLDER, SNAPSHOTS_FOLDER]:
+        if path and not os.path.splitext(path)[1]:
+            os.makedirs(path, exist_ok=True)
+
+
+refresh_runtime_config(BACKEND_CONFIG)
 
 app = FastAPI()
 
@@ -80,6 +131,21 @@ def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+@app.get("/config")
+def get_config():
+    return load_config()
+
+
+@app.put("/config")
+def put_config(payload: dict):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Config payload must be an object.")
+
+    saved = save_config(payload)
+    refresh_runtime_config(saved)
+    return saved
 
 
 def _quote_identifier(name: str) -> str:
@@ -576,8 +642,7 @@ def _flywire_search_tokens(batch_id, batch_date):
 
 
 def _find_flywire_candidate_path(batch_id, batch_date):
-    emails_folder = os.path.join(WORKFLOW_ROOT, "4.Emails")
-    if not os.path.isdir(emails_folder):
+    if not os.path.isdir(EMAILS_FOLDER):
         return None
 
     search_tokens = _flywire_search_tokens(batch_id, batch_date)
@@ -587,7 +652,7 @@ def _find_flywire_candidate_path(batch_id, batch_date):
     best_candidate = None
     best_score = 0
 
-    for root, _dirs, files in os.walk(emails_folder):
+    for root, _dirs, files in os.walk(EMAILS_FOLDER):
         for file_name in files:
             lower_name = file_name.lower()
             if "flywire" not in lower_name:
@@ -789,15 +854,15 @@ def _row_pending_day(row, batch_date_index, batch_id_index, processed_at_index):
 
 
 def _run_pythonw_worker(*args):
-    if not os.path.exists(PYTHONW_EXE):
-        raise HTTPException(status_code=500, detail="pythonw.exe was not found")
+    if not os.path.exists(PYTHON_EXECUTABLE):
+        raise HTTPException(status_code=500, detail="Python executable was not found")
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=".json") as tmp:
         output_path = tmp.name
 
     try:
         completed = subprocess.run(
-            [PYTHONW_EXE, EMAIL_DOWNLOADER_SCRIPT, *args, "--output", output_path],
+            [PYTHON_EXECUTABLE, EMAIL_DOWNLOADER_SCRIPT, *args, "--output", output_path],
             cwd=os.path.dirname(__file__),
             capture_output=True,
             text=True,
@@ -2153,6 +2218,48 @@ def get_rejectlist():
             "filename": row[1],
             "reason": row[2],
             "date": row[3],
+        }
+        for row in rows
+    ]
+
+
+@app.get("/site-review/history")
+def get_site_review_history(view: str | None = None):
+    normalized_view = (view or "complete").strip().lower()
+    status_filter = {
+        "approved": "Approved",
+        "rejected": "Rejected",
+    }.get(normalized_view)
+
+    conn = get_conn()
+    cur = conn.cursor()
+
+    query = """
+        SELECT id, filename, site, detail, review_notes, amount, review_status, processed_at, batch_id, batch_date
+        FROM imported_files
+    """
+    params = []
+    if status_filter:
+        query += " WHERE review_status = ?"
+        params.append(status_filter)
+
+    query += " ORDER BY COALESCE(batch_date, processed_at, filename) DESC, id DESC"
+    cur.execute(query, params)
+    rows = cur.fetchall()
+    conn.close()
+
+    return [
+        {
+            "id": row[0],
+            "filename": row[1],
+            "site": row[2],
+            "detail": row[3],
+            "reason": row[4],
+            "total": row[5] or 0,
+            "status": row[6],
+            "processedAt": row[7],
+            "batchId": row[8],
+            "batchDate": row[9],
         }
         for row in rows
     ]
@@ -5162,7 +5269,7 @@ def get_snapshot(attachment_id: int):
     row = cur.fetchone()
 
     if not row or not row[0]:
-        fallback_path = os.path.join(WORKFLOW_ROOT, "snapshots", f"{attachment_id}.png")
+        fallback_path = os.path.join(SNAPSHOTS_FOLDER, f"{attachment_id}.png")
         if not os.path.exists(fallback_path):
             conn.close()
             raise HTTPException(status_code=404, detail="Snapshot not found")
@@ -5182,7 +5289,7 @@ def get_snapshot(attachment_id: int):
     snapshot_path = row[0]
 
     if not os.path.exists(snapshot_path):
-        fallback_path = os.path.join(WORKFLOW_ROOT, "snapshots", f"{attachment_id}.png")
+        fallback_path = os.path.join(SNAPSHOTS_FOLDER, f"{attachment_id}.png")
         if not os.path.exists(fallback_path):
             conn.close()
             raise HTTPException(status_code=404, detail="Snapshot file missing")
@@ -5219,9 +5326,9 @@ def get_original_attachment(attachment_id: int):
     candidate_paths = [moved_to]
 
     if original_filename:
-        candidate_paths.append(os.path.join(WORKFLOW_ROOT, "4.Emails", original_filename))
+        candidate_paths.append(os.path.join(EMAILS_FOLDER, original_filename))
     if stored_filename:
-        candidate_paths.append(os.path.join(WORKFLOW_ROOT, "4.Emails", stored_filename))
+        candidate_paths.append(os.path.join(EMAILS_FOLDER, stored_filename))
 
     for candidate_path in candidate_paths:
         if candidate_path and os.path.exists(candidate_path):
@@ -5316,7 +5423,7 @@ def autofind_keyproof_flywire(attachment_id: int):
         batch_id, batch_date = _flywire_attachment_context(attachment_row)
         candidate_path = _find_flywire_candidate_path(batch_id, batch_date)
         if not candidate_path or not os.path.exists(candidate_path):
-            raise HTTPException(status_code=404, detail="No matching Fly Wire file was found in 4.Emails")
+            raise HTTPException(status_code=404, detail="No matching Fly Wire file was found in the configured email folder")
 
         with open(candidate_path, "rb") as input_file:
             file_bytes = input_file.read()

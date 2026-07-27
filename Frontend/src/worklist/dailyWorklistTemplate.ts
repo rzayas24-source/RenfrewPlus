@@ -92,12 +92,12 @@ export const DEFAULT_DAILY_WORKLIST_TEMPLATE: DailyWorklistTemplateItem[] = [
   {
     id: "balsheet-view",
     title: "Balance Sheet View",
-    details: "http://localhost:5173/balsheet/view",
+    details: "/balsheet/view",
     category: WORKLIST_CATEGORY,
     recurrence: "daily",
     actionType: "url",
     actionLabel: "Open view",
-    actionValue: "http://localhost:5173/balsheet/view",
+    actionValue: "/balsheet/view",
   },
   {
     id: "import-bank",
@@ -112,12 +112,12 @@ export const DEFAULT_DAILY_WORKLIST_TEMPLATE: DailyWorklistTemplateItem[] = [
   {
     id: "tools",
     title: "Tools",
-    details: "http://localhost:5173/tools",
+    details: "/tools",
     category: WORKLIST_CATEGORY,
     recurrence: "daily",
     actionType: "url",
     actionLabel: "Open tools",
-    actionValue: "http://localhost:5173/tools",
+    actionValue: "/tools",
   },
   {
     id: "convert-era",
@@ -302,12 +302,12 @@ export const DEFAULT_DAILY_WORKLIST_TEMPLATE: DailyWorklistTemplateItem[] = [
   {
     id: "prepare-nd-folder",
     title: "Prepare ND Folder",
-    details: "C:\\Renfrew\\Workflow\\3.HTML\\Renamed",
+    details: "3.HTML\\Renamed",
     category: WORKLIST_CATEGORY,
     recurrence: "daily",
     actionType: "copy",
     actionLabel: "Copy path",
-    actionValue: "C:\\Renfrew\\Workflow\\3.HTML\\Renamed",
+    actionValue: "3.HTML\\Renamed",
   },
   {
     id: "calendar",
@@ -317,6 +317,6 @@ export const DEFAULT_DAILY_WORKLIST_TEMPLATE: DailyWorklistTemplateItem[] = [
     recurrence: "daily",
     actionType: "url",
     actionLabel: "Open calendar",
-    actionValue: "http://localhost:5173/calendar",
+    actionValue: "/calendar",
   },
 ];

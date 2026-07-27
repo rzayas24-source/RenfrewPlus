@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface EmailFolderOption {
   index: number;
@@ -20,7 +20,7 @@ function jsonHeaders() {
 }
 
 export async function getEmailDownloaderFolders() {
-  const response = await fetch(`${API}/email-downloader/folders`);
+  const response = await fetch(`${API_BASE}/email-downloader/folders`);
   if (!response.ok) {
     throw new Error("Failed to load email folders");
   }
@@ -28,7 +28,7 @@ export async function getEmailDownloaderFolders() {
 }
 
 export async function getEmailDownloaderDates(folderIndex: number) {
-  const response = await fetch(`${API}/email-downloader/dates?folder_index=${encodeURIComponent(folderIndex)}`);
+  const response = await fetch(`${API_BASE}/email-downloader/dates?folder_index=${encodeURIComponent(folderIndex)}`);
   if (!response.ok) {
     throw new Error("Failed to load email dates");
   }
@@ -41,7 +41,7 @@ export async function runEmailDownloader(payload: {
   move_messages_after?: boolean;
   dest_folder_index?: number | null;
 }) {
-  const response = await fetch(`${API}/email-downloader/run`, {
+  const response = await fetch(`${API_BASE}/email-downloader/run`, {
     method: "POST",
     headers: jsonHeaders(),
     body: JSON.stringify(payload),
@@ -53,3 +53,4 @@ export async function runEmailDownloader(payload: {
 
   return (await response.json()) as EmailDownloadResult;
 }
+

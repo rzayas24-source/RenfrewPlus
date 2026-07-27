@@ -152,12 +152,6 @@ export default function ToolsScreen() {
       sidebarCopy="A soft tools console for helpers, utilities, and workflow support."
       onBack={() => navigate("/cash")}
       hideBackButton
-      ribbonItems={[
-        { title: "ERA Convert", meta: "Rename workflow", onClick: () => navigate("/era-convert") },
-        { title: "HTML Convert", meta: "HTML workflow", onClick: () => navigate("/html-convert") },
-        { title: "Other Day Check", meta: "Missing rows", onClick: () => navigate("/otherday") },
-        { title: "Duplicate Check", meta: "Duplicate scan", onClick: () => navigate("/duplicatecheck") },
-      ]}
     >
       <section style={toolsPageStyles.content}>
         <section style={toolsPageStyles.heroShell}>

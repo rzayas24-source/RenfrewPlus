@@ -1,6 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAppConfig } from "../config/appConfig";
+import type { AppConfig } from "../config/appConfig";
 import { WorklistBrandButton } from "../worklist/worklist";
 import {
   GAZEBO_MENU_ID,
@@ -79,6 +81,7 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/": { path: "/", label: "Main", meta: "Main workspace" },
   "/home": { path: "/home", label: "Main", meta: "Main workspace" },
   "/admin": { path: "/admin", label: "Admin", meta: "Admin console" },
+  "/admin/config": { path: "/admin/config", label: "Config", meta: "App config editor" },
   "/admin/tables": { path: "/admin/tables", label: "Tables", meta: "Database browser" },
   "/admin/users": { path: "/admin/users", label: "Users", meta: "Access control" },
   "/admin/menus": { path: "/admin/menus", label: "Menu Builder", meta: "Sidebar navigation" },
@@ -99,7 +102,6 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/site-review": { path: "/site-review", label: "Site Review", meta: "Site review" },
   "/email-downloader": { path: "/email-downloader", label: "Email Downloader", meta: "Email review" },
   "/snapshot-generator": { path: "/snapshot-generator", label: "Snapshot Generator", meta: "Snapshot review" },
-  "/approved": { path: "/approved", label: "Approved", meta: "Approved items" },
   "/worklist-editor": { path: "/worklist-editor", label: "Daily Worklist", meta: "Worklist editor" },
   "/attachments": { path: "/attachments", label: "Pending", meta: "Pending queue" },
   "/balancecheck": { path: "/balancecheck", label: "Balance Check", meta: "Balance review" },
@@ -113,7 +115,6 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/research": { path: "/research", label: "Research", meta: "Research tools" },
   "/finance": { path: "/finance", label: "Finance", meta: "Finance tools" },
   "/business": { path: "/business", label: "Business", meta: "Business tools" },
-  "/rejectlist": { path: "/rejectlist", label: "Reject List", meta: "Reject list" },
   "/sites": { path: "/sites", label: "Sites", meta: "Sites browser" },
   "/aux-posting": { path: "/aux-posting", label: "Aux Posting", meta: "Aux posting" },
   "/check-search": { path: "/check-search", label: "Check Search", meta: "Check search" },
@@ -197,15 +198,42 @@ function loadLegacyGazeboSelection() {
   }
 }
 
-function resolveScreen(pathname: string): FavoriteScreen {
+function resolveScreen(pathname: string, config?: AppConfig | null): FavoriteScreen {
   const normalized = normalizePath(pathname);
-  return (
-    SCREEN_REGISTRY[normalized] ?? {
-      path: normalized,
-      label: formatScreenLabel(normalized),
-      meta: "Saved screen",
-    }
-  );
+  const labels = {
+    attachments: config?.ui?.navigation?.attachments?.label ?? "Pending",
+    batches: config?.ui?.navigation?.batches?.label ?? "Batches",
+    siteReview: config?.ui?.navigation?.site_review?.label ?? "Site Review",
+  };
+  if (normalized === "/attachments") {
+    return {
+      path: "/attachments",
+      label: labels.attachments,
+      meta: config?.ui?.navigation?.attachments?.meta ?? "Pending queue",
+    };
+  }
+
+  if (normalized === "/batches") {
+    return {
+      path: "/batches",
+      label: labels.batches,
+      meta: config?.ui?.navigation?.batches?.meta ?? "Batch workspace",
+    };
+  }
+
+  if (normalized === "/site-review") {
+    return {
+      path: "/site-review",
+      label: labels.siteReview,
+      meta: config?.ui?.navigation?.site_review?.meta ?? "Site review",
+    };
+  }
+
+  return SCREEN_REGISTRY[normalized] ?? {
+    path: normalized,
+    label: formatScreenLabel(normalized),
+    meta: "Saved screen",
+  };
 }
 
 export function AdminShell({
@@ -232,7 +260,8 @@ export function AdminShell({
   void hideBackButton;
   const location = useLocation();
   const navigate = useNavigate();
-  const currentScreen = useMemo(() => resolveScreen(location.pathname), [location.pathname]);
+  const appConfig = useAppConfig();
+  const currentScreen = useMemo(() => resolveScreen(location.pathname, appConfig ?? undefined), [location.pathname, appConfig]);
   const [isRibbonOpen, setIsRibbonOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [gazeboSelection, setGazeboSelection] = useState<MenuSelectionEntry[]>([]);
@@ -240,14 +269,14 @@ export function AdminShell({
   const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>([]);
   const isFavorite = gazeboSelection.some((item) => item.id === currentScreen.path);
   const favoriteScreens = useMemo(
-    () => gazeboSelection.map((item) => resolveScreen(item.id)).slice(0, MAX_FAVORITES),
-    [gazeboSelection]
+    () => gazeboSelection.map((item) => resolveScreen(item.id, appConfig)).slice(0, MAX_FAVORITES),
+    [appConfig, gazeboSelection]
   );
   const navItems = useMemo(
     () => {
       const resolvedItems = menuSelection
         .map((entry) => {
-          const resolved = resolveMenuSelection(entry.id, entry);
+          const resolved = resolveMenuSelection(entry.id, entry, appConfig ?? undefined);
           if (!resolved) {
             return null;
           }
@@ -274,7 +303,7 @@ export function AdminShell({
 
       return resolvedItems.sort((left, right) => compareNavLabels(left.label, right.label));
     },
-    [hideSidebarBackMenu, hideSidebarBackStyles, menuSelection, navigate]
+    [appConfig, hideSidebarBackMenu, hideSidebarBackStyles, menuSelection, navigate]
   );
   const priorityNavItems = navItems.slice(0, 2);
   const remainingNavItems = navItems.slice(2);

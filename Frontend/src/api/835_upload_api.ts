@@ -1,4 +1,4 @@
-const API = "http://127.0.0.1:8000";
+import { API_BASE } from "../config/apiBase";
 
 export interface Upload835ZipResponse {
   status: string;
@@ -84,7 +84,7 @@ export async function upload835ZipFile(file: File): Promise<Upload835ZipResponse
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(`${API}/835/upload-stage`, {
+  const response = await fetch(`${API_BASE}/835/upload-stage`, {
     method: "POST",
     body: formData,
   });
@@ -98,7 +98,7 @@ export async function upload835ZipFile(file: File): Promise<Upload835ZipResponse
 }
 
 export async function load835TrnFiles(): Promise<Load835TrnResponse> {
-  const response = await fetch(`${API}/835/load-trn-folder`, {
+  const response = await fetch(`${API_BASE}/835/load-trn-folder`, {
     method: "POST",
   });
 
@@ -111,7 +111,7 @@ export async function load835TrnFiles(): Promise<Load835TrnResponse> {
 }
 
 export async function stage835EdiLoad(): Promise<Stage835EdiResponse> {
-  const response = await fetch(`${API}/835/stage-edi`, {
+  const response = await fetch(`${API_BASE}/835/stage-edi`, {
     method: "POST",
   });
 
@@ -124,7 +124,7 @@ export async function stage835EdiLoad(): Promise<Stage835EdiResponse> {
 }
 
 export async function vet835EdiStage(): Promise<Vet835EdiResponse> {
-  const response = await fetch(`${API}/835/vet-edi`, {
+  const response = await fetch(`${API_BASE}/835/vet-edi`, {
     method: "POST",
   });
 
@@ -137,7 +137,7 @@ export async function vet835EdiStage(): Promise<Vet835EdiResponse> {
 }
 
 export async function approve835EdiStage(decision: "approve" | "deny"): Promise<Approve835EdiResponse> {
-  const response = await fetch(`${API}/835/approval-stage`, {
+  const response = await fetch(`${API_BASE}/835/approval-stage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -152,3 +152,4 @@ export async function approve835EdiStage(decision: "approve" | "deny"): Promise<
 
   return await response.json();
 }
+
