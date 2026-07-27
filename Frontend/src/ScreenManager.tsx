@@ -159,7 +159,7 @@ export default function ScreenManager() {
         <Route path="/balsheet/view" element={<Balsheet />} />
         <Route path="/keyproof" element={<Keyproof />} />
         <Route path="/itemization" element={<Itemization />} />
-        <Route path="/batches" element={<IntroScreen />} />
+        <Route path="/itemstoreview" element={<IntroScreen />} />
         <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
         <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />
         <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import {
+  getAttachmentById,
   getNextAttachment,
   getPendingAttachment,
   getPreviousAttachment,
@@ -21,6 +22,7 @@ export default function AttachmentReviewScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const day = searchParams.get("day");
+  const attachmentIdParam = searchParams.get("attachmentId");
   const [attachment, setAttachment] = useState<PendingAttachment | null>(null);
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [site, setSite] = useState("");
@@ -49,7 +51,9 @@ export default function AttachmentReviewScreen() {
 
   useEffect(() => {
     setLoading(true);
-    getPendingAttachment(day)
+    const request = attachmentIdParam ? getAttachmentById(Number(attachmentIdParam)) : getPendingAttachment(day);
+
+    request
       .then((data) => {
         const nextAttachment = data.done ? null : data;
         setAttachment(nextAttachment);
@@ -61,7 +65,7 @@ export default function AttachmentReviewScreen() {
         setError(err instanceof Error ? err.message : "Failed to load attachment");
       })
       .finally(() => setLoading(false));
-  }, [day]);
+  }, [day, attachmentIdParam]);
 
   useEffect(() => {
     fetchPendingByDay()
@@ -167,7 +171,7 @@ export default function AttachmentReviewScreen() {
 
   return (
     <AdminShell
-      sidebarCopy="Review each pending attachment, assign its site, and carry the selected site forward."
+      sidebarCopy="Review each attachment, assign its site, and carry the selected site forward."
       onBack={() => navigate("/site")}
       sidebarAction={
         <div style={attachmentStyles.sidebarField}>
@@ -189,7 +193,7 @@ export default function AttachmentReviewScreen() {
       }
       sidebarCardLabel="Batch items"
       sidebarCardValue={String(batchCount ?? "...")}
-      sidebarCardMeta={day ? "Counted from the current batch day." : "Counted from all pending items."}
+      sidebarCardMeta={day ? "Counted from the current batch day." : "Counted from all items in the flow."}
     >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
@@ -236,7 +240,7 @@ export default function AttachmentReviewScreen() {
                 </div>
               </div>
               <div style={adminStyles.heroStatusTitle}>
-                {attachment ? attachment.filename : "No pending attachment"}
+                {attachment ? attachment.filename : "No attachment selected"}
               </div>
               <div style={adminStyles.heroStatusText}>
                 The image gets more room now that the site metadata lives in the sidebar.
@@ -260,7 +264,7 @@ export default function AttachmentReviewScreen() {
           {siteError && <div style={attachmentStyles.errorBanner}>{siteError}</div>}
 
           {!attachment && !error && (
-            <div style={attachmentStyles.emptyState}>No pending attachments for this day.</div>
+            <div style={attachmentStyles.emptyState}>No attachments for this day.</div>
           )}
 
           {attachment && (

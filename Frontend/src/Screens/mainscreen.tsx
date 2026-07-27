@@ -52,11 +52,11 @@ export default function MainScreen() {
     },
     {
       title: "Site Review",
-      meta: "Open pending batches, review attachments, and keep the queue moving.",
+      meta: "Open review batches, review attachments, and keep the queue moving.",
       tone: "blue",
       action: "Open Site",
       path: "/site",
-      footnote: "Pending queue",
+      footnote: "Review queue",
     },
     {
       title: "Balance Sheet",
@@ -95,7 +95,7 @@ export default function MainScreen() {
   const stats: StatCard[] = [
     {
       label: "Focus",
-      value: "Pending review",
+      value: "Review queue",
       detail: "Keep the attachment queue moving with a calmer workspace.",
     },
     {

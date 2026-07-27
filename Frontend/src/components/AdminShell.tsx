@@ -104,13 +104,13 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/email-downloader": { path: "/email-downloader", label: "Email Downloader", meta: "Email review" },
   "/snapshot-generator": { path: "/snapshot-generator", label: "Snapshot Generator", meta: "Snapshot review" },
   "/worklist-editor": { path: "/worklist-editor", label: "Daily Worklist", meta: "Worklist editor" },
-  "/attachments": { path: "/attachments", label: "Pending", meta: "Pending queue" },
+  "/attachments": { path: "/attachments", label: "Attachments", meta: "Attachments queue" },
   "/balancecheck": { path: "/balancecheck", label: "Balance Check", meta: "Balance review" },
   "/balsheet": { path: "/balsheet", label: "Balance Sheet", meta: "Balance sheet" },
   "/balsheet/view": { path: "/balsheet/view", label: "Balance Sheet", meta: "Balance sheet" },
   "/keyproof": { path: "/keyproof", label: "Keyproof", meta: "Keyproof review" },
   "/itemization": { path: "/itemization", label: "Itemization", meta: "Itemization" },
-  "/batches": { path: "/batches", label: "Batches", meta: "Batch workspace" },
+  "/itemstoreview": { path: "/itemstoreview", label: "Items to Review", meta: "Items to Review workspace" },
   "/statements": { path: "/statements", label: "Statements", meta: "Statements" },
   "/request": { path: "/request", label: "Request", meta: "Request queue" },
   "/research": { path: "/research", label: "Research", meta: "Research tools" },
@@ -202,23 +202,23 @@ function loadLegacyGazeboSelection() {
 function resolveScreen(pathname: string, config?: AppConfig | null): FavoriteScreen {
   const normalized = normalizePath(pathname);
   const labels = {
-    attachments: config?.ui?.navigation?.attachments?.label ?? "Pending",
-    batches: config?.ui?.navigation?.batches?.label ?? "Batches",
+    attachments: config?.ui?.navigation?.attachments?.label ?? "Attachments",
+    itemstoreview: config?.ui?.navigation?.itemstoreview?.label ?? "Items to Review",
     siteReview: config?.ui?.navigation?.site_review?.label ?? "Site Review",
   };
   if (normalized === "/attachments") {
     return {
       path: "/attachments",
       label: labels.attachments,
-      meta: config?.ui?.navigation?.attachments?.meta ?? "Pending queue",
+      meta: config?.ui?.navigation?.attachments?.meta ?? "Attachments queue",
     };
   }
 
-  if (normalized === "/batches") {
+  if (normalized === "/itemstoreview") {
     return {
-      path: "/batches",
-      label: labels.batches,
-      meta: config?.ui?.navigation?.batches?.meta ?? "Batch workspace",
+      path: "/itemstoreview",
+      label: labels.itemstoreview,
+      meta: config?.ui?.navigation?.itemstoreview?.meta ?? "Items to Review workspace",
     };
   }
 

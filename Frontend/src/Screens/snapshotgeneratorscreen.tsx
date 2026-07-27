@@ -2,8 +2,8 @@ import type { CSSProperties } from "react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { runSnapshotGenerator, type SnapshotGeneratorResult } from "../api/snapshot_generator_api";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 
 export default function SnapshotGeneratorScreen() {
   const navigate = useNavigate();
@@ -33,48 +33,15 @@ export default function SnapshotGeneratorScreen() {
   }
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A snapshot generator workspace that turns the day bundle into review images for the queue.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Snapshot generator navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
-            <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/email-downloader")}>
-            <span style={adminStyles.navButtonLabel}>Email Downloader</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>Snapshot generator ready</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            It reads the email download folder and keeps each attachment linked to the imported file row.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      onBack={() => navigate("/")}
+      sidebarCopy="A snapshot generator workspace that turns the day bundle into review images for the queue."
+      sidebarCardLabel="Today"
+      sidebarCardValue="Snapshot generator ready"
+      sidebarCardMeta="It reads the email download folder and keeps each attachment linked to the imported file row."
+      ribbonTitle="Snapshot Generator"
+      useGlobalMenuFallback={false}
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -165,7 +132,7 @@ export default function SnapshotGeneratorScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 

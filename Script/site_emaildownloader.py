@@ -43,6 +43,11 @@ def prefixed_filename(batch_label, filename):
     return f"{batch_label}-{filename}"
 
 
+def is_signature_image(filename):
+    name = os.path.basename(str(filename or "")).lower()
+    return name.startswith("image001") and name.endswith(".png")
+
+
 def make_unique_path(folder, filename):
     base, ext = os.path.splitext(filename)
     candidate = filename
@@ -136,6 +141,7 @@ def _download_messages(folder, date_filter=None, move_messages_after=False, dest
     messages.Sort("[ReceivedTime]", True)
 
     downloaded_files = []
+    skipped_files = []
     processed_entry_ids = []
     batch_labels = set()
 
@@ -176,6 +182,10 @@ def _download_messages(folder, date_filter=None, move_messages_after=False, dest
 
         for att in msg.Attachments:
             filename = att.FileName
+            if is_signature_image(filename):
+                skipped_files.append(filename)
+                continue
+
             saved_name = prefixed_filename(batch_label, filename)
             save_path, actual_name = make_unique_path(DOWNLOAD_DIR, saved_name)
             att.SaveAsFile(save_path)
@@ -199,6 +209,8 @@ def _download_messages(folder, date_filter=None, move_messages_after=False, dest
     return {
         "downloaded_count": len(downloaded_files),
         "downloaded_files": downloaded_files,
+        "skipped_count": len(skipped_files),
+        "skipped_files": skipped_files,
         "processed_count": len(processed_entry_ids),
         "moved_count": moved_count,
         "batch_labels": sorted(batch_labels),
@@ -250,6 +262,8 @@ def download_emails_cli():
 
     result = _download_messages(folder, date_filter=date_filter, outlook=outlook)
     print("\nDownloaded:", result["downloaded_files"])
+    if result.get("skipped_files"):
+        print("\nSkipped signature images:", result["skipped_files"])
 
     while True:
         confirm = input("\nMove these emails to another folder? (Y/N): ").strip().upper()

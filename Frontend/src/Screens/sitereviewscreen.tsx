@@ -27,6 +27,7 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
   const [searchParams] = useSearchParams();
   const appConfig = useAppConfig();
   const [rows, setRows] = useState<ReviewHistoryRow[]>([]);
+  const [expandedBatchKeys, setExpandedBatchKeys] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const reviewUi = appConfig?.ui?.siteReview;
@@ -46,21 +47,23 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
   const activeView = normalizeView(searchParams.get("view"), initialView);
   const activeOption = viewOptions.find((option) => option.id === activeView) ?? viewOptions[2];
 
-  useEffect(() => {
+  const loadRows = async () => {
     setLoading(true);
-    getSiteReviewHistory()
-      .then((data) => {
-        setRows(data);
-        setError(null);
-      })
-      .catch((err) => {
-        setRows([]);
-        setError(err instanceof Error ? err.message : "Failed to load site review history");
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+    try {
+      const data = await getSiteReviewHistory(activeView);
+      setRows(activeView === "complete" ? data.filter(hasBatchId) : data);
+      setError(null);
+    } catch (err) {
+      setRows([]);
+      setError(err instanceof Error ? err.message : "Failed to load site review history");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadRows();
+  }, [activeView]);
 
   const approvedCount = useMemo(() => rows.filter((row) => row.status === "Approved").length, [rows]);
   const rejectedCount = useMemo(() => rows.filter((row) => row.status === "Rejected").length, [rows]);
@@ -81,6 +84,18 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
   const batchGroups = useMemo(() => groupRowsByBatch(rows), [rows]);
   const visibleBatchGroups = useMemo(() => groupRowsByBatch(visibleRows), [visibleRows]);
   const uniqueVisibleBatches = visibleBatchGroups.length;
+  const isBatchExpanded = (key: string) => expandedBatchKeys.has(key);
+  const toggleBatchExpanded = (key: string) => {
+    setExpandedBatchKeys((current) => {
+      const next = new Set(current);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
 
   const sidebarMeta =
     activeView === "complete"
@@ -108,13 +123,21 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
   const heroStatusText =
     reviewUi?.heroStatusText?.[activeView] ??
     (activeView === "complete"
-      ? `The timeline below groups records by batch so you can see how each file moved through the workflow, including ${pendingCount} pending row${
+      ? `The timeline below groups records by batch number so you can see how each file moved through the workflow, including ${pendingCount} row${
           pendingCount === 1 ? "" : "s"
-        }.`
+        } still queued for review.`
       : `The table below shows only ${activeOption.label.toLowerCase()} records, using the same structure as the other views.`);
 
   const openView = (view: ReviewHistoryView) => {
     navigate(`/site-review?view=${view}`);
+  };
+
+  const openPendingAttachment = (row: ReviewHistoryRow) => {
+    const params = new URLSearchParams({ attachmentId: String(row.id) });
+    if (row.batchDate) {
+      params.set("day", row.batchDate);
+    }
+    navigate(`/attachments?${params.toString()}`);
   };
 
   if (loading) {
@@ -239,6 +262,7 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
                     <th style={screenStyles.th}>Detail / Note</th>
                     <th style={screenStyles.th}>Amount</th>
                     <th style={screenStyles.th}>Processed</th>
+                    <th style={screenStyles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -251,6 +275,15 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
                       <td style={screenStyles.td}>{getDetailText(row)}</td>
                       <td style={screenStyles.td}>{formatCurrency(row.total)}</td>
                       <td style={screenStyles.td}>{formatDate(row.processedAt)}</td>
+                      <td style={screenStyles.td}>
+                        <button
+                          type="button"
+                          onClick={() => openPendingAttachment(row)}
+                          style={screenStyles.openButton}
+                        >
+                          Open Attachments
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -270,26 +303,45 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
                       </div>
                       <div style={screenStyles.batchMeta}>{summarizeGroup(group.rows)}</div>
                     </div>
-                    <div style={screenStyles.batchPills}>
-                      <span style={screenStyles.batchPill}>{countStatus(group.rows, "Approved")} approved</span>
-                      <span style={screenStyles.batchPill}>{countStatus(group.rows, "Rejected")} rejected</span>
-                      <span style={screenStyles.batchPill}>{countStatus(group.rows, "Pending")} pending</span>
+                    <div style={screenStyles.batchHeaderActions}>
+                      <div style={screenStyles.batchPills}>
+                        <span style={screenStyles.batchPill}>{countStatus(group.rows, "Approved")} approved</span>
+                        <span style={screenStyles.batchPill}>{countStatus(group.rows, "Rejected")} rejected</span>
+                        <span style={screenStyles.batchPill}>{countStatus(group.rows, "Pending")} to review</span>
+                      </div>
+                      <button
+                        type="button"
+                        aria-expanded={isBatchExpanded(group.key)}
+                        onClick={() => toggleBatchExpanded(group.key)}
+                        style={screenStyles.batchToggle}
+                      >
+                        {isBatchExpanded(group.key) ? "Collapse" : "Expand"}
+                      </button>
                     </div>
                   </div>
 
-                  <div style={screenStyles.batchRows}>
-                    {group.rows.map((row) => (
-                      <div key={row.id} style={screenStyles.batchRow}>
-                        <div style={screenStyles.batchRowTop}>
-                          <div style={screenStyles.batchRowTitle}>{row.filename}</div>
-                          <span style={{ ...screenStyles.statusChip, ...statusChipStyle(row.status) }}>{row.status}</span>
+                  {isBatchExpanded(group.key) && (
+                    <div style={screenStyles.batchRows}>
+                      {group.rows.map((row) => (
+                        <div key={row.id} style={screenStyles.batchRow}>
+                          <div style={screenStyles.batchRowTop}>
+                            <div style={screenStyles.batchRowTitle}>{row.filename}</div>
+                            <span style={{ ...screenStyles.statusChip, ...statusChipStyle(row.status) }}>
+                              {formatStatusLabel(row.status)}
+                            </span>
+                          </div>
+                          <div style={screenStyles.batchRowMeta}>
+                            {row.site || "No site"} - {getDetailText(row)} - {formatDate(row.processedAt)}
+                          </div>
+                          <div style={screenStyles.batchRowActions}>
+                            <button type="button" onClick={() => openPendingAttachment(row)} style={screenStyles.openButton}>
+                              Open Attachments
+                            </button>
+                          </div>
                         </div>
-                        <div style={screenStyles.batchRowMeta}>
-                          {row.site || "No site"} - {getDetailText(row)} - {formatDate(row.processedAt)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>
@@ -338,6 +390,10 @@ function getBatchKey(row: ReviewHistoryRow) {
 }
 
 function getBatchLabel(row: ReviewHistoryRow) {
+  if (row.batchId) {
+    return row.batchId;
+  }
+
   if (row.batchDate) {
     return formatDate(row.batchDate);
   }
@@ -358,7 +414,7 @@ function getDetailText(row: ReviewHistoryRow) {
     return row.reason || "Rejected";
   }
 
-  return row.detail || row.reason || "Pending";
+  return row.detail || row.reason || "To review";
 }
 
 function countStatus(rows: ReviewHistoryRow[], status: string) {
@@ -370,7 +426,15 @@ function summarizeGroup(rows: ReviewHistoryRow[]) {
   const rejected = countStatus(rows, "Rejected");
   const pending = countStatus(rows, "Pending");
 
-  return `${approved} approved, ${rejected} rejected, ${pending} pending`;
+  return `${approved} approved, ${rejected} rejected, ${pending} to review`;
+}
+
+function formatStatusLabel(status: string) {
+  if (status === "Pending") {
+    return "To review";
+  }
+
+  return status;
 }
 
 function groupRowsByBatch(rows: ReviewHistoryRow[]) {
@@ -399,6 +463,10 @@ function groupRowsByBatch(rows: ReviewHistoryRow[]) {
   }
 
   return Array.from(groups.values());
+}
+
+function hasBatchId(row: ReviewHistoryRow) {
+  return Boolean(row.batchId?.trim());
 }
 
 function statusChipStyle(status: string): CSSProperties {
@@ -534,6 +602,17 @@ const screenStyles: Record<string, CSSProperties> = {
     fontSize: "14px",
     verticalAlign: "top",
   },
+  openButton: {
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "rgba(245, 249, 253, 0.95)",
+    color: "#1f364d",
+    borderRadius: "999px",
+    padding: "8px 12px",
+    fontSize: "12px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 18px rgba(31, 54, 77, 0.06)",
+  },
   batchStack: {
     display: "grid",
     gap: "14px",
@@ -552,6 +631,13 @@ const screenStyles: Record<string, CSSProperties> = {
     alignItems: "flex-start",
     marginBottom: "14px",
     flexWrap: "wrap",
+  },
+  batchHeaderActions: {
+    display: "flex",
+    gap: "12px",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+    alignItems: "center",
   },
   batchKicker: {
     fontSize: "11px",
@@ -589,6 +675,22 @@ const screenStyles: Record<string, CSSProperties> = {
   batchRows: {
     display: "grid",
     gap: "10px",
+  },
+  batchRowActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    paddingTop: "8px",
+  },
+  batchToggle: {
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "rgba(245, 249, 253, 0.95)",
+    color: "#1f364d",
+    borderRadius: "999px",
+    padding: "10px 14px",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 18px rgba(31, 54, 77, 0.06)",
   },
   batchRow: {
     padding: "14px 15px",

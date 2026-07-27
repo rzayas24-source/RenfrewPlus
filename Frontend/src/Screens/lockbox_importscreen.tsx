@@ -248,7 +248,7 @@ export default function LockboxImportScreen() {
                 {uploading ? "Uploading..." : "Upload SearchResults.xls"}
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/attachments")}>
-                Open Pending
+                Open Attachments
               </button>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
                 Open Banking

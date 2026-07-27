@@ -24,7 +24,7 @@ export type AppConfig = {
         label?: string;
         meta?: string;
       };
-      batches?: {
+      itemstoreview?: {
         label?: string;
         meta?: string;
       };
@@ -33,7 +33,7 @@ export type AppConfig = {
         meta?: string;
       };
     };
-    batches?: {
+    itemstoreview?: {
       sidebarCopy?: string;
       heroKicker?: string;
       heroSubtitle?: string;

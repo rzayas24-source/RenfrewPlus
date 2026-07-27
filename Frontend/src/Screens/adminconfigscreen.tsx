@@ -49,6 +49,7 @@ export default function AdminConfigScreen() {
       sidebarCopy="Edit the live config.json payload that drives backend paths and config-aware UI labels."
       onBack={() => navigate("/admin")}
       hideBackButton
+      useGlobalMenuFallback={false}
       ribbonTitle="Config"
     >
       <section style={styles.page}>

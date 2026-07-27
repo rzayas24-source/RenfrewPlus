@@ -25,7 +25,17 @@ export async function getPendingAttachment(day?: string | null): Promise<Pending
   const response = await fetch(`${API_BASE}/attachments/pending${dayQuery(day)}`);
 
   if (!response.ok) {
-    throw new Error("Failed to load pending attachment");
+    throw new Error("Failed to load review attachment");
+  }
+
+  return await response.json();
+}
+
+export async function getAttachmentById(id: number): Promise<PendingResponse> {
+  const response = await fetch(`${API_BASE}/attachments/${id}`);
+
+  if (!response.ok) {
+    throw new Error("Failed to load attachment");
   }
 
   return await response.json();
@@ -82,6 +92,16 @@ export async function rejectAttachment(id: number) {
 
   if (!response.ok) {
     throw new Error("Failed to reject attachment");
+  }
+
+  return await response.json();
+}
+
+export async function restoreAttachmentToPending(id: number) {
+  const response = await fetch(`${API_BASE}/attachments/${id}/restore-pending`, { method: "POST" });
+
+  if (!response.ok) {
+    throw new Error("Failed to restore attachment to review");
   }
 
   return await response.json();

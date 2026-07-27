@@ -40,25 +40,25 @@ def default_config() -> dict[str, Any]:
         "ui": {
             "navigation": {
                 "attachments": {
-                    "label": "Pending",
-                    "meta": "Pending queue",
+                    "label": "Attachments",
+                    "meta": "Attachments queue",
                 },
-                "batches": {
-                    "label": "Batches",
-                    "meta": "Batch workspace",
+                "itemstoreview": {
+                    "label": "Items to Review",
+                    "meta": "Items to Review workspace",
                 },
                 "site_review": {
                     "label": "Site Review",
                     "meta": "Site review",
                 },
             },
-            "batches": {
-                "sidebarCopy": "A calm pending-items console for moving through day-based review batches.",
-                "heroKicker": "Batches",
+            "itemstoreview": {
+                "sidebarCopy": "A calm pending-items console for moving through day-based item review.",
+                "heroKicker": "Items to Review",
                 "heroSubtitle": "Review the day groups, open a batch, and step straight into the attachment flow.",
-                "statusPill": "Review batches",
+                "statusPill": "Review items",
                 "statusTitle": "One day, one bundle",
-                "statusText": "Each day group opens the matching attachment queue and stays tied to that batch.",
+                "statusText": "Each day group opens the matching attachment queue and stays tied to that item group.",
                 "sidebarCardLabel": "Today",
                 "sidebarCardMeta": "No pending work found.",
             },

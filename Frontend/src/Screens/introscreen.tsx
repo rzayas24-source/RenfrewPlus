@@ -39,14 +39,17 @@ export default function IntroScreen() {
   const [pending, setPending] = useState<PendingByDay>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const batchesUi = appConfig?.ui?.batches;
-  const sidebarCopy = batchesUi?.sidebarCopy ?? "A calm pending-items console for moving through day-based review batches.";
-  const ribbonTitle = batchesUi?.heroKicker ?? "Batches Menu";
-  const heroSubtitle = batchesUi?.heroSubtitle ?? "Review the day groups, open a batch, and step straight into the attachment flow.";
-  const heroStatusPill = batchesUi?.statusPill ?? "Review batches";
-  const heroStatusTitle = batchesUi?.statusTitle ?? "One day, one bundle";
-  const heroStatusText = batchesUi?.statusText ?? "Each day group opens the matching attachment queue and stays tied to that batch.";
-  const sidebarCardLabel = batchesUi?.sidebarCardLabel ?? "Today";
+  const itemstoreviewUi = appConfig?.ui?.itemstoreview;
+  const sidebarCopy =
+    itemstoreviewUi?.sidebarCopy ?? "A calm review console for moving through day-based item review.";
+  const ribbonTitle = itemstoreviewUi?.heroKicker ?? "Items to Review Menu";
+  const heroSubtitle =
+    itemstoreviewUi?.heroSubtitle ?? "Review the day groups, open a batch, and step straight into the attachment flow.";
+  const heroStatusPill = itemstoreviewUi?.statusPill ?? "Review items";
+  const heroStatusTitle = itemstoreviewUi?.statusTitle ?? "One day, one bundle";
+  const heroStatusText =
+    itemstoreviewUi?.statusText ?? "Each day group opens the matching attachment queue and stays tied to that item group.";
+  const sidebarCardLabel = itemstoreviewUi?.sidebarCardLabel ?? "Today";
 
   useEffect(() => {
     fetchPendingByDay()
@@ -56,7 +59,7 @@ export default function IntroScreen() {
       })
       .catch((err) => {
         setPending({});
-        setError(err instanceof Error ? err.message : "Failed to load pending items");
+        setError(err instanceof Error ? err.message : "Failed to load review items");
       })
       .finally(() => {
         setLoading(false);
@@ -69,8 +72,8 @@ export default function IntroScreen() {
     [days, pending]
   );
   const sidebarCardMeta =
-    batchesUi?.sidebarCardMeta ??
-    (days.length > 0 ? `${days.length} day group${days.length === 1 ? "" : "s"} ready to review.` : "No pending work found.");
+    itemstoreviewUi?.sidebarCardMeta ??
+    (days.length > 0 ? `${days.length} day group${days.length === 1 ? "" : "s"} ready to review.` : "No review work found.");
 
   if (loading) {
     return (
@@ -80,7 +83,7 @@ export default function IntroScreen() {
         hideBackButton
         ribbonTitle={ribbonTitle}
       >
-        <div style={introStyles.loadingState}>Loading pending items...</div>
+        <div style={introStyles.loadingState}>Loading review items...</div>
       </AdminShell>
     );
   }
@@ -92,13 +95,13 @@ export default function IntroScreen() {
       hideBackButton
       ribbonTitle={ribbonTitle}
       sidebarCardLabel={sidebarCardLabel}
-      sidebarCardValue={`${totalPending} pending`}
+      sidebarCardValue={`${totalPending} items`}
       sidebarCardMeta={sidebarCardMeta}
     >
       <section style={{ ...adminStyles.content, ...batchesStyles.content }}>
         <section style={{ ...adminStyles.heroShell, ...batchesStyles.heroShell }}>
           <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>{batchesUi?.heroKicker ?? "Batches"}</div>
+            <div style={adminStyles.kicker}>{itemstoreviewUi?.heroKicker ?? "Items to Review"}</div>
             <p style={adminStyles.subtitle}>{heroSubtitle}</p>
           </div>
 
@@ -116,7 +119,7 @@ export default function IntroScreen() {
 
         <section style={adminStyles.statsGrid}>
           <article style={adminStyles.statCard}>
-            <div style={adminStyles.statLabel}>Pending</div>
+            <div style={adminStyles.statLabel}>Items</div>
             <div style={adminStyles.statValue}>{totalPending}</div>
             <div style={adminStyles.statDetail}>All items currently waiting in the queue.</div>
           </article>
@@ -145,7 +148,7 @@ export default function IntroScreen() {
 
           {error && <div style={introStyles.errorBanner}>{error}</div>}
 
-          {days.length === 0 && !error && <div style={introStyles.emptyState}>No pending items found.</div>}
+          {days.length === 0 && !error && <div style={introStyles.emptyState}>No review items found.</div>}
 
           <div style={introStyles.dayGrid}>
             {days.map((day) => (

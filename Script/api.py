@@ -2106,6 +2106,33 @@ def get_first_pending(day: str | None = None):
     }
 
 
+@app.get("/attachments/{attachment_id}")
+def get_attachment_by_id(attachment_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        SELECT id, filename, site, snapshot_path, review_status, batch_date, batch_id, processed_at
+        FROM imported_files
+        WHERE id = ?
+    """, (attachment_id,))
+
+    row = cur.fetchone()
+    conn.close()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    return {
+        "id": row[0],
+        "filename": row[1],
+        "site": row[2],
+        "snapshot": row[3],
+        "status": row[4],
+        "done": False,
+    }
+
+
 @app.get("/email-downloader/folders")
 def get_email_downloader_folders():
     try:
@@ -2253,6 +2280,8 @@ def get_site_review_history(view: str | None = None):
     if status_filter:
         query += " WHERE review_status = ?"
         params.append(status_filter)
+    elif normalized_view == "complete":
+        query += " WHERE batch_id IS NOT NULL AND TRIM(batch_id) != ''"
 
     query += " ORDER BY COALESCE(batch_date, processed_at, filename) DESC, id DESC"
     cur.execute(query, params)
@@ -5493,6 +5522,23 @@ def reject_attachment(attachment_id: int):
     conn.close()
 
     return {"status": "rejected", "id": attachment_id}
+
+
+@app.post("/attachments/{attachment_id}/restore-pending")
+def restore_attachment_pending(attachment_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute("""
+        UPDATE imported_files
+        SET review_status = 'Pending'
+        WHERE id = ?
+    """, (attachment_id,))
+
+    conn.commit()
+    conn.close()
+
+    return {"status": "pending", "id": attachment_id}
 
 
 @app.get("/auth/roles")

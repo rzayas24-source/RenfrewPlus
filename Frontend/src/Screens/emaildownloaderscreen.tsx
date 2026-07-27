@@ -8,8 +8,8 @@ import {
   type EmailFolderOption,
   type EmailDownloadResult,
 } from "../api/email_downloader_api";
+import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
 
 export default function EmailDownloaderScreen() {
   const navigate = useNavigate();
@@ -135,48 +135,15 @@ export default function EmailDownloaderScreen() {
   }
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A focused workspace for picking the Outlook folder, choosing the day bundle, and running the downloader through the project.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label="Email downloader navigation">
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/site-review")}>
-            <span style={adminStyles.navButtonLabel}>Site Review</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/attachments")}>
-            <span style={adminStyles.navButtonLabel}>Pending</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>?</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Today</div>
-          <div style={adminStyles.sidebarCardValue}>Email downloader ready</div>
-          <div style={adminStyles.sidebarCardMeta}>
-            The batch stays tied to the selected day, and files land in the review pipeline automatically.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      onBack={() => navigate("/")}
+      sidebarCopy="A focused workspace for picking the Outlook folder, choosing the day bundle, and running the downloader through the project."
+      sidebarCardLabel="Selected folder"
+      sidebarCardValue={selectedFolderName}
+      sidebarCardMeta={loadingDates ? "Loading dates..." : `${dates.length} available date${dates.length === 1 ? "" : "s"}`}
+      ribbonTitle="Email Downloader"
+      useGlobalMenuFallback={false}
+    >
       <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
@@ -330,7 +297,7 @@ export default function EmailDownloaderScreen() {
           )}
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
