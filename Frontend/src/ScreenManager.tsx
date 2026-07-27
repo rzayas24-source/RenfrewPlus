@@ -6,7 +6,6 @@ import ApprovedList from "./Screens/approvedlist";
 import AttachmentReviewScreen from "./Screens/attachmentreview";
 import BalanceCheck from "./Screens/balancecheck";
 import Balsheet from "./Screens/balsheet";
-import CompletionLabel from "./Screens/completionlabel";
 import IntroScreen from "./Screens/introscreen";
 import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
@@ -33,8 +32,6 @@ import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
 import WorklistEditorScreen from "./Screens/worklisteditor";
-import NextLoader from "./Screens/nextloader";
-import Queue from "./Screens/queue";
 import RejectList from "./Screens/rejectlist";
 import SitesScreen from "./Screens/sitescreen";
 import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
@@ -95,21 +92,6 @@ function buildReviewParams(attachmentId: string | null, day: string | null, site
   return params;
 }
 
-function QueueScreen() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const day = searchParams.get("day");
-
-  return (
-    <Queue
-      onSelect={(id) => {
-        const params = buildReviewParams(String(id), day);
-        navigate(`/keyproof?${params.toString()}`);
-      }}
-    />
-  );
-}
-
 function RejectListScreen() {
   return <RejectList />;
 }
@@ -140,31 +122,6 @@ function BalanceCheckScreen() {
         onEditItemization={() => navigate(`/itemization?${itemizationParams.toString()}`)}
         onAccept={() => navigate(returnToQueue)}
       />
-    </main>
-  );
-}
-
-function CompletionLabelScreen() {
-  const navigate = useNavigate();
-
-  return (
-    <main style={balanceStyles.page}>
-      <section style={balanceStyles.card}>
-        <CompletionLabel />
-        <button style={balanceStyles.button} type="button" onClick={() => navigate("/attachments")}>
-          Back to Pending
-        </button>
-      </section>
-    </main>
-  );
-}
-
-function NextLoaderScreen() {
-  const navigate = useNavigate();
-
-  return (
-    <main style={balanceStyles.page}>
-      <NextLoader loadNext={() => navigate("/attachments")} />
     </main>
   );
 }
@@ -205,17 +162,14 @@ export default function ScreenManager() {
         <Route path="/balancecheck" element={<BalanceCheckScreen />} />
         <Route path="/balsheet" element={<Balsheet />} />
         <Route path="/balsheet/view" element={<Balsheet />} />
-        <Route path="/completionlabel" element={<CompletionLabelScreen />} />
         <Route path="/keyproof" element={<Keyproof />} />
         <Route path="/itemization" element={<Itemization />} />
-        <Route path="/nextloader" element={<NextLoaderScreen />} />
-        <Route path="/site" element={<IntroScreen />} />
+        <Route path="/batches" element={<IntroScreen />} />
         <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
         <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />
         <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />
         <Route path="/finance" element={<SectionPlaceholderScreen title="Finance" description="Finance tools will live here." />} />
         <Route path="/business" element={<SectionPlaceholderScreen title="Business" description="Business tools will live here." />} />
-        <Route path="/queue" element={<QueueScreen />} />
         <Route path="/rejectlist" element={<RejectListScreen />} />
         <Route path="/sites" element={<SitesScreen />} />
       </Routes>

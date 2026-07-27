@@ -16,6 +16,7 @@ from collections import defaultdict
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from openpyxl import load_workbook
 
 from system_calendar_core import (
     add_days,
@@ -40,6 +41,8 @@ ZIP_835_TRN_FOLDER = os.path.join(WORKFLOW_ROOT, "1.TRN")
 ZIP_835_ERA_FOLDER = os.path.join(WORKFLOW_ROOT, "2.ERA")
 ZIP_835_HTML_FOLDER = os.path.join(WORKFLOW_ROOT, "3.HTML")
 ZIP_835_TRN_ARCHIVE_FOLDER = os.path.join(ZIP_835_TRN_FOLDER, "Loaded")
+FLYWIRE_STORAGE_ROOT = os.path.join(WORKFLOW_ROOT, "Import_Flywire")
+FLYWIRE_UPLOAD_FOLDER = os.path.join(FLYWIRE_STORAGE_ROOT, "Uploads")
 EMAIL_DOWNLOADER_SCRIPT = os.path.join(os.path.dirname(__file__), "site_emaildownloader.py")
 SNAPSHOT_GENERATOR_SCRIPT = os.path.join(os.path.dirname(__file__), "site_snapshotgenerator.py")
 PYTHONW_EXE = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
@@ -60,12 +63,14 @@ def _ensure_source_table_columns_on_startup():
     try:
         ensure_imported_files_table(conn)
         backfill_imported_file_batches(conn)
+        ensure_flywire_tables(conn)
         ensure_source_table_columns(conn)
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
         ensure_tasks_table(conn)
         ensure_auth_tables(conn)
+        ensure_menu_table(conn)
         normalize_tasks_table_categories(conn)
         refresh_source_table_mirrors(conn)
     finally:
@@ -194,6 +199,541 @@ def backfill_imported_file_batches(conn=None):
 
     if close_conn:
         conn.close()
+
+
+FLYWIRE_DOCUMENTS_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("attachment_id", "INTEGER NOT NULL"),
+    ("attachment_filename", "TEXT"),
+    ("batch_id", "TEXT"),
+    ("batch_date", "TEXT"),
+    ("source_filename", "TEXT"),
+    ("stored_filename", "TEXT"),
+    ("stored_path", "TEXT"),
+    ("sheet_name", "TEXT"),
+    ("row_count", "INTEGER"),
+    ("total_amount", "REAL"),
+    ("summary_json", "TEXT"),
+    ("created_at", "TEXT"),
+    ("updated_at", "TEXT"),
+]
+
+FLYWIRE_ROWS_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("document_id", "INTEGER NOT NULL"),
+    ("position", "INTEGER"),
+    ("location", "TEXT"),
+    ("department", "TEXT"),
+    ("payment_method", "TEXT"),
+    ("payment_type", "TEXT"),
+    ("time_text", "TEXT"),
+    ("amount", "REAL"),
+    ("flywire_id", "TEXT"),
+    ("account_number", "TEXT"),
+    ("patient_name", "TEXT"),
+    ("billing_name", "TEXT"),
+    ("application", "TEXT"),
+    ("raw_json", "TEXT"),
+]
+
+
+def ensure_flywire_tables(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    os.makedirs(FLYWIRE_UPLOAD_FOLDER, exist_ok=True)
+
+    cur = conn.cursor()
+
+    document_column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in FLYWIRE_DOCUMENTS_TABLE_COLUMNS
+    )
+    row_column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in FLYWIRE_ROWS_TABLE_COLUMNS)
+
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Import_FlywireDocuments")} ({document_column_defs})')
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Import_FlywireRows")} ({row_column_defs})')
+    cur.execute(
+        f'CREATE UNIQUE INDEX IF NOT EXISTS idx_import_flywire_documents_attachment_id '
+        f'ON {_quote_identifier("Import_FlywireDocuments")} ({_quote_identifier("attachment_id")})'
+    )
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS idx_import_flywire_rows_document_id '
+        f'ON {_quote_identifier("Import_FlywireRows")} ({_quote_identifier("document_id")}, {_quote_identifier("position")})'
+    )
+
+    existing_document_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Import_FlywireDocuments")})').fetchall()
+    }
+    existing_row_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Import_FlywireRows")})').fetchall()
+    }
+
+    for column_name, column_type in FLYWIRE_DOCUMENTS_TABLE_COLUMNS:
+        if column_name.lower() in existing_document_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("Import_FlywireDocuments")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    for column_name, column_type in FLYWIRE_ROWS_TABLE_COLUMNS:
+        if column_name.lower() in existing_row_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("Import_FlywireRows")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def _normalize_flywire_text(value):
+    if value is None:
+        return ""
+    if isinstance(value, float) and pd.isna(value):
+        return ""
+    text = str(value).strip()
+    return text
+
+
+def _normalize_flywire_amount(value):
+    if value in (None, ""):
+        return None
+
+    if isinstance(value, (int, float)) and not pd.isna(value):
+        return float(value)
+
+    try:
+        parsed = float(str(value).replace("$", "").replace(",", "").strip())
+    except Exception:
+        return None
+
+    return parsed
+
+
+def _normalize_flywire_json_value(value):
+    if value is None:
+        return None
+    if isinstance(value, float) and pd.isna(value):
+        return None
+    if isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat(sep=" ", timespec="seconds")
+
+    try:
+        return value.item()
+    except Exception:
+        return str(value)
+
+
+def _normalize_flywire_column_name(value, index):
+    text = str(value or "").strip()
+    if not text or text.startswith("Unnamed:"):
+        return f"column_{index}"
+    return text
+
+
+def _load_flywire_workbook(file_bytes: bytes, filename: str):
+    extension = os.path.splitext(filename or "")[1].lower()
+    if extension in {".xlsx", ".xlsm"}:
+        engine = "openpyxl"
+    elif extension == ".xls":
+        engine = "xlrd"
+    else:
+        raise HTTPException(status_code=400, detail="Please upload a Fly Wire .xls or .xlsx workbook")
+
+    try:
+        workbook = load_workbook(BytesIO(file_bytes), data_only=True, read_only=True)
+    except Exception:
+        workbook = None
+
+    if workbook is not None:
+        worksheet = workbook[workbook.sheetnames[0]]
+        rows = list(worksheet.iter_rows(values_only=True))
+        if not rows:
+            raise HTTPException(status_code=400, detail="Fly Wire workbook is empty")
+
+        headers = [_normalize_flywire_column_name(value, index + 1) for index, value in enumerate(rows[0])]
+        data_rows = []
+        for raw_row in rows[1:]:
+            row_map = {
+                headers[index]: _normalize_flywire_json_value(value)
+                for index, value in enumerate(raw_row[: len(headers)])
+            }
+            data_rows.append(row_map)
+
+        return worksheet.title, data_rows
+
+    try:
+        dataframe = pd.read_excel(BytesIO(file_bytes), sheet_name=0, engine=engine)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Unable to read Fly Wire workbook: {exc}") from exc
+
+    if dataframe.empty:
+        raise HTTPException(status_code=400, detail="Fly Wire workbook is empty")
+
+    dataframe.columns = [_normalize_flywire_column_name(value, index + 1) for index, value in enumerate(dataframe.columns)]
+    data_rows = dataframe.where(pd.notna(dataframe), None).to_dict(orient="records")
+    sheet_name = str(getattr(dataframe, "attrs", {}).get("sheet_name") or "Sheet1")
+    return sheet_name, data_rows
+
+
+def _flywire_row_is_data(row_map: dict):
+    text_values = [str(value).strip() for value in row_map.values() if value not in (None, "")]
+    if not text_values:
+        return False
+
+    upper_values = [value.upper() for value in text_values]
+    if any(value == "TOTAL:" for value in upper_values):
+        return False
+    if any(value.startswith("AR COLLECTION:") for value in upper_values):
+        return False
+
+    meaningful_keys = (
+        "location",
+        "department",
+        "payment method",
+        "type",
+        "time",
+        "amount",
+        "id",
+        "account #",
+        "patient name",
+        "billing name",
+        "application",
+    )
+    lower_map = {str(key).strip().lower(): value for key, value in row_map.items()}
+    if any(_normalize_flywire_text(lower_map.get(key)) for key in meaningful_keys):
+        return True
+
+    amount = _normalize_flywire_amount(lower_map.get("amount"))
+    return amount not in (None, 0)
+
+
+def _row_dict_for_flywire(row_map: dict):
+    lower_map = {str(key).strip().lower(): value for key, value in row_map.items()}
+    amount = _normalize_flywire_amount(lower_map.get("amount"))
+    normalized_row = {
+        "location": _normalize_flywire_text(lower_map.get("location")),
+        "department": _normalize_flywire_text(lower_map.get("department")),
+        "payment_method": _normalize_flywire_text(lower_map.get("payment method")),
+        "payment_type": _normalize_flywire_text(lower_map.get("type")),
+        "time_text": _normalize_flywire_text(lower_map.get("time")),
+        "amount": amount,
+        "flywire_id": _normalize_flywire_text(lower_map.get("id")),
+        "account_number": _normalize_flywire_text(lower_map.get("account #") or lower_map.get("account number")),
+        "patient_name": _normalize_flywire_text(lower_map.get("patient name")),
+        "billing_name": _normalize_flywire_text(lower_map.get("billing name")),
+        "application": _normalize_flywire_text(lower_map.get("application")),
+        "raw_json": json.dumps(row_map, ensure_ascii=False),
+    }
+    return normalized_row
+
+
+def _build_flywire_summary(document_row, rows):
+    amount_total = round(sum(float(row["amount"] or 0) for row in rows), 2)
+    times = [row["time_text"] for row in rows if row["time_text"]]
+    locations = []
+    payment_methods = []
+    for row in rows:
+        if row["location"] and row["location"] not in locations:
+            locations.append(row["location"])
+        if row["payment_method"] and row["payment_method"] not in payment_methods:
+            payment_methods.append(row["payment_method"])
+
+    summary = {
+        "attachment_id": document_row["attachment_id"],
+        "attachment_filename": document_row["attachment_filename"],
+        "batch_id": document_row["batch_id"],
+        "batch_date": document_row["batch_date"],
+        "source_filename": document_row["source_filename"],
+        "sheet_name": document_row["sheet_name"],
+        "row_count": document_row["row_count"],
+        "total_amount": amount_total,
+        "first_time": times[0] if times else None,
+        "last_time": times[-1] if times else None,
+        "unique_locations": len(locations),
+        "payment_methods": payment_methods[:5],
+    }
+    return summary
+
+
+def _remove_existing_flywire_document(conn, attachment_id: int):
+    cur = conn.cursor()
+    existing_documents = cur.execute(
+        f'''
+        SELECT id, stored_path
+        FROM {_quote_identifier("Import_FlywireDocuments")}
+        WHERE {_quote_identifier("attachment_id")} = ?
+        ''',
+        (attachment_id,),
+    ).fetchall()
+
+    for document_id, stored_path in existing_documents:
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Import_FlywireRows")} WHERE {_quote_identifier("document_id")} = ?',
+            (document_id,),
+        )
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Import_FlywireDocuments")} WHERE {_quote_identifier("id")} = ?',
+            (document_id,),
+        )
+        if stored_path and os.path.exists(stored_path):
+            try:
+                os.remove(stored_path)
+            except OSError:
+                pass
+
+
+def _flywire_document_payload(document_row, rows):
+    summary = json.loads(document_row["summary_json"] or "{}")
+    return {
+        "document": {
+            "id": document_row["id"],
+            "attachment_id": document_row["attachment_id"],
+            "attachment_filename": document_row["attachment_filename"],
+            "batch_id": document_row["batch_id"],
+            "batch_date": document_row["batch_date"],
+            "source_filename": document_row["source_filename"],
+            "stored_filename": document_row["stored_filename"],
+            "stored_path": document_row["stored_path"],
+            "sheet_name": document_row["sheet_name"],
+            "row_count": document_row["row_count"],
+            "total_amount": document_row["total_amount"],
+            "created_at": document_row["created_at"],
+            "updated_at": document_row["updated_at"],
+        },
+        "summary": summary,
+        "rows": [
+            {
+                "id": row["id"],
+                "document_id": row["document_id"],
+                "position": row["position"],
+                "location": row["location"],
+                "department": row["department"],
+                "payment_method": row["payment_method"],
+                "payment_type": row["payment_type"],
+                "time_text": row["time_text"],
+                "amount": row["amount"],
+                "flywire_id": row["flywire_id"],
+                "account_number": row["account_number"],
+                "patient_name": row["patient_name"],
+                "billing_name": row["billing_name"],
+                "application": row["application"],
+                "raw_json": row["raw_json"],
+            }
+            for row in rows
+        ],
+    }
+
+
+def _flywire_attachment_context(attachment_row):
+    batch_id = attachment_row["batch_id"]
+    batch_date = attachment_row["batch_date"]
+
+    if not batch_id or not batch_date:
+        fallback_batch_id, fallback_batch_date = _batch_info_from_filename(attachment_row["filename"] or "")
+        if not batch_id:
+          batch_id = fallback_batch_id
+        if not batch_date:
+            batch_date = fallback_batch_date
+
+    return batch_id, batch_date
+
+
+def _flywire_search_tokens(batch_id, batch_date):
+    tokens = []
+
+    def add_token(value):
+        token = str(value or "").strip().lower()
+        if token and token not in tokens:
+            tokens.append(token)
+
+    if batch_id:
+        add_token(batch_id)
+        add_token(str(batch_id).replace(".", ""))
+        add_token(str(batch_id).replace(".", "-"))
+
+    normalized_batch_date = _normalize_pending_day(batch_date)
+    if normalized_batch_date:
+        add_token(normalized_batch_date)
+        try:
+            parsed_date = datetime.strptime(normalized_batch_date, "%Y-%m-%d")
+            add_token(parsed_date.strftime("%m%d%y"))
+            add_token(parsed_date.strftime("%m.%d.%y"))
+            add_token(parsed_date.strftime("%m-%d-%y"))
+            add_token(parsed_date.strftime("%Y%m%d"))
+        except ValueError:
+            pass
+
+    return tokens
+
+
+def _find_flywire_candidate_path(batch_id, batch_date):
+    emails_folder = os.path.join(WORKFLOW_ROOT, "4.Emails")
+    if not os.path.isdir(emails_folder):
+        return None
+
+    search_tokens = _flywire_search_tokens(batch_id, batch_date)
+    if not search_tokens:
+        return None
+
+    best_candidate = None
+    best_score = 0
+
+    for root, _dirs, files in os.walk(emails_folder):
+        for file_name in files:
+            lower_name = file_name.lower()
+            if "flywire" not in lower_name:
+                continue
+
+            score = 0
+            for token in search_tokens:
+                if token and token in lower_name:
+                    score += len(token)
+
+            if score > best_score:
+                best_score = score
+                best_candidate = os.path.join(root, file_name)
+
+    return best_candidate
+
+
+def _import_flywire_document(conn, attachment_row, file_name, file_bytes):
+    sheet_name, raw_rows = _load_flywire_workbook(file_bytes, file_name)
+    parsed_rows = [_row_dict_for_flywire(row_map) for row_map in raw_rows if _flywire_row_is_data(row_map)]
+    if not parsed_rows:
+        raise HTTPException(status_code=400, detail="No Fly Wire payment rows were found in that workbook")
+
+    attachment_id = attachment_row["id"]
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    extension = os.path.splitext(file_name)[1].lower()
+    stored_filename = f"Import_Flywire_{attachment_id}_{timestamp}{extension}"
+    stored_path = os.path.join(FLYWIRE_UPLOAD_FOLDER, stored_filename)
+    with open(stored_path, "wb") as output_file:
+        output_file.write(file_bytes)
+
+    _remove_existing_flywire_document(conn, attachment_id)
+
+    summary = {
+        "attachment_id": attachment_id,
+        "attachment_filename": attachment_row["filename"],
+        "batch_id": attachment_row["batch_id"],
+        "batch_date": attachment_row["batch_date"],
+        "source_filename": file_name,
+        "sheet_name": sheet_name,
+        "row_count": len(parsed_rows),
+        "total_amount": round(sum(float(row["amount"] or 0) for row in parsed_rows), 2),
+        "first_time": next((row["time_text"] for row in parsed_rows if row["time_text"]), None),
+        "last_time": next((row["time_text"] for row in reversed(parsed_rows) if row["time_text"]), None),
+        "unique_locations": len({row["location"] for row in parsed_rows if row["location"]}),
+        "payment_methods": list(dict.fromkeys(row["payment_method"] for row in parsed_rows if row["payment_method"]))[:5],
+    }
+
+    now = datetime.now().isoformat(timespec="seconds")
+    cur = conn.cursor()
+    cur.execute(
+        f'''
+        INSERT INTO {_quote_identifier("Import_FlywireDocuments")} (
+            {_quote_identifier("attachment_id")},
+            {_quote_identifier("attachment_filename")},
+            {_quote_identifier("batch_id")},
+            {_quote_identifier("batch_date")},
+            {_quote_identifier("source_filename")},
+            {_quote_identifier("stored_filename")},
+            {_quote_identifier("stored_path")},
+            {_quote_identifier("sheet_name")},
+            {_quote_identifier("row_count")},
+            {_quote_identifier("total_amount")},
+            {_quote_identifier("summary_json")},
+            {_quote_identifier("created_at")},
+            {_quote_identifier("updated_at")}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        (
+            attachment_id,
+            attachment_row["filename"],
+            attachment_row["batch_id"],
+            attachment_row["batch_date"],
+            file_name,
+            stored_filename,
+            stored_path,
+            sheet_name,
+            len(parsed_rows),
+            summary["total_amount"],
+            json.dumps(summary, ensure_ascii=False),
+            now,
+            now,
+        ),
+    )
+    document_id = cur.lastrowid
+
+    cur.executemany(
+        f'''
+        INSERT INTO {_quote_identifier("Import_FlywireRows")} (
+            {_quote_identifier("document_id")},
+            {_quote_identifier("position")},
+            {_quote_identifier("location")},
+            {_quote_identifier("department")},
+            {_quote_identifier("payment_method")},
+            {_quote_identifier("payment_type")},
+            {_quote_identifier("time_text")},
+            {_quote_identifier("amount")},
+            {_quote_identifier("flywire_id")},
+            {_quote_identifier("account_number")},
+            {_quote_identifier("patient_name")},
+            {_quote_identifier("billing_name")},
+            {_quote_identifier("application")},
+            {_quote_identifier("raw_json")}
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''',
+        [
+            (
+                document_id,
+                index,
+                row["location"],
+                row["department"],
+                row["payment_method"],
+                row["payment_type"],
+                row["time_text"],
+                row["amount"],
+                row["flywire_id"],
+                row["account_number"],
+                row["patient_name"],
+                row["billing_name"],
+                row["application"],
+                row["raw_json"],
+            )
+            for index, row in enumerate(parsed_rows, start=1)
+        ],
+    )
+
+    conn.commit()
+
+    document = conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier("Import_FlywireDocuments")}
+        WHERE {_quote_identifier("id")} = ?
+        ''',
+        (document_id,),
+    ).fetchone()
+    rows = conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier("Import_FlywireRows")}
+        WHERE {_quote_identifier("document_id")} = ?
+        ORDER BY {_quote_identifier("position")} ASC, {_quote_identifier("id")} ASC
+        ''',
+        (document_id,),
+    ).fetchall()
+    return _flywire_document_payload(document, rows)
 
 
 def _normalize_pending_day(value):
@@ -482,6 +1022,18 @@ AUTH_USER_TABLE_COLUMNS = [
     ("updated_at", "TEXT NOT NULL"),
 ]
 
+MENU_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("menu_key", "TEXT NOT NULL"),
+    ("item_id", "TEXT NOT NULL"),
+    ("position", "INTEGER NOT NULL DEFAULT 0"),
+    ("back", "INTEGER NOT NULL DEFAULT 0"),
+    ("darken", "INTEGER NOT NULL DEFAULT 0"),
+    ("enabled", "INTEGER NOT NULL DEFAULT 1"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
 DEFAULT_AUTH_ROLES = [
     {
         "name": "Admin",
@@ -646,6 +1198,123 @@ def ensure_auth_tables(conn=None):
         conn.close()
 
 
+def ensure_menu_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+
+    menu_column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in MENU_TABLE_COLUMNS
+    )
+
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Menu")} ({menu_column_defs})')
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS idx_menu_menu_key ON {_quote_identifier("Menu")} ({_quote_identifier("menu_key")}, {_quote_identifier("position")})'
+    )
+    cur.execute(
+        f'CREATE UNIQUE INDEX IF NOT EXISTS idx_menu_menu_key_item_id ON {_quote_identifier("Menu")} ({_quote_identifier("menu_key")}, {_quote_identifier("item_id")})'
+    )
+
+    existing_menu_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Menu")})').fetchall()
+    }
+    for column_name, column_type in MENU_TABLE_COLUMNS:
+        if column_name.lower() in existing_menu_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("Menu")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def _menu_row_to_payload(row):
+    return {
+        "id": row["id"],
+        "menu_key": row["menu_key"],
+        "item_id": row["item_id"],
+        "position": row["position"],
+        "back": bool(row["back"]),
+        "darken": bool(row["darken"]),
+        "enabled": bool(row["enabled"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _normalize_menu_key(menu_key: str) -> str:
+    value = str(menu_key or "").strip()
+    if not value:
+        raise HTTPException(status_code=400, detail="menu_key is required")
+    return value
+
+
+def _normalize_menu_selection(selection):
+    if selection is None:
+        return []
+
+    if not isinstance(selection, list):
+        raise HTTPException(status_code=400, detail="selection must be a list")
+
+    normalized = []
+    for entry in selection:
+        if not isinstance(entry, dict):
+            raise HTTPException(status_code=400, detail="selection entries must be objects")
+
+        item_id = str(entry.get("id") or "").strip()
+        if not item_id:
+            raise HTTPException(status_code=400, detail="selection entry id is required")
+
+        normalized.append(
+            {
+                "id": item_id,
+                "back": bool(entry.get("back")),
+                "darken": bool(entry.get("darken")),
+                "enabled": True if entry.get("enabled") is None else bool(entry.get("enabled")),
+            }
+        )
+
+    unique = []
+    seen = set()
+    for entry in normalized:
+        if entry["id"] in seen:
+            continue
+        seen.add(entry["id"])
+        unique.append(entry)
+    return unique
+
+
+def _replace_menu_rows(conn, menu_key: str, selection):
+    normalized_key = _normalize_menu_key(menu_key)
+    normalized_selection = _normalize_menu_selection(selection)
+    timestamp = _utc_now_iso()
+
+    cur = conn.cursor()
+    cur.execute(f'DELETE FROM {_quote_identifier("Menu")} WHERE {_quote_identifier("menu_key")} = ?', (normalized_key,))
+
+    for position, entry in enumerate(normalized_selection):
+        cur.execute(
+            f'INSERT INTO {_quote_identifier("Menu")} ({_quote_identifier("menu_key")}, {_quote_identifier("item_id")}, {_quote_identifier("position")}, {_quote_identifier("back")}, {_quote_identifier("darken")}, {_quote_identifier("enabled")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            (
+                normalized_key,
+                entry["id"],
+                position,
+                1 if entry["back"] else 0,
+                1 if entry["darken"] else 0,
+                1 if entry["enabled"] else 0,
+                timestamp,
+                timestamp,
+            ),
+        )
+
+
 def _role_row_to_payload(row):
     permissions = []
     try:
@@ -677,6 +1346,90 @@ def _user_row_to_payload(row):
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
+
+
+@app.get("/menu")
+def list_menu_entries():
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Menu")}
+            ORDER BY {_quote_identifier("menu_key")} ASC, {_quote_identifier("position")} ASC, {_quote_identifier("id")} ASC
+            '''
+        ).fetchall()
+        return [_menu_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.get("/menu/{menu_key:path}")
+def get_menu_entries(menu_key: str):
+    normalized_key = _normalize_menu_key(menu_key)
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Menu")}
+            WHERE {_quote_identifier("menu_key")} = ?
+            ORDER BY {_quote_identifier("position")} ASC, {_quote_identifier("id")} ASC
+            ''',
+            (normalized_key,),
+        ).fetchall()
+        return [_menu_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.put("/menu/{menu_key:path}")
+def save_menu_entries(menu_key: str, payload: dict):
+    conn = get_conn()
+    try:
+        _replace_menu_rows(conn, menu_key, payload.get("selection"))
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Menu")}
+            WHERE {_quote_identifier("menu_key")} = ?
+            ORDER BY {_quote_identifier("position")} ASC, {_quote_identifier("id")} ASC
+            ''',
+            (_normalize_menu_key(menu_key),),
+        ).fetchall()
+        return [_menu_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.delete("/menu/{menu_key:path}")
+def delete_menu_entries(menu_key: str):
+    normalized_key = _normalize_menu_key(menu_key)
+    conn = get_conn()
+    try:
+        conn.execute(
+            f'DELETE FROM {_quote_identifier("Menu")} WHERE {_quote_identifier("menu_key")} = ?',
+            (normalized_key,),
+        )
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
+
+
+@app.delete("/menu")
+def delete_all_menu_entries():
+    conn = get_conn()
+    try:
+        conn.execute(f'DELETE FROM {_quote_identifier("Menu")}')
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
 
 
 def _fetch_role_or_404(conn, role_id: int):
@@ -1325,32 +2078,6 @@ def run_snapshot_generator():
         return _run_script_worker(SNAPSHOT_GENERATOR_SCRIPT)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to run snapshot generator: {exc}") from exc
-
-
-@app.get("/queue")
-def get_queue():
-    conn = get_conn()
-    cur = conn.cursor()
-
-    cur.execute("""
-        SELECT id, filename, snapshot_path, review_status
-        FROM imported_files
-        WHERE review_status = 'Pending'
-        ORDER BY id ASC
-    """)
-
-    rows = cur.fetchall()
-    conn.close()
-
-    return [
-        {
-            "id": row[0],
-            "filename": row[1],
-            "snapshot": row[2],
-            "status": row[3],
-        }
-        for row in rows
-    ]
 
 
 @app.get("/pending/by-day")
@@ -4503,6 +5230,111 @@ def get_original_attachment(attachment_id: int):
 
     conn.close()
     raise HTTPException(status_code=404, detail="Original file not found")
+
+
+@app.get("/keyproof/flywire/{attachment_id}")
+def get_keyproof_flywire(attachment_id: int):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        document = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Import_FlywireDocuments")}
+            WHERE {_quote_identifier("attachment_id")} = ?
+            ORDER BY {_quote_identifier("id")} DESC
+            LIMIT 1
+            ''',
+            (attachment_id,),
+        ).fetchone()
+
+        if not document:
+            return {"document": None, "summary": None, "rows": []}
+
+        rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Import_FlywireRows")}
+            WHERE {_quote_identifier("document_id")} = ?
+            ORDER BY {_quote_identifier("position")} ASC, {_quote_identifier("id")} ASC
+            ''',
+            (document["id"],),
+        ).fetchall()
+        return _flywire_document_payload(document, rows)
+    finally:
+        conn.close()
+
+
+@app.post("/keyproof/flywire/{attachment_id}")
+async def upload_keyproof_flywire(attachment_id: int, file: UploadFile = File(...)):
+    file_name = os.path.basename(file.filename or "").strip()
+    if not file_name:
+        raise HTTPException(status_code=400, detail="Fly Wire filename is required")
+
+    extension = os.path.splitext(file_name)[1].lower()
+    if extension not in {".xlsx", ".xlsm", ".xls"}:
+        raise HTTPException(status_code=400, detail="Please upload a Fly Wire .xls or .xlsx workbook")
+
+    file_bytes = await file.read()
+    if not file_bytes:
+        raise HTTPException(status_code=400, detail="Fly Wire workbook is empty")
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        attachment_row = conn.execute(
+            f'''
+            SELECT id, filename, batch_id, batch_date
+            FROM {_quote_identifier("imported_files")}
+            WHERE {_quote_identifier("id")} = ?
+            ''',
+            (attachment_id,),
+        ).fetchone()
+        if not attachment_row:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+        return _import_flywire_document(conn, attachment_row, file_name, file_bytes)
+    finally:
+        conn.close()
+
+
+@app.post("/keyproof/flywire/{attachment_id}/autofind")
+def autofind_keyproof_flywire(attachment_id: int):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        attachment_row = conn.execute(
+            f'''
+            SELECT id, filename, batch_id, batch_date
+            FROM {_quote_identifier("imported_files")}
+            WHERE {_quote_identifier("id")} = ?
+            ''',
+            (attachment_id,),
+        ).fetchone()
+        if not attachment_row:
+            raise HTTPException(status_code=404, detail="Attachment not found")
+
+        batch_id, batch_date = _flywire_attachment_context(attachment_row)
+        candidate_path = _find_flywire_candidate_path(batch_id, batch_date)
+        if not candidate_path or not os.path.exists(candidate_path):
+            raise HTTPException(status_code=404, detail="No matching Fly Wire file was found in 4.Emails")
+
+        with open(candidate_path, "rb") as input_file:
+            file_bytes = input_file.read()
+        file_name = os.path.basename(candidate_path)
+        return _import_flywire_document(conn, attachment_row, file_name, file_bytes)
+    finally:
+        conn.close()
+
+
+@app.delete("/keyproof/flywire/{attachment_id}")
+def delete_keyproof_flywire(attachment_id: int):
+    conn = get_conn()
+    try:
+        _remove_existing_flywire_document(conn, attachment_id)
+        conn.commit()
+        return {"ok": True}
+    finally:
+        conn.close()
 
 
 # ------------------------------------------------------------

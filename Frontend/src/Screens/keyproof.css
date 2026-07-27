@@ -191,6 +191,10 @@
     background: #f6f9fc;
 }
 
+.keyproof-hidden-file {
+    display: none;
+}
+
 .keyproof-empty {
     padding: 24px;
 }
@@ -293,6 +297,171 @@
     padding: 14px;
 }
 
+.keyproof-flywire-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.keyproof-flywire-button {
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(188, 193, 203, 0.68);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(244, 248, 252, 0.96) 100%);
+    color: #15304f;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 18px rgba(119, 151, 198, 0.08);
+    transition: transform 120ms ease, box-shadow 160ms ease, border-color 160ms ease, background 160ms ease, color 160ms ease;
+}
+
+.keyproof-flywire-button:hover {
+    background: #ffffff;
+    transform: translateY(-1px);
+}
+
+.keyproof-flywire-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.66;
+    transform: none;
+}
+
+.keyproof-flywire-button-success {
+    border-color: rgba(95, 191, 110, 0.92);
+    background: linear-gradient(180deg, rgba(244, 255, 246, 0.98) 0%, rgba(226, 250, 231, 0.98) 100%);
+    color: #1c6b2b;
+    box-shadow:
+        0 0 0 1px rgba(111, 204, 129, 0.24),
+        0 0 24px rgba(111, 204, 129, 0.38),
+        0 12px 20px rgba(119, 151, 198, 0.08);
+    animation: keyproof-flywire-glow 1.8s ease-in-out infinite;
+}
+
+.keyproof-flywire-button-success:hover {
+    background: linear-gradient(180deg, rgba(239, 255, 241, 1) 0%, rgba(214, 246, 221, 1) 100%);
+}
+
+@keyframes keyproof-flywire-glow {
+    0%,
+    100% {
+        box-shadow:
+            0 0 0 1px rgba(111, 204, 129, 0.24),
+            0 0 16px rgba(111, 204, 129, 0.30),
+            0 12px 20px rgba(119, 151, 198, 0.08);
+    }
+
+    50% {
+        box-shadow:
+            0 0 0 1px rgba(111, 204, 129, 0.38),
+            0 0 28px rgba(111, 204, 129, 0.56),
+            0 14px 24px rgba(119, 151, 198, 0.10);
+    }
+}
+
+.keyproof-flywire-pill {
+    display: inline-flex;
+    align-items: center;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: rgba(214, 229, 255, 0.9);
+    color: #1f4e91;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.keyproof-flywire-status {
+    margin-bottom: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #597085;
+}
+
+.keyproof-flywire-empty {
+    padding: 14px;
+    border-radius: 16px;
+    border: 1px dashed rgba(140, 160, 184, 0.30);
+    background: rgba(247, 250, 253, 0.96);
+    color: #597085;
+    line-height: 1.6;
+}
+
+.keyproof-flywire-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.keyproof-flywire-stat {
+    padding: 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(140, 160, 184, 0.18);
+    background: rgba(247, 250, 253, 0.96);
+}
+
+.keyproof-flywire-statLabel {
+    margin-bottom: 6px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #72859a;
+    font-weight: 800;
+}
+
+.keyproof-flywire-statValue {
+    font-size: 15px;
+    line-height: 1.4;
+    font-weight: 800;
+    color: #17314f;
+    overflow-wrap: anywhere;
+}
+
+.keyproof-flywire-preview {
+    display: grid;
+    gap: 10px;
+}
+
+.keyproof-flywire-row {
+    padding: 12px 14px;
+    border-radius: 16px;
+    border: 1px solid rgba(140, 160, 184, 0.16);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 10px 18px rgba(119, 151, 198, 0.06);
+    display: grid;
+    gap: 6px;
+}
+
+.keyproof-flywire-rowTop {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
+.keyproof-flywire-rowTitle {
+    font-weight: 800;
+    color: #17314f;
+    line-height: 1.4;
+}
+
+.keyproof-flywire-rowAmount {
+    font-weight: 900;
+    color: #1f4e91;
+    white-space: nowrap;
+}
+
+.keyproof-flywire-rowMeta {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #597085;
+    overflow-wrap: anywhere;
+}
+
 .keyproof-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -355,5 +524,13 @@
 
     .keyproof-grid {
         grid-template-columns: 1fr;
+    }
+
+    .keyproof-flywire-summary {
+        grid-template-columns: 1fr;
+    }
+
+    .keyproof-flywire-rowTop {
+        flex-direction: column;
     }
 }

@@ -1,9 +1,13 @@
+import axios from "axios";
+
+const API = "http://127.0.0.1:8000";
+
 export type MenuOption = {
   id: string;
   label: string;
   meta: string;
   path?: string;
-  kind?: "back" | "screen";
+  kind?: "back" | "screen" | "menu";
 };
 
 export type MenuSelectionEntry = {
@@ -25,6 +29,7 @@ export const GLOBAL_MENU_ID = "__global__";
 export const ADMIN_MENU_ID = GLOBAL_MENU_ID;
 export const FIXED_MENU_ID = "__menu__";
 export const BACK_MENU_ID = "__back__";
+export const GAZEBO_MENU_ID = "gazebo";
 export const MENU_BUTTON_OPTION: MenuOption = {
   id: FIXED_MENU_ID,
   label: "Menu",
@@ -33,8 +38,16 @@ export const MENU_BUTTON_OPTION: MenuOption = {
   path: "/admin/menus",
 };
 
+export const GAZEBO_MENU_OPTION: MenuOption = {
+  id: GAZEBO_MENU_ID,
+  label: "Gazebo",
+  meta: "Pinned screens for the gazebo ribbon.",
+  kind: "menu",
+};
+
 export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: BACK_MENU_ID, label: "Previous", meta: "Return to the previous screen.", kind: "back", path: "/" },
+  GAZEBO_MENU_OPTION,
   { id: "/", label: "Main", meta: "Main workspace.", kind: "screen", path: "/" },
   { id: "/admin", label: "Admin", meta: "Admin console.", kind: "screen", path: "/admin" },
   { id: "/admin/tables", label: "Tables", meta: "Database browser.", kind: "screen", path: "/admin/tables" },
@@ -62,133 +75,117 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/attachments", label: "Pending", meta: "Pending queue.", kind: "screen", path: "/attachments" },
   { id: "/balancecheck", label: "Balance Check", meta: "Balance review.", kind: "screen", path: "/balancecheck" },
   { id: "/balsheet", label: "Balance Sheet", meta: "Balance sheet.", kind: "screen", path: "/balsheet" },
-  { id: "/completionlabel", label: "Completion Label", meta: "Completion label.", kind: "screen", path: "/completionlabel" },
   { id: "/keyproof", label: "Keyproof", meta: "Keyproof review.", kind: "screen", path: "/keyproof" },
   { id: "/itemization", label: "Itemization", meta: "Itemization.", kind: "screen", path: "/itemization" },
-  { id: "/nextloader", label: "Next Loader", meta: "Next item loader.", kind: "screen", path: "/nextloader" },
-  { id: "/site", label: "Site", meta: "Site workspace.", kind: "screen", path: "/site" },
+  { id: "/batches", label: "Batches", meta: "Batch workspace.", kind: "screen", path: "/batches" },
   { id: "/statements", label: "Statements", meta: "Statements.", kind: "screen", path: "/statements" },
   { id: "/request", label: "Request", meta: "Request queue.", kind: "screen", path: "/request" },
   { id: "/research", label: "Research", meta: "Research tools.", kind: "screen", path: "/research" },
   { id: "/finance", label: "Finance", meta: "Finance tools.", kind: "screen", path: "/finance" },
   { id: "/business", label: "Business", meta: "Business tools.", kind: "screen", path: "/business" },
-  { id: "/queue", label: "Queue", meta: "Queue view.", kind: "screen", path: "/queue" },
   { id: "/rejectlist", label: "Reject List", meta: "Reject list.", kind: "screen", path: "/rejectlist" },
   { id: "/sites", label: "Sites", meta: "Sites browser.", kind: "screen", path: "/sites" },
 ];
 
-type StoredMenuSelectionEntry = {
-  id: string;
-  mode?: "regular" | "back" | "darken";
-  back?: boolean;
-  darken?: boolean;
+export type MenuRow = {
+  id: number;
+  menu_key: string;
+  item_id: string;
+  position: number;
+  back?: boolean | number;
+  darken?: boolean | number;
+  enabled?: boolean | number;
+  created_at?: string;
+  updated_at?: string;
 };
 
-type MenuConfig = Record<string, Array<string | StoredMenuSelectionEntry>>;
-
-const DEFAULT_MENU_SELECTIONS: Record<string, string[]> = {
-};
-
-function loadConfig(): MenuConfig {
-  if (typeof window === "undefined") {
-    return {};
-  }
-
-  try {
-    const raw = window.localStorage.getItem(MENU_CONFIG_STORAGE_KEY);
-    if (!raw) return {};
-
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-
-    return Object.fromEntries(
-      Object.entries(parsed as Record<string, unknown>).map(([key, value]) => {
-        if (!Array.isArray(value)) {
-          return [key, []];
-        }
-
-        const entries = value.filter(
-          (item): item is string | StoredMenuSelectionEntry =>
-            typeof item === "string" || (Boolean(item) && typeof item === "object" && typeof (item as StoredMenuSelectionEntry).id === "string")
-        );
-
-        return [key, entries];
-      })
-    );
-  } catch {
-    return {};
-  }
-}
-
-function saveConfig(config: MenuConfig) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.localStorage.setItem(MENU_CONFIG_STORAGE_KEY, JSON.stringify(config));
-}
-
-function normalizeSelectionEntry(value: string | MenuSelectionEntry | StoredMenuSelectionEntry): MenuSelectionEntry | null {
-  if (typeof value === "string") {
-    return { id: value };
-  }
-
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-
+function normalizeSelectionEntry(value: Partial<MenuSelectionEntry> & { id?: string }): MenuSelectionEntry | null {
   if (typeof value.id !== "string") {
     return null;
   }
 
-  const storedValue = value as StoredMenuSelectionEntry;
-  const back = value.back === true || storedValue.mode === "back";
-  const darken = value.darken === true || storedValue.mode === "darken";
-
   const entry: MenuSelectionEntry = { id: value.id };
-  if (back) {
+  if (value.back === true) {
     entry.back = true;
   }
-  if (darken) {
+  if (value.darken === true) {
     entry.darken = true;
   }
   return entry;
 }
 
-export function loadMenuSelection(menuId: string, fallback: Array<string | MenuSelectionEntry> = []) {
-  const config = loadConfig();
-  const saved = config[menuId];
-  const rawSelection = saved && saved.length > 0 ? saved : fallback;
-  const normalized = rawSelection
-    .map(normalizeSelectionEntry)
-    .filter((item): item is MenuSelectionEntry => Boolean(item));
-
-  return normalized.filter((item, index, values) => values.findIndex((candidate) => candidate.id === item.id) === index);
-}
-
-export function getDefaultMenuSelection(menuId: string) {
-  return DEFAULT_MENU_SELECTIONS[menuId] ?? [];
-}
-
-export function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
-  const config = loadConfig();
-  config[menuId] = selection
+function normalizeSelectionEntries(values: Array<Partial<MenuSelectionEntry> & { id?: string }> = []) {
+  return values
     .map(normalizeSelectionEntry)
     .filter((item): item is MenuSelectionEntry => Boolean(item))
-    .filter((item, index, values) => values.findIndex((candidate) => candidate.id === item.id) === index);
-  saveConfig(config);
-  window.dispatchEvent(new Event("renfrew:menu-config-updated"));
+    .filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index);
 }
 
-export function clearAllMenuSelections() {
-  if (typeof window === "undefined") {
-    return;
+function rowToSelectionEntry(row: MenuRow) {
+  if (row.enabled === false || row.enabled === 0) {
+    return null;
   }
 
-  window.localStorage.removeItem(MENU_CONFIG_STORAGE_KEY);
-  window.dispatchEvent(new Event("renfrew:menu-config-updated"));
+  return normalizeSelectionEntry({
+    id: row.item_id,
+    back: row.back === true || row.back === 1,
+    darken: row.darken === true || row.darken === 1,
+  });
+}
+
+function selectionToPayload(selection: MenuSelectionEntry[]) {
+  return selection.map((entry) => ({
+    id: entry.id,
+    back: entry.back === true,
+    darken: entry.darken === true,
+    enabled: true,
+  }));
+}
+
+export async function loadMenuSelection(menuId: string) {
+  const response = await axios.get<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`);
+  return normalizeSelectionEntries(response.data.map((row) => rowToSelectionEntry(row)).filter(Boolean) as MenuSelectionEntry[]);
+}
+
+export async function loadAllMenuSelections() {
+  const response = await axios.get<MenuRow[]>(`${API}/menu`);
+  return response.data.reduce<Record<string, MenuSelectionEntry[]>>((accumulator, row) => {
+    const selection = rowToSelectionEntry(row);
+    if (!selection) {
+      return accumulator;
+    }
+
+    const bucket = accumulator[row.menu_key] ?? [];
+    if (!bucket.some((item) => item.id === selection.id)) {
+      bucket.push(selection);
+    }
+    accumulator[row.menu_key] = bucket;
+    return accumulator;
+  }, {});
+}
+
+export async function saveMenuSelection(menuId: string, selection: MenuSelectionEntry[]) {
+  const response = await axios.put<MenuRow[]>(`${API}/menu/${encodeURIComponent(menuId)}`, {
+    selection: selectionToPayload(selection),
+  });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("renfrew:menu-config-updated"));
+  }
+  return normalizeSelectionEntries(response.data.map((row) => rowToSelectionEntry(row)).filter(Boolean) as MenuSelectionEntry[]);
+}
+
+export async function clearMenuSelection(menuId: string) {
+  await axios.delete(`${API}/menu/${encodeURIComponent(menuId)}`);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("renfrew:menu-config-updated"));
+  }
+}
+
+export async function clearAllMenuSelections() {
+  await axios.delete(`${API}/menu`);
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("renfrew:menu-config-updated"));
+  }
 }
 
 export function getMenuOption(optionId: string) {

@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { WorklistBrandButton } from "../worklist/worklist";
 import {
-  GLOBAL_MENU_ID,
-  getDefaultMenuSelection,
+  GAZEBO_MENU_ID,
   loadMenuSelection,
+  saveMenuSelection,
   resolveMenuSelection,
   type MenuSelectionEntry,
 } from "../navigation/menuConfig";
@@ -30,6 +30,7 @@ type AdminShellProps = {
   sidebarAction?: ReactNode;
   sidebarCardLabel?: string;
   sidebarCardValue?: string;
+  sidebarCardValueStyle?: CSSProperties;
   sidebarCardMeta?: string;
   backLabel?: string;
   hideBackButton?: boolean;
@@ -48,8 +49,8 @@ type FavoriteScreen = {
   meta: string;
 };
 
-const FAVORITES_STORAGE_KEY = "gazebo:favorites";
 const MAX_FAVORITES = 8;
+const LEGACY_GAZEBO_STORAGE_KEY = "gazebo:favorites";
 
 const RIBBON_PASTELS: CSSProperties[] = [
   {
@@ -104,17 +105,14 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/balancecheck": { path: "/balancecheck", label: "Balance Check", meta: "Balance review" },
   "/balsheet": { path: "/balsheet", label: "Balance Sheet", meta: "Balance sheet" },
   "/balsheet/view": { path: "/balsheet/view", label: "Balance Sheet", meta: "Balance sheet" },
-  "/completionlabel": { path: "/completionlabel", label: "Completion Label", meta: "Completion label" },
   "/keyproof": { path: "/keyproof", label: "Keyproof", meta: "Keyproof review" },
   "/itemization": { path: "/itemization", label: "Itemization", meta: "Itemization" },
-  "/nextloader": { path: "/nextloader", label: "Next Loader", meta: "Next item loader" },
-  "/site": { path: "/site", label: "Site", meta: "Site workspace" },
+  "/batches": { path: "/batches", label: "Batches", meta: "Batch workspace" },
   "/statements": { path: "/statements", label: "Statements", meta: "Statements" },
   "/request": { path: "/request", label: "Request", meta: "Request queue" },
   "/research": { path: "/research", label: "Research", meta: "Research tools" },
   "/finance": { path: "/finance", label: "Finance", meta: "Finance tools" },
   "/business": { path: "/business", label: "Business", meta: "Business tools" },
-  "/queue": { path: "/queue", label: "Queue", meta: "Queue view" },
   "/rejectlist": { path: "/rejectlist", label: "Reject List", meta: "Reject list" },
   "/sites": { path: "/sites", label: "Sites", meta: "Sites browser" },
   "/aux-posting": { path: "/aux-posting", label: "Aux Posting", meta: "Aux posting" },
@@ -176,6 +174,29 @@ function formatScreenLabel(pathname: string) {
     .join(" ");
 }
 
+function loadLegacyGazeboSelection() {
+  if (typeof window === "undefined") {
+    return [];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(LEGACY_GAZEBO_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => normalizePath(value))
+      .filter((value, index, values) => values.indexOf(value) === index)
+      .slice(0, MAX_FAVORITES)
+      .map((value) => ({ id: value }));
+  } catch {
+    return [];
+  }
+}
+
 function resolveScreen(pathname: string): FavoriteScreen {
   const normalized = normalizePath(pathname);
   return (
@@ -187,67 +208,40 @@ function resolveScreen(pathname: string): FavoriteScreen {
   );
 }
 
-function loadFavoritePaths() {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  try {
-    const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
-    if (!raw) return [];
-
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((value): value is string => typeof value === "string")
-      .map((value) => normalizePath(value))
-      .filter((value, index, values) => values.indexOf(value) === index)
-      .slice(0, MAX_FAVORITES);
-  } catch {
-    return [];
-  }
-}
-
 export function AdminShell({
   children,
   sidebarCopy,
   sidebarTopCard,
   sidebarMiddleCard,
   sidebarAction,
+  ribbonItems,
   sidebarCardLabel,
   sidebarCardValue,
+  sidebarCardValueStyle,
   sidebarCardMeta,
   backLabel,
   hideBackButton,
   backButtonFirst,
   hideSidebarBackMenu,
   hideSidebarBackStyles,
-  useGlobalMenuFallback = true,
   onBack,
   ribbonTitle = "Favorites",
 }: AdminShellProps) {
   void backLabel;
   void onBack;
   void hideBackButton;
-  void backButtonFirst;
   const location = useLocation();
   const navigate = useNavigate();
   const currentScreen = useMemo(() => resolveScreen(location.pathname), [location.pathname]);
-  const currentScreenDefaults = useMemo(() => getDefaultMenuSelection(currentScreen.path), [currentScreen.path]);
   const [isRibbonOpen, setIsRibbonOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
-  const [favoritePaths, setFavoritePaths] = useState<string[]>(() => loadFavoritePaths());
-  const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>(() =>
-    loadMenuSelection(
-      currentScreen.path,
-      useGlobalMenuFallback ? loadMenuSelection(GLOBAL_MENU_ID, currentScreenDefaults) : currentScreenDefaults
-    )
-  );
-  const isFavorite = favoritePaths.includes(currentScreen.path);
+  const [gazeboSelection, setGazeboSelection] = useState<MenuSelectionEntry[]>([]);
+  const [isGazeboLoaded, setIsGazeboLoaded] = useState(false);
+  const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>([]);
+  const isFavorite = gazeboSelection.some((item) => item.id === currentScreen.path);
   const favoriteScreens = useMemo(
-    () => favoritePaths.map((path) => resolveScreen(path)).slice(0, MAX_FAVORITES),
-    [favoritePaths]
+    () => gazeboSelection.map((item) => resolveScreen(item.id)).slice(0, MAX_FAVORITES),
+    [gazeboSelection]
   );
   const navItems = useMemo(
     () => {
@@ -285,26 +279,45 @@ export function AdminShell({
   const priorityNavItems = navItems.slice(0, 2);
   const remainingNavItems = navItems.slice(2);
   useEffect(() => {
-    window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoritePaths));
-  }, [favoritePaths]);
+    let active = true;
 
-  useEffect(() => {
-    const syncMenu = () =>
-      setMenuSelection(
-        loadMenuSelection(
-          currentScreen.path,
-          useGlobalMenuFallback ? loadMenuSelection(GLOBAL_MENU_ID, currentScreenDefaults) : currentScreenDefaults
-        )
-      );
-    syncMenu();
+    const syncMenu = async () => {
+      const [nextSelection, nextGazeboSelection] = await Promise.all([
+        loadMenuSelection(currentScreen.path).catch(() => [] as MenuSelectionEntry[]),
+        loadMenuSelection(GAZEBO_MENU_ID).catch(() => [] as MenuSelectionEntry[]),
+      ]);
+
+      let resolvedGazeboSelection = nextGazeboSelection.slice(0, MAX_FAVORITES);
+      if (resolvedGazeboSelection.length === 0) {
+        const legacyGazeboSelection = loadLegacyGazeboSelection();
+        if (legacyGazeboSelection.length > 0) {
+          try {
+            resolvedGazeboSelection = (await saveMenuSelection(GAZEBO_MENU_ID, legacyGazeboSelection)).slice(
+              0,
+              MAX_FAVORITES
+            );
+            window.localStorage.removeItem(LEGACY_GAZEBO_STORAGE_KEY);
+          } catch {
+            resolvedGazeboSelection = legacyGazeboSelection;
+          }
+        }
+      }
+
+      if (active) {
+        setMenuSelection(nextSelection);
+        setGazeboSelection(resolvedGazeboSelection);
+        setIsGazeboLoaded(true);
+      }
+    };
+
+    void syncMenu();
     window.addEventListener("renfrew:menu-config-updated", syncMenu as EventListener);
-    window.addEventListener("storage", syncMenu);
 
     return () => {
+      active = false;
       window.removeEventListener("renfrew:menu-config-updated", syncMenu as EventListener);
-      window.removeEventListener("storage", syncMenu);
     };
-  }, [currentScreen.path, currentScreenDefaults, useGlobalMenuFallback]);
+  }, [currentScreen.path]);
 
   useEffect(() => {
     if (!favoriteNotice) return undefined;
@@ -312,21 +325,34 @@ export function AdminShell({
     return () => window.clearTimeout(timer);
   }, [favoriteNotice]);
 
-  const toggleFavorite = () => {
-    setFavoritePaths((current) => {
-      const exists = current.includes(currentScreen.path);
-      if (exists) {
-        return current.filter((path) => path !== currentScreen.path);
-      }
+  const toggleFavorite = async () => {
+    if (!isGazeboLoaded) {
+      return;
+    }
 
-      if (current.length >= MAX_FAVORITES) {
-        setFavoriteNotice("You can only have 8 items starred.");
-        return current;
-      }
+    const previousSelection = gazeboSelection;
+    const exists = previousSelection.some((item) => item.id === currentScreen.path);
+    const nextSelection = exists
+      ? previousSelection.filter((item) => item.id !== currentScreen.path)
+      : previousSelection.length >= MAX_FAVORITES
+        ? null
+        : [...previousSelection, { id: currentScreen.path }];
 
-      setFavoriteNotice(null);
-      return [...current, currentScreen.path];
-    });
+    if (!nextSelection) {
+      setFavoriteNotice("You can only have 8 items starred.");
+      return;
+    }
+
+    setFavoriteNotice(null);
+    setGazeboSelection(nextSelection);
+
+    try {
+      const savedSelection = await saveMenuSelection(GAZEBO_MENU_ID, nextSelection);
+      setGazeboSelection(savedSelection.slice(0, MAX_FAVORITES));
+    } catch {
+      setGazeboSelection(previousSelection);
+      setFavoriteNotice("Could not save the gazebo menu.");
+    }
   };
 
   return (
@@ -351,39 +377,80 @@ export function AdminShell({
           </button>
         </div>
 
+        {backButtonFirst && (
+          <nav style={styles.navStack} aria-label="Admin navigation">
+            {priorityNavItems.map((item) => (
+              <button
+                key={item.label}
+                className="sidebar-nav-button"
+                style={{
+                  ...styles.navButton,
+                  ...(item.isBackStyle ? styles.navButtonBack : null),
+                }}
+                type="button"
+                onClick={item.onClick}
+              >
+                <span style={styles.navButtonLabel}>{item.label}</span>
+                <span
+                  className="sidebar-nav-button__glyph"
+                  style={{
+                    ...styles.navButtonGlyph,
+                    ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
+                  }}
+                >
+                  {item.glyph ?? ">"}
+                </span>
+              </button>
+            ))}
+          </nav>
+        )}
+
         {sidebarCopy && <p style={styles.sidebarCopy}>{sidebarCopy}</p>}
 
         {sidebarTopCard && <div style={styles.sidebarTopCard}>{sidebarTopCard}</div>}
 
-        <nav style={styles.navStack} aria-label="Admin navigation">
-          {priorityNavItems.map((item) => (
-            <button
-              key={item.label}
-              className="sidebar-nav-button"
-              style={{
-                ...styles.navButton,
-                ...(item.isBackStyle ? styles.navButtonBack : null),
-              }}
-              type="button"
-              onClick={item.onClick}
-            >
-              <span style={styles.navButtonLabel}>{item.label}</span>
-              <span
-                className="sidebar-nav-button__glyph"
+        {!backButtonFirst && (
+          <nav style={styles.navStack} aria-label="Admin navigation">
+            {priorityNavItems.map((item) => (
+              <button
+                key={item.label}
+                className="sidebar-nav-button"
                 style={{
-                  ...styles.navButtonGlyph,
-                  ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
+                  ...styles.navButton,
+                  ...(item.isBackStyle ? styles.navButtonBack : null),
                 }}
+                type="button"
+                onClick={item.onClick}
               >
-                {item.glyph ?? ">"}
-              </span>
-            </button>
-          ))}
-        </nav>
+                <span style={styles.navButtonLabel}>{item.label}</span>
+                <span
+                  className="sidebar-nav-button__glyph"
+                  style={{
+                    ...styles.navButtonGlyph,
+                    ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
+                  }}
+                >
+                  {item.glyph ?? ">"}
+                </span>
+              </button>
+            ))}
+          </nav>
+        )}
 
         {sidebarMiddleCard && <div style={styles.sidebarCard}>{sidebarMiddleCard}</div>}
 
         {sidebarAction && <div style={styles.sidebarAction}>{sidebarAction}</div>}
+
+        {ribbonItems && ribbonItems.length > 0 && (
+          <div style={styles.sidebarRibbon}>
+            {ribbonItems.map((item) => (
+              <button key={item.title} type="button" onClick={item.onClick} style={styles.sidebarRibbonButton}>
+                <div style={styles.sidebarRibbonTitle}>{item.title}</div>
+                <div style={styles.sidebarRibbonMeta}>{item.meta}</div>
+              </button>
+            ))}
+          </div>
+        )}
 
         {remainingNavItems.length > 0 && (
           <nav style={styles.navStack} aria-label="Admin navigation more">
@@ -416,7 +483,9 @@ export function AdminShell({
         {(sidebarCardLabel || sidebarCardValue || sidebarCardMeta) && (
           <div style={styles.sidebarCard}>
             {sidebarCardLabel && <div style={styles.sidebarCardLabel}>{sidebarCardLabel}</div>}
-            {sidebarCardValue && <div style={styles.sidebarCardValue}>{sidebarCardValue}</div>}
+            {sidebarCardValue && (
+              <div style={{ ...styles.sidebarCardValue, ...sidebarCardValueStyle }}>{sidebarCardValue}</div>
+            )}
             {sidebarCardMeta && <div style={styles.sidebarCardMeta}>{sidebarCardMeta}</div>}
           </div>
         )}
@@ -430,6 +499,7 @@ export function AdminShell({
             }}
             aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
             title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+            disabled={!isGazeboLoaded}
           >
             <span style={{ ...styles.favoriteGlyph, ...(isFavorite ? styles.favoriteGlyphActive : null) }}>
               {isFavorite ? String.fromCharCode(9733) : String.fromCharCode(9734)}
@@ -600,6 +670,33 @@ export const styles: Record<string, CSSProperties> = {
   },
   sidebarAction: {
     marginBottom: "12px",
+  },
+  sidebarRibbon: {
+    display: "grid",
+    gap: "10px",
+    marginBottom: "12px",
+  },
+  sidebarRibbonButton: {
+    width: "100%",
+    textAlign: "left",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(245,248,252,0.95) 100%)",
+    padding: "14px",
+    cursor: "pointer",
+    boxShadow: "0 12px 24px rgba(52, 84, 120, 0.06)",
+    display: "grid",
+    gap: "4px",
+  },
+  sidebarRibbonTitle: {
+    fontSize: "14px",
+    fontWeight: 800,
+    color: "#17324f",
+  },
+  sidebarRibbonMeta: {
+    fontSize: "12px",
+    lineHeight: 1.45,
+    color: "#5d7187",
   },
   sidebarFooter: {
     marginTop: "auto",
