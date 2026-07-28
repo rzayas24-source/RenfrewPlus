@@ -4,7 +4,6 @@ import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
 import {
   approve835EdiStage,
-  load835TrnFiles,
   stage835EdiLoad,
   vet835EdiStage,
   upload835ZipFile,
@@ -43,13 +42,12 @@ export default function Upload835Screen() {
     text: "Choose the associated zip files to load into the TRN, ERA, and HTML workflow folders.",
   });
   const [zipSummary, setZipSummary] = useState<Upload835ZipResponse | null>(null);
-  const [loadingTrn, setLoadingTrn] = useState(false);
   const [trnStatus, setTrnStatus] = useState<{
     kind: "idle" | "success" | "error";
     text: string;
   }>({
     kind: "idle",
-    text: "Load the TRN files from the TRN workflow folder into EDILoad.",
+    text: "TRN files load directly from the zip after duplicate checks pass.",
   });
   const [trnSummary, setTrnSummary] = useState<Load835TrnResponse | null>(null);
   const [loadingStage, setLoadingStage] = useState(false);
@@ -100,7 +98,7 @@ export default function Upload835Screen() {
     setVetSummary(null);
     setTrnStatus({
       kind: "idle",
-      text: "Load the TRN files from the TRN workflow folder into EDILoad.",
+      text: "TRN files load directly from the zip after duplicate checks pass.",
     });
     setStageStatus({
       kind: "idle",
@@ -127,7 +125,9 @@ export default function Upload835Screen() {
     setZipSummary(null);
 
     try {
-      const results = await Promise.all(zipFiles.map((file) => upload835ZipFile(file)));
+      const uploadGroupId = crypto.randomUUID();
+      const results = await Promise.all(zipFiles.map((file) => upload835ZipFile(file, uploadGroupId)));
+      const lastZipResult = results[results.length - 1] ?? null;
       const totals = results.reduce(
         (acc, result) => {
           acc.trn += result.extractedCounts.trn;
@@ -139,14 +139,25 @@ export default function Upload835Screen() {
         { trn: 0, era: 0, html: 0, files: 0 }
       );
 
-      setZipSummary(results[results.length - 1] ?? null);
+      setZipSummary(lastZipResult);
       const totalBlocked = results.reduce((sum, result) => sum + (result.blockedCount || 0), 0);
+      const lastTrnLoad = [...results].reverse().find((result) => result.trnLoad)?.trnLoad ?? null;
+      if (lastTrnLoad) {
+        setTrnSummary(lastTrnLoad);
+        setTrnStatus({
+          kind: lastTrnLoad.filesBlocked > 0 ? "error" : "success",
+          text:
+            lastTrnLoad.filesBlocked > 0
+              ? `Uploaded zip(s) and loaded ${lastTrnLoad.filesLoaded} TRN file(s) into EDILoad. ${lastTrnLoad.filesBlocked} file(s) were blocked.`
+              : `Uploaded zip(s) and loaded ${lastTrnLoad.filesLoaded} TRN file(s) into EDILoad.`,
+        });
+      }
       setZipStatus({
         kind: totalBlocked > 0 ? "error" : "success",
         text:
           totalBlocked > 0
-            ? `Loaded ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s) from the workflow folders. ${totalBlocked} duplicate member(s) were blocked.`
-            : `Loaded ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s) from the workflow folders.`,
+            ? `Captured ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s). ${totalBlocked} TRN row(s) were blocked as duplicates. ERA and HTML remain pending acceptance.${lastTrnLoad ? " TRN files were also loaded into EDILoad." : ""}${lastZipResult?.manifestId ? ` Manifest ${lastZipResult.manifestId} is waiting in ${lastZipResult.pendingFolder}.` : ""}`
+            : `Captured ${totals.files} zip file(s): ${totals.trn} TRN, ${totals.era} ERA, ${totals.html} HTML file(s). TRN rows were loaded into EDILoad and ERA/HTML remain pending acceptance.${lastTrnLoad ? " TRN files were also loaded into EDILoad." : ""}${lastZipResult?.manifestId ? ` Manifest ${lastZipResult.manifestId} is waiting in ${lastZipResult.pendingFolder}.` : ""}`,
       });
     } catch (error) {
       setZipStatus({
@@ -155,34 +166,6 @@ export default function Upload835Screen() {
       });
     } finally {
       setLoadingZip(false);
-    }
-  };
-
-  const loadTrnFolder = async () => {
-    setLoadingTrn(true);
-    setTrnSummary(null);
-    setTrnStatus({
-      kind: "idle",
-      text: "Loading TRN files from the TRN workflow folder...",
-    });
-
-    try {
-      const response = await load835TrnFiles();
-      setTrnSummary(response);
-      setTrnStatus({
-        kind: response.filesBlocked > 0 ? "error" : "success",
-        text:
-          response.filesBlocked > 0
-            ? `Loaded ${response.filesLoaded} TRN file(s) into EDILoad. ${response.filesBlocked} file(s) were blocked.`
-            : `Loaded ${response.filesLoaded} TRN file(s) into EDILoad.`,
-      });
-    } catch (error) {
-      setTrnStatus({
-        kind: "error",
-        text: error instanceof Error ? error.message : "Failed to load TRN files.",
-      });
-    } finally {
-      setLoadingTrn(false);
     }
   };
 
@@ -199,7 +182,7 @@ export default function Upload835Screen() {
       setStageSummary(response);
       setStageStatus({
         kind: "success",
-        text: `${response.statusTag}: ${response.rowsStaged} row(s) staged into ${response.table}.`,
+        text: `${response.statusTag}: ${response.filesStaged} file(s) staged into ${response.table}.`,
       });
     } catch (error) {
       setStageStatus({
@@ -226,8 +209,8 @@ export default function Upload835Screen() {
         kind: response.duplicateCount > 0 ? "error" : "success",
         text:
           response.duplicateCount > 0
-            ? `${response.statusTag}: ${response.duplicateCount} duplicate row(s) blocked, ${response.rowsLoaded} row(s) loaded into ${response.table}.`
-            : `${response.statusTag}: ${response.rowsLoaded} row(s) loaded into ${response.table}.`,
+            ? `${response.statusTag}: ${response.duplicateCount} duplicate row(s) blocked, ${response.filesLoaded} file(s) loaded into ${response.table}.`
+            : `${response.statusTag}: ${response.filesLoaded} file(s) loaded into ${response.table}.`,
       });
     } catch (error) {
       setVetStatus({
@@ -342,37 +325,7 @@ export default function Upload835Screen() {
     >
       <input ref={fileInputRef} type="file" accept=".zip" multiple hidden onChange={handleZipInputChange} />
 
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
-          <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>835 Upload</div>
-            <p style={adminStyles.subtitle}>
-              A calm upload workspace for 835 remittance files, styled to match the EFT upload screen.
-            </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/835-match")}>
-                Open 835 Match
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/eft-upload")}>
-                Back to EFT Upload
-              </button>
-            </div>
-          </div>
-
-          <div style={adminStyles.heroArt}>
-            <div style={adminStyles.heroStatusCard}>
-              <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>835 upload window</span>
-                <span style={adminStyles.statusDot} />
-              </div>
-              <div style={adminStyles.heroStatusTitle}>Upload shell only</div>
-              <div style={adminStyles.heroStatusText}>
-                The styling matches the EFT upload screen so the new 835 area feels native to the same family.
-              </div>
-            </div>
-          </div>
-        </section>
+      <section style={{ ...adminStyles.content, paddingTop: 0, gap: "16px" }}>
 
         <section style={adminStyles.statsGrid}>
           <article style={adminStyles.statCard}>
@@ -464,7 +417,7 @@ export default function Upload835Screen() {
               <div style={adminStyles.widgetBody}>
                 <div style={adminStyles.widgetTitle}>Please select the associated zip files.</div>
                 <div style={adminStyles.widgetMeta}>
-                  Use the picker to choose the zip archives. When supported, it will start in Downloads.
+                  Use the picker to choose the zip archives. TRN is checked first, then ERA and HTML continue if clean.
                 </div>
                 {selectedZipNames.length > 0 && (
                   <div style={{ marginTop: "12px", display: "grid", gap: "6px" }}>
@@ -531,9 +484,6 @@ export default function Upload835Screen() {
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                      <button style={adminStyles.primaryButton} type="button" onClick={loadTrnFolder} disabled={loadingTrn}>
-                        {loadingTrn ? "Loading..." : "Load TRN Files"}
-                      </button>
                       <span
                         style={{
                           ...adminStyles.statusPill,
@@ -603,7 +553,7 @@ export default function Upload835Screen() {
                 </div>
                 {stageSummary && (
                   <div style={{ marginTop: "12px", fontSize: "0.92rem", color: "#5d6a7a" }}>
-                    Batch {stageSummary.batchnum}, trans {stageSummary.startTransnum} - {stageSummary.endTransnum}.
+                    {stageSummary.filesStaged} file(s), {stageSummary.rowsStaged} row(s). Batch {stageSummary.batchnum}, trans {stageSummary.startTransnum} - {stageSummary.endTransnum}.
                   </div>
                 )}
               </div>
@@ -690,7 +640,7 @@ export default function Upload835Screen() {
                     </summary>
                     <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
                       <div style={{ fontSize: "0.92rem", color: "#5d6a7a" }}>
-                        {vetSummary.totalRows} staged row(s), {vetSummary.rowsLoaded} loaded into EDIVett.
+                        {vetSummary.filesLoaded} file(s), {vetSummary.totalRows} staged row(s), {vetSummary.rowsLoaded} loaded into EDIVett.
                       </div>
                       {vetSummary.duplicateRows.length > 0 && (
                         <div

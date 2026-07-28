@@ -104,6 +104,45 @@ SOURCE_TABLE_MIRRORS = {
 }
 
 
+EDI_BATCH_MANIFEST_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("upload_group_id", "TEXT"),
+    ("batch_id", "TEXT"),
+    ("zip_filename", "TEXT"),
+    ("zip_path", "TEXT"),
+    ("zip_hash", "TEXT"),
+    ("status", "TEXT"),
+    ("trn_file_count", "INTEGER"),
+    ("era_file_count", "INTEGER"),
+    ("html_file_count", "INTEGER"),
+    ("accepted_count", "INTEGER"),
+    ("blocked_count", "INTEGER"),
+    ("duplicate_count", "INTEGER"),
+    ("notes", "TEXT"),
+    ("created_at", "TEXT"),
+    ("updated_at", "TEXT"),
+]
+
+
+EDI_BATCH_MANIFEST_ITEM_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY"),
+    ("manifest_id", "INTEGER"),
+    ("row_index", "INTEGER"),
+    ("trn_filename", "TEXT"),
+    ("check_date", "TEXT"),
+    ("check_number", "TEXT"),
+    ("check_amount", "REAL"),
+    ("row_status", "TEXT"),
+    ("blocked_reason", "TEXT"),
+    ("edi_id", "INTEGER"),
+    ("ediload_id", "INTEGER"),
+    ("edistage_id", "INTEGER"),
+    ("accepted_at", "TEXT"),
+    ("created_at", "TEXT"),
+    ("updated_at", "TEXT"),
+]
+
+
 def _quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
@@ -293,6 +332,39 @@ def ensure_eft_tables(conn=None):
         conn.close()
 
 
+def ensure_edi_manifest_tables(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    _create_table_exact(cur, "EDI_BatchManifest", EDI_BATCH_MANIFEST_COLUMNS)
+    _create_table_exact(cur, "EDI_BatchManifestItem", EDI_BATCH_MANIFEST_ITEM_COLUMNS)
+    conn.commit()
+
+    _rebuild_table_exact(conn, "EDI_BatchManifest", EDI_BATCH_MANIFEST_COLUMNS)
+    _rebuild_table_exact(conn, "EDI_BatchManifestItem", EDI_BATCH_MANIFEST_ITEM_COLUMNS)
+    conn.commit()
+
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_edi_batch_manifest_item_manifest_id ON EDI_BatchManifestItem(manifest_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_edi_batch_manifest_upload_group_id ON EDI_BatchManifest(upload_group_id)"
+    )
+    cur.execute(
+        "CREATE INDEX IF NOT EXISTS idx_edi_batch_manifest_item_check_number ON EDI_BatchManifestItem(check_number)"
+    )
+    cur.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_edi_batch_manifest_item_manifest_row ON EDI_BatchManifestItem(manifest_id, row_index)"
+    )
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
 def refresh_source_table_mirrors(conn=None):
     close_conn = False
     if conn is None:
@@ -307,11 +379,6 @@ def refresh_source_table_mirrors(conn=None):
 
         for mirror_table in mirror_tables:
             _ensure_table_schema_like_source(conn, source_table, mirror_table)
-            cur.execute(f"DELETE FROM {_quote_identifier(mirror_table)}")
-            cur.execute(
-                f"INSERT INTO {_quote_identifier(mirror_table)} "
-                f"SELECT * FROM {_quote_identifier(source_table)}"
-            )
 
     conn.commit()
 

@@ -6,6 +6,11 @@ export interface Upload835ZipResponse {
   filename: string;
   rowsLoaded: number;
   blockedCount: number;
+  trnLoad?: Load835TrnResponse | null;
+  manifestId?: number | null;
+  batchId?: string | null;
+  uploadGroupId?: string | null;
+  pendingFolder?: string | null;
   extractedCounts: {
     trn: number;
     era: number;
@@ -28,7 +33,7 @@ export interface Load835TrnResponse {
   filesBlocked: number;
   blockedRows: number;
   timestamp: string;
-  movedTo: string;
+  movedTo?: string | null;
 }
 
 export interface Stage835EdiResponse {
@@ -37,6 +42,7 @@ export interface Stage835EdiResponse {
   message: string;
   table: string;
   rowsStaged: number;
+  filesStaged: number;
   batchnum: string;
   startTransnum: string;
   endTransnum: string;
@@ -50,6 +56,7 @@ export interface Vet835EdiResponse {
   table: string;
   rowsLoaded: number;
   totalRows: number;
+  filesLoaded: number;
   duplicateCount: number;
   allDuplicates: boolean;
   duplicateRows: Array<{
@@ -80,9 +87,12 @@ export interface Approve835EdiResponse {
   matchRefreshWarning?: string;
 }
 
-export async function upload835ZipFile(file: File): Promise<Upload835ZipResponse> {
+export async function upload835ZipFile(file: File, uploadGroupId?: string): Promise<Upload835ZipResponse> {
   const formData = new FormData();
   formData.append("file", file);
+  if (uploadGroupId) {
+    formData.append("upload_group_id", uploadGroupId);
+  }
 
   const response = await fetch(`${API_BASE}/835/upload-stage`, {
     method: "POST",

@@ -7,14 +7,15 @@ import tempfile
 import zipfile
 import subprocess
 import sys
+import uuid
 import hashlib
 import hmac
 import secrets
-from io import BytesIO
+from io import BytesIO, StringIO
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from openpyxl import load_workbook
@@ -32,7 +33,13 @@ from system_calendar_core import (
     set_current_work_day,
     setup,
 )
-from source_table_schema import ensure_eft_tables, ensure_eftload_schema, ensure_source_table_columns, refresh_source_table_mirrors
+from source_table_schema import (
+    ensure_edi_manifest_tables,
+    ensure_eft_tables,
+    ensure_eftload_schema,
+    ensure_source_table_columns,
+    refresh_source_table_mirrors,
+)
 from system_source_match_core import build_match_dashboard, build_match_history, commit_all_strong_matches, commit_match, ensure_match_indexes, get_match_detail, normalize_checknum
 from system_banking_core import build_banking_spreadsheet
 import pandas as pd
@@ -44,6 +51,9 @@ DB_PATH = ""
 ZIP_835_TRN_FOLDER = ""
 ZIP_835_ERA_FOLDER = ""
 ZIP_835_HTML_FOLDER = ""
+ZIP_835_ERA_PROCESSING_FOLDER = ""
+ZIP_835_HTML_PROCESSING_FOLDER = ""
+EDI_PENDING_ROOT = ""
 ZIP_835_TRN_ARCHIVE_FOLDER = ""
 FLYWIRE_STORAGE_ROOT = ""
 FLYWIRE_UPLOAD_FOLDER = ""
@@ -61,6 +71,9 @@ def refresh_runtime_config(config: dict | None = None):
     global ZIP_835_TRN_FOLDER
     global ZIP_835_ERA_FOLDER
     global ZIP_835_HTML_FOLDER
+    global ZIP_835_ERA_PROCESSING_FOLDER
+    global ZIP_835_HTML_PROCESSING_FOLDER
+    global EDI_PENDING_ROOT
     global ZIP_835_TRN_ARCHIVE_FOLDER
     global FLYWIRE_STORAGE_ROOT
     global FLYWIRE_UPLOAD_FOLDER
@@ -75,6 +88,9 @@ def refresh_runtime_config(config: dict | None = None):
     ZIP_835_TRN_FOLDER = resolve_path(BACKEND_CONFIG, "trn_folder", Path(WORKFLOW_ROOT) / "1.TRN", relative_to=Path(WORKFLOW_ROOT))
     ZIP_835_ERA_FOLDER = resolve_path(BACKEND_CONFIG, "era_folder", Path(WORKFLOW_ROOT) / "2.ERA", relative_to=Path(WORKFLOW_ROOT))
     ZIP_835_HTML_FOLDER = resolve_path(BACKEND_CONFIG, "html_folder", Path(WORKFLOW_ROOT) / "3.HTML", relative_to=Path(WORKFLOW_ROOT))
+    ZIP_835_ERA_PROCESSING_FOLDER = os.path.join(ZIP_835_ERA_FOLDER, "Processing")
+    ZIP_835_HTML_PROCESSING_FOLDER = os.path.join(ZIP_835_HTML_FOLDER, "Processing")
+    EDI_PENDING_ROOT = os.path.join(WORKFLOW_ROOT, "EDI_Pending")
     ZIP_835_TRN_ARCHIVE_FOLDER = os.path.join(ZIP_835_TRN_FOLDER, "Loaded")
     FLYWIRE_STORAGE_ROOT = resolve_path(
         BACKEND_CONFIG,
@@ -91,7 +107,19 @@ def refresh_runtime_config(config: dict | None = None):
         relative_to=Path(WORKFLOW_ROOT),
     )
 
-    for path in [WORKFLOW_ROOT, DB_PATH, ZIP_835_TRN_FOLDER, ZIP_835_ERA_FOLDER, ZIP_835_HTML_FOLDER, FLYWIRE_STORAGE_ROOT, EMAILS_FOLDER, SNAPSHOTS_FOLDER]:
+    for path in [
+        WORKFLOW_ROOT,
+        DB_PATH,
+        ZIP_835_TRN_FOLDER,
+        ZIP_835_ERA_FOLDER,
+        ZIP_835_HTML_FOLDER,
+        ZIP_835_ERA_PROCESSING_FOLDER,
+        ZIP_835_HTML_PROCESSING_FOLDER,
+        EDI_PENDING_ROOT,
+        FLYWIRE_STORAGE_ROOT,
+        EMAILS_FOLDER,
+        SNAPSHOTS_FOLDER,
+    ]:
         if path and not os.path.splitext(path)[1]:
             os.makedirs(path, exist_ok=True)
 
@@ -117,6 +145,7 @@ def _ensure_source_table_columns_on_startup():
         backfill_imported_file_batches(conn)
         ensure_flywire_tables(conn)
         ensure_source_table_columns(conn)
+        ensure_edi_manifest_tables(conn)
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
@@ -767,7 +796,7 @@ def _import_flywire_document(conn, attachment_row, file_name, file_bytes):
             {_quote_identifier("billing_name")},
             {_quote_identifier("application")},
             {_quote_identifier("raw_json")}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
         [
             (
@@ -2807,6 +2836,420 @@ def _route_835_zip_member(member_name: str) -> tuple[str, str] | tuple[None, Non
     return None, None
 
 
+def _ensure_edi_pending_root():
+    os.makedirs(EDI_PENDING_ROOT, exist_ok=True)
+    return EDI_PENDING_ROOT
+
+
+def _edi_manifest_dir(manifest_id: int):
+    return os.path.join(_ensure_edi_pending_root(), f"manifest_{manifest_id}")
+
+
+def _edi_manifest_member_dir(manifest_id: int, member_kind: str):
+    return os.path.join(_edi_manifest_dir(manifest_id), member_kind.upper())
+
+
+def _edi_manifest_processing_member_dir(manifest_id: int, member_kind: str):
+    member_kind = str(member_kind or "").strip().upper()
+    processing_root = ZIP_835_ERA_PROCESSING_FOLDER if member_kind == "ERA" else ZIP_835_HTML_PROCESSING_FOLDER
+    return os.path.join(processing_root, f"manifest_{manifest_id}")
+
+
+def _save_bytes_to_path(destination: str, content: bytes):
+    os.makedirs(os.path.dirname(destination), exist_ok=True)
+    with open(destination, "wb") as handle:
+        handle.write(content)
+
+
+def _sha256_bytes(content: bytes) -> str:
+    return hashlib.sha256(content).hexdigest()
+
+
+def _create_edi_batch_manifest(
+    conn,
+    *,
+    upload_group_id: str,
+    batch_id: str,
+    zip_filename: str,
+    zip_path: str,
+    zip_hash: str,
+    created_at: str,
+):
+    cur = conn.cursor()
+    cur.execute(
+        """
+        INSERT INTO EDI_BatchManifest (
+            upload_group_id,
+            batch_id,
+            zip_filename,
+            zip_path,
+            zip_hash,
+            status,
+            trn_file_count,
+            era_file_count,
+            html_file_count,
+            accepted_count,
+            blocked_count,
+            duplicate_count,
+            notes,
+            created_at,
+            updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            upload_group_id,
+            batch_id,
+            zip_filename,
+            zip_path,
+            zip_hash,
+            "UPLOADING",
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            "",
+            created_at,
+            created_at,
+        ),
+    )
+    manifest_id = int(cur.lastrowid)
+    return manifest_id, batch_id
+
+
+def _update_edi_batch_manifest(
+    conn,
+    manifest_id: int,
+    *,
+    status: str,
+    trn_file_count: int,
+    era_file_count: int,
+    html_file_count: int,
+    accepted_count: int,
+    blocked_count: int,
+    duplicate_count: int,
+    notes: str,
+    updated_at: str,
+):
+    conn.execute(
+        """
+        UPDATE EDI_BatchManifest
+        SET status = ?,
+            trn_file_count = ?,
+            era_file_count = ?,
+            html_file_count = ?,
+            accepted_count = ?,
+            blocked_count = ?,
+            duplicate_count = ?,
+            notes = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            status,
+            trn_file_count,
+            era_file_count,
+            html_file_count,
+            accepted_count,
+            blocked_count,
+            duplicate_count,
+            notes,
+            updated_at,
+            manifest_id,
+        ),
+    )
+
+
+def _build_edi_manifest_item_rows(manifest_id: int, trn_file_rows, existing_edi_numbers, created_at: str):
+    seen_numbers = set(str(number).strip() for number in existing_edi_numbers if str(number).strip())
+    accepted_trn_file_rows = []
+    manifest_items = []
+    accepted_count = 0
+    blocked_count = 0
+    duplicate_count = 0
+    next_row_index = 1
+
+    for file_row in trn_file_rows:
+        filename = str(file_row.get("filename") or "").strip()
+        parsed_rows = list(file_row.get("rows") or [])
+        if not filename:
+            continue
+
+        accepted_rows_for_file = []
+        for file_row_index, (check_date, check_number, check_amount) in enumerate(parsed_rows, start=1):
+            normalized_check = str(check_number or "").strip()
+            is_duplicate = bool(normalized_check and normalized_check in seen_numbers)
+            row_status = "BLOCKED_DUPLICATE" if is_duplicate else "ACCEPTED"
+            blocked_reason = "Duplicate check number already exists in EDI" if is_duplicate else None
+
+            manifest_items.append(
+                {
+                    "manifest_id": manifest_id,
+                    "row_index": next_row_index,
+                    "trn_filename": filename,
+                    "trn_row_index": file_row_index,
+                    "check_date": check_date,
+                    "check_number": normalized_check,
+                    "check_amount": check_amount,
+                    "row_status": row_status,
+                    "blocked_reason": blocked_reason,
+                    "edi_id": None,
+                    "ediload_id": None,
+                    "edistage_id": None,
+                    "accepted_at": created_at if not is_duplicate else None,
+                    "created_at": created_at,
+                    "updated_at": created_at,
+                }
+            )
+
+            if is_duplicate:
+                blocked_count += 1
+                duplicate_count += 1
+                next_row_index += 1
+                continue
+
+            seen_numbers.add(normalized_check)
+            accepted_count += 1
+            accepted_rows_for_file.append((check_date, check_number, check_amount))
+            next_row_index += 1
+
+        if accepted_rows_for_file:
+            accepted_trn_file_rows.append({"filename": filename, "rows": accepted_rows_for_file})
+
+    return accepted_trn_file_rows, pd.DataFrame(manifest_items), accepted_count, blocked_count, duplicate_count
+
+
+def _normalize_sqlite_row(row, cursor=None):
+    if row is None:
+        return None
+    if hasattr(row, "keys"):
+        return dict(row)
+    if cursor is not None and getattr(cursor, "description", None):
+        return dict(zip([column[0] for column in cursor.description], row))
+    return row
+
+
+def _get_latest_edi_manifest(conn, statuses: tuple[str, ...] = ("PENDING_ACCEPTANCE", "PARTIAL", "TRANSFER_PENDING")):
+    if not statuses:
+        return None
+
+    placeholders = ", ".join(["?"] * len(statuses))
+    cur = conn.execute(
+        f"""
+        SELECT *
+        FROM EDI_BatchManifest
+        WHERE UPPER(TRIM(status)) IN ({placeholders})
+        ORDER BY datetime(created_at) DESC, id DESC
+        LIMIT 1
+        """,
+        tuple(statuses),
+    )
+    return _normalize_sqlite_row(cur.fetchone(), cur)
+
+
+def _short_edi_batch_id(upload_group_id: str):
+    token = str(upload_group_id or "").replace("-", "").strip()
+    if not token:
+        token = uuid.uuid4().hex
+    return f"835-{token[:8].upper()}"
+
+
+def _collect_edi_manifest_group(conn, manifest_row):
+    upload_group_id = str(manifest_row.get("upload_group_id") or "").strip()
+    if not upload_group_id:
+        return [_normalize_sqlite_row(manifest_row)]
+
+    cur = conn.execute(
+        """
+        SELECT *
+        FROM EDI_BatchManifest
+        WHERE upload_group_id = ?
+        ORDER BY datetime(created_at) ASC, id ASC
+        """,
+        (upload_group_id,),
+    )
+    rows = [_normalize_sqlite_row(row, cur) for row in cur.fetchall()]
+    return [row for row in rows if row]
+
+
+def _manifest_member_signature(manifest_dir: str):
+    stems = []
+    if not manifest_dir or not os.path.isdir(manifest_dir):
+        return ""
+
+    for root_dir, _dirs, files in os.walk(manifest_dir):
+        for filename in files:
+            if filename.lower().endswith(".zip"):
+                continue
+            stem = Path(filename).stem.strip().lower()
+            if stem:
+                stems.append(stem)
+
+    if not stems:
+        return ""
+
+    digest_input = "|".join(sorted(stems))
+    return hashlib.sha256(digest_input.encode("utf-8", errors="ignore")).hexdigest()
+
+
+def _collect_edi_manifest_family(conn, manifest_row):
+    manifest_id = int(manifest_row["id"])
+    manifest_dir = _edi_manifest_dir(manifest_id)
+    signature = _manifest_member_signature(manifest_dir)
+    if not signature:
+        return [{"row": _normalize_sqlite_row(manifest_row), "dir": manifest_dir, "signature": ""}]
+
+    family = []
+    pending_root = Path(EDI_PENDING_ROOT)
+    if not pending_root.is_dir():
+        return [{"row": _normalize_sqlite_row(manifest_row), "dir": manifest_dir, "signature": signature}]
+
+    for child in sorted(pending_root.iterdir(), key=lambda item: item.name):
+        if not child.is_dir() or not child.name.startswith("manifest_"):
+            continue
+        try:
+            sibling_id = int(child.name.split("_", 1)[1])
+        except (IndexError, ValueError):
+            continue
+
+        sibling_signature = _manifest_member_signature(str(child))
+        if sibling_signature != signature:
+            continue
+
+        sibling_row = conn.execute("SELECT * FROM EDI_BatchManifest WHERE id = ?", (sibling_id,)).fetchone()
+        if sibling_row is None:
+            continue
+        family.append(
+            {
+                "row": _normalize_sqlite_row(sibling_row),
+                "dir": str(child),
+                "signature": sibling_signature,
+            }
+        )
+
+    if not any(item["row"]["id"] == manifest_id for item in family):
+        family.append({"row": _normalize_sqlite_row(manifest_row), "dir": manifest_dir, "signature": signature})
+
+    family.sort(key=lambda item: int(item["row"]["id"]))
+    return family
+
+
+def _count_manifest_live_files(manifest_row, batch_id: str | None = None):
+    manifest_id = int(manifest_row["id"])
+    batch_id = str(batch_id or manifest_row["batch_id"] or f"835-{manifest_id}").strip()
+    counts = {"trn": 0, "era": 0, "html": 0}
+
+    for member_kind, target_root in (
+        ("trn", ZIP_835_TRN_ARCHIVE_FOLDER),
+        ("era", ZIP_835_ERA_FOLDER),
+        ("html", ZIP_835_HTML_FOLDER),
+    ):
+        if not os.path.isdir(target_root):
+            continue
+
+        prefix = f"{batch_id}__"
+        for filename in os.listdir(target_root):
+            full_path = os.path.join(target_root, filename)
+            if not os.path.isfile(full_path):
+                continue
+            if not filename.startswith(prefix):
+                continue
+            counts[member_kind] += 1
+
+    expected = {
+        "trn": int(manifest_row["trn_file_count"] or 0),
+        "era": int(manifest_row["era_file_count"] or 0),
+        "html": int(manifest_row["html_file_count"] or 0),
+    }
+    return expected, counts
+
+
+def _cleanup_edi_processing_dirs(manifest_rows):
+    for manifest_row in manifest_rows:
+        manifest_id = int(manifest_row["id"])
+        era_processing_dir = _edi_manifest_processing_member_dir(manifest_id, "ERA")
+        html_processing_dir = _edi_manifest_processing_member_dir(manifest_id, "HTML")
+        _safe_remove_tree(era_processing_dir, ZIP_835_ERA_FOLDER)
+        _safe_remove_tree(html_processing_dir, ZIP_835_HTML_FOLDER)
+
+
+def _cleanup_edi_processing_roots_if_idle(conn):
+    active_count = conn.execute(
+        """
+        SELECT COUNT(*)
+        FROM EDI_BatchManifest
+        WHERE UPPER(TRIM(status)) IN ('UPLOADING', 'PENDING_ACCEPTANCE', 'PARTIAL', 'TRANSFER_PENDING')
+        """
+    ).fetchone()[0]
+    if int(active_count or 0) > 0:
+        return
+
+    for processing_root in (ZIP_835_ERA_PROCESSING_FOLDER, ZIP_835_HTML_PROCESSING_FOLDER):
+        if not processing_root or not os.path.isdir(processing_root):
+            continue
+        for child_name in os.listdir(processing_root):
+            child_path = os.path.join(processing_root, child_name)
+            if os.path.isdir(child_path):
+                shutil.rmtree(child_path)
+            elif os.path.isfile(child_path):
+                os.remove(child_path)
+
+
+def _safe_remove_tree(path: str, allowed_root: str):
+    if not path:
+        return
+
+    resolved_path = Path(path).resolve()
+    resolved_root = Path(allowed_root).resolve()
+    try:
+        resolved_path.relative_to(resolved_root)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail="Refusing to remove a path outside the pending root") from exc
+
+    if resolved_path.exists():
+        shutil.rmtree(resolved_path)
+
+
+def _copy_manifest_file(source_path: str, destination_path: str):
+    if os.path.exists(destination_path):
+        return False
+    os.makedirs(os.path.dirname(destination_path), exist_ok=True)
+    shutil.copy2(source_path, destination_path)
+    return True
+
+
+def _promote_edi_manifest_files(conn, manifest_rows, destination_batch_id: str | None = None):
+    promoted = {"trn": 0, "era": 0, "html": 0}
+    manifest_dirs = []
+
+    for manifest_row in manifest_rows:
+        manifest_id = int(manifest_row["id"])
+        batch_id = str(destination_batch_id or manifest_row["batch_id"] or f"835-{manifest_id}").strip()
+        manifest_dirs.append(_edi_manifest_dir(manifest_id))
+
+        for member_kind, target_root, source_dir in (
+            ("TRN", ZIP_835_TRN_ARCHIVE_FOLDER, _edi_manifest_member_dir(manifest_id, "TRN")),
+            ("ERA", ZIP_835_ERA_FOLDER, _edi_manifest_processing_member_dir(manifest_id, "ERA")),
+            ("HTML", ZIP_835_HTML_FOLDER, _edi_manifest_processing_member_dir(manifest_id, "HTML")),
+        ):
+            if not os.path.isdir(source_dir):
+                continue
+
+            for filename in sorted(os.listdir(source_dir)):
+                source_path = os.path.join(source_dir, filename)
+                if not os.path.isfile(source_path):
+                    continue
+
+                promoted_name = f"{batch_id}__{filename}"
+                destination_path = os.path.join(target_root, promoted_name)
+                if _copy_manifest_file(source_path, destination_path):
+                    promoted[member_kind.lower()] += 1
+
+    primary_manifest_dir = manifest_dirs[0] if manifest_dirs else ""
+    return promoted, primary_manifest_dir
+
+
 def _ensure_ediload_table(conn):
     cur = conn.cursor()
     cur.execute(
@@ -2827,10 +3270,153 @@ def _ensure_ediload_table(conn):
     conn.commit()
 
 
+def _load_835_trn_folder_into_ediload(conn):
+    if not os.path.exists(ZIP_835_TRN_FOLDER):
+        raise HTTPException(status_code=404, detail="TRN folder does not exist")
+
+    os.makedirs(ZIP_835_TRN_ARCHIVE_FOLDER, exist_ok=True)
+
+    _ensure_ediload_table(conn)
+    cur = conn.cursor()
+    conn.execute("BEGIN IMMEDIATE")
+    cur.execute("DELETE FROM EDILoad")
+
+    work_state = cur.execute("SELECT batchnum, transnum FROM work_state WHERE id = 1").fetchone()
+    batchnum = str(work_state[0]).strip() if work_state and work_state[0] not in (None, "") else "1"
+    try:
+        next_trans = int(str(work_state[1]).strip() or "0") + 1 if work_state and work_state[1] not in (None, "") else 1
+    except ValueError:
+        next_trans = 1
+
+    load_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    total_files = 0
+    loaded_files = 0
+    blocked_files = 0
+    inserted_rows = 0
+    blocked_rows = 0
+    last_transnum = ""
+
+    for filename in sorted(os.listdir(ZIP_835_TRN_FOLDER)):
+        full_path = os.path.join(ZIP_835_TRN_FOLDER, filename)
+        if not os.path.isfile(full_path):
+            continue
+        if filename.startswith("~$"):
+            continue
+        if not filename.lower().endswith((".trn", ".txt")):
+            continue
+
+        total_files += 1
+        parsed_rows = _parse_835_trn_file(full_path)
+        if not parsed_rows:
+            blocked_files += 1
+            continue
+
+        new_rows = []
+        duplicate_numbers = []
+        for row in parsed_rows:
+            check_date, check_number, check_amount = row
+            exists = cur.execute(
+                "SELECT 1 FROM EDILoad WHERE check_number = ?",
+                (check_number,),
+            ).fetchone()
+            if exists:
+                duplicate_numbers.append(check_number)
+            else:
+                new_rows.append(row)
+
+        if not new_rows:
+            blocked_files += 1
+            blocked_rows += len(duplicate_numbers)
+            continue
+
+        file_frame = pd.DataFrame(
+            [
+                {
+                    "check_date": check_date,
+                    "check_number": check_number,
+                    "check_amount": check_amount,
+                    "filename": filename,
+                    "batchnum": batchnum,
+                    "transnum": str(next_trans + index),
+                    "timestamp": load_timestamp,
+                    "matchstatus": "UNMATCHED",
+                }
+                for index, (check_date, check_number, check_amount) in enumerate(new_rows)
+            ]
+        )
+
+        _append_table_from_dataframe(
+            conn,
+            "EDILoad",
+            file_frame[
+                [
+                    "check_date",
+                    "check_number",
+                    "check_amount",
+                    "filename",
+                    "batchnum",
+                    "transnum",
+                    "timestamp",
+                    "matchstatus",
+                ]
+            ],
+        )
+
+        inserted_rows += int(len(file_frame))
+        last_transnum = str(next_trans + len(file_frame) - 1)
+        next_trans += len(file_frame)
+
+        archive_path = os.path.join(ZIP_835_TRN_ARCHIVE_FOLDER, filename)
+        shutil.move(full_path, archive_path)
+        loaded_files += 1
+
+    if inserted_rows > 0:
+        cur.execute(
+            """
+            UPDATE work_state
+            SET transnum = ?,
+                timestamp = ?,
+                matchstatus = ?
+            WHERE id = 1
+            """,
+            (last_transnum, load_timestamp, "LOADED"),
+        )
+
+    conn.commit()
+
+    status_tag = "EDILOAD LOADED" if blocked_files == 0 else "EDILOAD PARTIAL"
+    status = "loaded" if blocked_files == 0 else "partial"
+    if inserted_rows == 0:
+        status_tag = "EDILOAD BLOCKED"
+        status = "blocked"
+
+    return {
+        "status": status,
+        "statusTag": status_tag,
+        "message": (
+            f"Loaded {loaded_files} TRN file(s) into EDILoad."
+            if inserted_rows > 0
+            else "No TRN rows qualified for EDILoad."
+        ),
+        "table": "EDILoad",
+        "rowsLoaded": inserted_rows,
+        "filesLoaded": loaded_files,
+        "filesBlocked": blocked_files,
+        "blockedRows": blocked_rows,
+        "timestamp": load_timestamp,
+        "movedTo": ZIP_835_TRN_ARCHIVE_FOLDER,
+        "totalFiles": total_files,
+    }
+
+
 def _parse_835_trn_file(path: str):
-    rows = []
     with open(path, "r", encoding="utf-8") as handle:
-        lines = [line.strip() for line in handle if line.strip()]
+        return _parse_835_trn_text(handle.read())
+
+
+def _parse_835_trn_text(text: str):
+    rows = []
+    lines = [line.strip() for line in StringIO(text) if line.strip()]
 
     if len(lines) < 3:
         return rows
@@ -2855,54 +3441,324 @@ def _parse_835_trn_file(path: str):
     return rows
 
 
+def _load_835_trn_rows_into_ediload(conn, trn_file_rows):
+    ensure_source_table_columns(conn)
+    _ensure_ediload_table(conn)
+    cur = conn.cursor()
+    conn.execute("BEGIN IMMEDIATE")
+    cur.execute("DELETE FROM EDILoad")
+
+    work_state = cur.execute("SELECT batchnum, transnum FROM work_state WHERE id = 1").fetchone()
+    batchnum = str(work_state[0]).strip() if work_state and work_state[0] not in (None, "") else "1"
+    try:
+        next_trans = int(str(work_state[1]).strip() or "0") + 1 if work_state and work_state[1] not in (None, "") else 1
+    except ValueError:
+        next_trans = 1
+
+    load_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    total_files = 0
+    loaded_files = 0
+    blocked_files = 0
+    inserted_rows = 0
+    blocked_rows = 0
+    last_transnum = ""
+    existing_edi_rows = cur.execute('SELECT "check_number" FROM EDI').fetchall()
+    edi_numbers = {
+        str(row[0]).strip()
+        for row in existing_edi_rows
+        if row and str(row[0]).strip()
+    }
+    seen_numbers = set(edi_numbers)
+
+    for file_row in trn_file_rows:
+        filename = str(file_row.get("filename") or "").strip()
+        parsed_rows = list(file_row.get("rows") or [])
+        if not filename:
+            continue
+
+        total_files += 1
+        if not parsed_rows:
+            blocked_files += 1
+            continue
+
+        new_rows = []
+        duplicate_numbers = []
+        for row in parsed_rows:
+            check_date, check_number, check_amount = row
+            if check_number in seen_numbers:
+                duplicate_numbers.append(check_number)
+            else:
+                new_rows.append(row)
+                seen_numbers.add(check_number)
+
+        if not new_rows:
+            blocked_files += 1
+            blocked_rows += len(duplicate_numbers)
+            continue
+
+        file_frame = pd.DataFrame(
+            [
+                {
+                    "check_date": check_date,
+                    "check_number": check_number,
+                    "check_amount": check_amount,
+                    "filename": filename,
+                    "batchnum": batchnum,
+                    "transnum": str(next_trans + index),
+                    "timestamp": load_timestamp,
+                    "matchstatus": "UNMATCHED",
+                }
+                for index, (check_date, check_number, check_amount) in enumerate(new_rows)
+            ]
+        )
+
+        _append_table_from_dataframe(
+            conn,
+            "EDILoad",
+            file_frame[
+                [
+                    "check_date",
+                    "check_number",
+                    "check_amount",
+                    "filename",
+                    "batchnum",
+                    "transnum",
+                    "timestamp",
+                    "matchstatus",
+                ]
+            ],
+        )
+
+        inserted_rows += int(len(file_frame))
+        last_transnum = str(next_trans + len(file_frame) - 1)
+        next_trans += len(file_frame)
+        loaded_files += 1
+
+    if inserted_rows > 0:
+        cur.execute(
+            """
+            UPDATE work_state
+            SET transnum = ?,
+                timestamp = ?,
+                matchstatus = ?
+            WHERE id = 1
+            """,
+            (last_transnum, load_timestamp, "LOADED"),
+        )
+
+    conn.commit()
+
+    status_tag = "EDILOAD LOADED" if blocked_files == 0 else "EDILOAD PARTIAL"
+    status = "loaded" if blocked_files == 0 else "partial"
+    if inserted_rows == 0:
+        status_tag = "EDILOAD BLOCKED"
+        status = "blocked"
+
+    return {
+        "status": status,
+        "statusTag": status_tag,
+        "message": (
+            f"Loaded {loaded_files} TRN file(s) into EDILoad."
+            if inserted_rows > 0
+            else "No TRN rows qualified for EDILoad."
+        ),
+        "table": "EDILoad",
+        "rowsLoaded": inserted_rows,
+        "filesLoaded": loaded_files,
+        "filesBlocked": blocked_files,
+        "blockedRows": blocked_rows,
+        "timestamp": load_timestamp,
+        "movedTo": None,
+        "totalFiles": total_files,
+    }
+
+
 @app.post("/835/upload-stage")
-async def post_835_upload_stage(file: UploadFile = File(...)):
+async def post_835_upload_stage(file: UploadFile = File(...), upload_group_id: str | None = Form(None)):
     filename = file.filename or ""
     if not filename.lower().endswith(".zip"):
         raise HTTPException(status_code=400, detail="Please choose a zip file")
 
+    conn = None
+    manifest_id = None
+    batch_id = None
+    upload_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    accepted_count = 0
+    blocked_count = 0
+    duplicate_count = 0
+    manifest_status = "BLOCKED"
+    upload_group_id = str(upload_group_id or "").strip() or uuid.uuid4().hex
+    batch_id = _short_edi_batch_id(upload_group_id)
+
     try:
         file_bytes = await file.read()
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Please choose a non-empty zip file")
+
         extracted_counts = {"trn": 0, "era": 0, "html": 0}
-        blocked_count = 0
+        trn_file_rows = []
+        trn_load = None
+        zip_hash = _sha256_bytes(file_bytes)
 
         with zipfile.ZipFile(BytesIO(file_bytes)) as archive:
+            conn = get_conn()
+            ensure_source_table_columns(conn)
+            ensure_edi_manifest_tables(conn)
+
+            existing_edi_rows = conn.execute('SELECT "check_number" FROM EDI').fetchall()
+            edi_numbers = {
+                str(row[0]).strip()
+                for row in existing_edi_rows
+                if row and str(row[0]).strip()
+            }
+
+            manifest_id, batch_id = _create_edi_batch_manifest(
+                conn,
+                upload_group_id=upload_group_id,
+                batch_id=batch_id,
+                zip_filename=filename,
+                zip_path="",
+                zip_hash=zip_hash,
+                created_at=upload_timestamp,
+            )
+            manifest_dir = _edi_manifest_dir(manifest_id)
+            pending_zip_path = os.path.join(manifest_dir, filename)
+            _save_bytes_to_path(pending_zip_path, file_bytes)
+            conn.execute(
+                """
+                UPDATE EDI_BatchManifest
+                SET zip_path = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (pending_zip_path, upload_timestamp, manifest_id),
+            )
+            conn.commit()
+
             for member in archive.infolist():
                 if member.is_dir():
                     continue
 
-                target_folder, target_name = _route_835_zip_member(member.filename)
-                if not target_folder or not target_name:
+                base_name = os.path.basename(member.filename or "").strip()
+                if not base_name:
                     continue
 
-                os.makedirs(target_folder, exist_ok=True)
-                destination = os.path.join(target_folder, target_name)
-                if os.path.exists(destination):
-                    blocked_count += 1
-                    continue
+                lower_name = base_name.lower()
+                if lower_name.endswith((".trn", ".txt")):
+                    with archive.open(member, "r") as source:
+                        trn_bytes = source.read()
+                    trn_destination = os.path.join(_edi_manifest_member_dir(manifest_id, "TRN"), base_name)
+                    _save_bytes_to_path(trn_destination, trn_bytes)
+                    trn_text = trn_bytes.decode("utf-8", errors="ignore")
+                    parsed_rows = _parse_835_trn_text(trn_text)
+                    if not parsed_rows:
+                        raise HTTPException(status_code=400, detail=f"TRN file {base_name} did not contain any parseable rows.")
 
-                with archive.open(member, "r") as source, open(destination, "wb") as target:
-                    shutil.copyfileobj(source, target)
-
-                if target_name.lower().endswith(".trn"):
+                    trn_file_rows.append({
+                        "filename": base_name,
+                        "rows": parsed_rows,
+                    })
                     extracted_counts["trn"] += 1
-                elif target_name.lower().endswith((".html", ".htm")):
+                elif lower_name.endswith((".html", ".htm")):
+                    with archive.open(member, "r") as source:
+                        html_bytes = source.read()
+                    html_destination = os.path.join(_edi_manifest_processing_member_dir(manifest_id, "HTML"), base_name)
+                    _save_bytes_to_path(html_destination, html_bytes)
                     extracted_counts["html"] += 1
-                elif target_name.lower().endswith(".era"):
+                elif lower_name.endswith(".era"):
+                    with archive.open(member, "r") as source:
+                        era_bytes = source.read()
+                    era_destination = os.path.join(_edi_manifest_processing_member_dir(manifest_id, "ERA"), base_name)
+                    _save_bytes_to_path(era_destination, era_bytes)
                     extracted_counts["era"] += 1
+
+            accepted_trn_file_rows, manifest_items_df, accepted_count, blocked_count, duplicate_count = _build_edi_manifest_item_rows(
+                manifest_id,
+                trn_file_rows,
+                edi_numbers,
+                upload_timestamp,
+            )
+
+            if not manifest_items_df.empty:
+                _append_table_from_dataframe(
+                    conn,
+                    "EDI_BatchManifestItem",
+                    manifest_items_df[
+                        [
+                            "manifest_id",
+                            "row_index",
+                            "trn_filename",
+                            "check_date",
+                            "check_number",
+                            "check_amount",
+                            "row_status",
+                            "blocked_reason",
+                            "edi_id",
+                            "ediload_id",
+                            "edistage_id",
+                            "accepted_at",
+                            "created_at",
+                            "updated_at",
+                        ]
+                    ],
+                )
+                conn.commit()
+
+            if accepted_trn_file_rows:
+                trn_conn = get_conn()
+                try:
+                    trn_load = _load_835_trn_rows_into_ediload(trn_conn, accepted_trn_file_rows)
+                finally:
+                    trn_conn.close()
+
+            if accepted_count == 0:
+                manifest_status = "BLOCKED"
+            elif blocked_count > 0:
+                manifest_status = "PARTIAL"
+            else:
+                manifest_status = "PENDING_ACCEPTANCE"
+
+            manifest_notes = (
+                "All TRN rows were blocked by duplicates in EDI."
+                if accepted_count == 0
+                else (
+                    f"{blocked_count} TRN row(s) were blocked as duplicates in EDI."
+                    if blocked_count > 0
+                    else "TRN rows were loaded and ERA/HTML were held pending acceptance."
+                )
+            )
+
+            _update_edi_batch_manifest(
+                conn,
+                manifest_id,
+                status=manifest_status,
+                trn_file_count=extracted_counts["trn"],
+                era_file_count=extracted_counts["era"],
+                html_file_count=extracted_counts["html"],
+                accepted_count=accepted_count,
+                blocked_count=blocked_count,
+                duplicate_count=duplicate_count,
+                notes=manifest_notes,
+                updated_at=upload_timestamp,
+            )
+            conn.commit()
 
         rows_loaded = extracted_counts["trn"] + extracted_counts["era"] + extracted_counts["html"]
         return {
             "status": "success",
-            "statusTag": "Loaded" if blocked_count == 0 else "Partial",
+            "statusTag": manifest_status,
             "filename": filename,
             "rowsLoaded": rows_loaded,
             "blockedCount": blocked_count,
             "extractedCounts": extracted_counts,
+            "trnLoad": trn_load,
+            "manifestId": manifest_id,
+            "batchId": batch_id,
+            "uploadGroupId": upload_group_id,
+            "pendingFolder": _edi_manifest_dir(manifest_id) if manifest_id is not None else None,
             "destinations": {
-                "trn": ZIP_835_TRN_FOLDER,
-                "era": ZIP_835_ERA_FOLDER,
-                "html": ZIP_835_HTML_FOLDER,
+                "trn": _edi_manifest_member_dir(manifest_id, "TRN") if manifest_id is not None else None,
+                "era": _edi_manifest_processing_member_dir(manifest_id, "ERA") if manifest_id is not None else None,
+                "html": _edi_manifest_processing_member_dir(manifest_id, "HTML") if manifest_id is not None else None,
             },
         }
     except zipfile.BadZipFile:
@@ -2910,147 +3766,35 @@ async def post_835_upload_stage(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as exc:
+        if conn is not None and manifest_id is not None:
+            try:
+                _update_edi_batch_manifest(
+                    conn,
+                    manifest_id,
+                    status="ERROR",
+                    trn_file_count=0,
+                    era_file_count=0,
+                    html_file_count=0,
+                    accepted_count=0,
+                    blocked_count=0,
+                    duplicate_count=0,
+                    notes=str(exc),
+                    updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to process 835 zip file: {exc}")
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @app.post("/835/load-trn-folder")
 def post_835_load_trn_folder():
-    if not os.path.exists(ZIP_835_TRN_FOLDER):
-        raise HTTPException(status_code=404, detail="TRN folder does not exist")
-
-    os.makedirs(ZIP_835_TRN_ARCHIVE_FOLDER, exist_ok=True)
-
     conn = get_conn()
     try:
-        _ensure_ediload_table(conn)
-        cur = conn.cursor()
-        conn.execute("BEGIN IMMEDIATE")
-
-        work_state = cur.execute("SELECT batchnum, transnum FROM work_state WHERE id = 1").fetchone()
-        batchnum = str(work_state[0]).strip() if work_state and work_state[0] not in (None, "") else "1"
-        try:
-            next_trans = int(str(work_state[1]).strip() or "0") + 1 if work_state and work_state[1] not in (None, "") else 1
-        except ValueError:
-            next_trans = 1
-
-        load_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        total_files = 0
-        loaded_files = 0
-        blocked_files = 0
-        inserted_rows = 0
-        blocked_rows = 0
-        last_transnum = ""
-
-        for filename in sorted(os.listdir(ZIP_835_TRN_FOLDER)):
-            full_path = os.path.join(ZIP_835_TRN_FOLDER, filename)
-            if not os.path.isfile(full_path):
-                continue
-            if filename.startswith("~$"):
-                continue
-            if not filename.lower().endswith((".trn", ".txt")):
-                continue
-
-            total_files += 1
-            parsed_rows = _parse_835_trn_file(full_path)
-            if not parsed_rows:
-                blocked_files += 1
-                continue
-
-            new_rows = []
-            duplicate_numbers = []
-            for row in parsed_rows:
-                check_date, check_number, check_amount = row
-                exists = cur.execute(
-                    "SELECT 1 FROM EDILoad WHERE check_number = ?",
-                    (check_number,),
-                ).fetchone()
-                if exists:
-                    duplicate_numbers.append(check_number)
-                else:
-                    new_rows.append(row)
-
-            if not new_rows:
-                blocked_files += 1
-                blocked_rows += len(duplicate_numbers)
-                continue
-
-            file_frame = pd.DataFrame(
-                [
-                    {
-                        "check_date": check_date,
-                        "check_number": check_number,
-                        "check_amount": check_amount,
-                        "filename": filename,
-                        "batchnum": batchnum,
-                        "transnum": str(next_trans + index),
-                        "timestamp": load_timestamp,
-                        "matchstatus": "UNMATCHED",
-                    }
-                    for index, (check_date, check_number, check_amount) in enumerate(new_rows)
-                ]
-            )
-
-            _append_table_from_dataframe(
-                conn,
-                "EDILoad",
-                file_frame[
-                    [
-                        "check_date",
-                        "check_number",
-                        "check_amount",
-                        "filename",
-                        "batchnum",
-                        "transnum",
-                        "timestamp",
-                        "matchstatus",
-                    ]
-                ],
-            )
-
-            inserted_rows += int(len(file_frame))
-            last_transnum = str(next_trans + len(file_frame) - 1)
-            next_trans += len(file_frame)
-
-            archive_path = os.path.join(ZIP_835_TRN_ARCHIVE_FOLDER, filename)
-            shutil.move(full_path, archive_path)
-            loaded_files += 1
-
-        if inserted_rows > 0:
-            cur.execute(
-                """
-                UPDATE work_state
-                SET transnum = ?,
-                    timestamp = ?,
-                    matchstatus = ?
-                WHERE id = 1
-                """,
-                (last_transnum, load_timestamp, "LOADED"),
-            )
-
-        conn.commit()
-
-        status_tag = "EDILOAD LOADED" if blocked_files == 0 else "EDILOAD PARTIAL"
-        status = "loaded" if blocked_files == 0 else "partial"
-        if inserted_rows == 0:
-            status_tag = "EDILOAD BLOCKED"
-            status = "blocked"
-
-        return {
-            "status": status,
-            "statusTag": status_tag,
-            "message": (
-                f"Loaded {loaded_files} TRN file(s) into EDILoad."
-                if inserted_rows > 0
-                else "No TRN rows qualified for EDILoad."
-            ),
-            "table": "EDILoad",
-            "rowsLoaded": inserted_rows,
-            "filesLoaded": loaded_files,
-            "filesBlocked": blocked_files,
-            "blockedRows": blocked_rows,
-            "timestamp": load_timestamp,
-            "movedTo": ZIP_835_TRN_ARCHIVE_FOLDER,
-        }
+        return _load_835_trn_folder_into_ediload(conn)
     except HTTPException:
         conn.rollback()
         raise
@@ -3112,6 +3856,7 @@ def post_835_stage_edi():
             "message": f"Copied {len(staged_df)} row(s) from EDILoad to EDIStage.",
             "table": "EDIStage",
             "rowsStaged": int(len(staged_df)),
+            "filesStaged": int(staged_df["filename"].nunique()) if "filename" in staged_df.columns else 0,
             "batchnum": batchnum,
             "startTransnum": str(next_trans),
             "endTransnum": str(end_trans),
@@ -3235,6 +3980,7 @@ def post_835_vet_edi():
             "table": "EDIVett",
             "rowsLoaded": loaded_count,
             "totalRows": total_rows,
+            "filesLoaded": int(working_df["filename"].nunique()) if "filename" in working_df.columns else 0,
             "duplicateCount": duplicate_count,
             "allDuplicates": all_duplicates,
             "duplicateRows": duplicate_rows,
@@ -3262,11 +4008,36 @@ async def post_835_approval_stage(request: Request):
     refresh_warning = ""
     try:
         ensure_source_table_columns(conn)
+        ensure_edi_manifest_tables(conn)
         cur = conn.cursor()
-        conn.execute("BEGIN IMMEDIATE")
         approval_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        manifest_row = _get_latest_edi_manifest(conn)
+        manifest_id = int(manifest_row["id"]) if manifest_row else None
+        manifest_batch_id = str(manifest_row["batch_id"] or "") if manifest_row else ""
+        manifest_group_rows = _collect_edi_manifest_group(conn, manifest_row) if manifest_row else []
 
         if decision == "deny":
+            if manifest_group_rows:
+                for group_row in manifest_group_rows:
+                    _update_edi_batch_manifest(
+                        conn,
+                        int(group_row["id"]),
+                        status="REJECTED",
+                        trn_file_count=int(group_row["trn_file_count"] or 0),
+                        era_file_count=int(group_row["era_file_count"] or 0),
+                        html_file_count=int(group_row["html_file_count"] or 0),
+                        accepted_count=int(group_row["accepted_count"] or 0),
+                        blocked_count=int(group_row["blocked_count"] or 0),
+                        duplicate_count=int(group_row["duplicate_count"] or 0),
+                        notes="Approval denied and pending files were removed.",
+                        updated_at=approval_timestamp,
+                    )
+                conn.commit()
+                for group_row in manifest_group_rows:
+                    _safe_remove_tree(_edi_manifest_dir(int(group_row["id"])), EDI_PENDING_ROOT)
+                _cleanup_edi_processing_dirs(manifest_group_rows)
+
+            conn.execute("BEGIN IMMEDIATE")
             cur.execute("DELETE FROM EDILoad")
             cur.execute("DELETE FROM EDIStage")
             cur.execute("DELETE FROM EDIVett")
@@ -3302,6 +4073,73 @@ async def post_835_approval_stage(request: Request):
                 detail="These 835 rows were already approved and are already present in EDI.",
             )
 
+        manifest_group_rows = _collect_edi_manifest_group(conn, manifest_row) if manifest_row else []
+        manifest_accepted_count = int(manifest_row["accepted_count"] or 0) if manifest_row else 0
+        promoted_manifest = None
+        promoted_manifest_files = {"trn": 0, "era": 0, "html": 0}
+        if manifest_row and manifest_accepted_count <= 0:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "No accepted TRN rows are available for this manifest, so EDI was not updated.",
+                    "manifestId": manifest_id,
+                    "batchId": manifest_batch_id,
+                    "acceptedCount": manifest_accepted_count,
+                    "blockedCount": int(manifest_row["blocked_count"] or 0),
+                    "duplicateCount": int(manifest_row["duplicate_count"] or 0),
+                },
+            )
+
+        if manifest_row and manifest_accepted_count > 0:
+            promoted_manifest_files, manifest_dir = _promote_edi_manifest_files(
+                conn,
+                manifest_group_rows,
+                destination_batch_id=manifest_batch_id,
+            )
+            expected_counts = {
+                "trn": sum(int(row["trn_file_count"] or 0) for row in manifest_group_rows),
+                "era": sum(int(row["era_file_count"] or 0) for row in manifest_group_rows),
+                "html": sum(int(row["html_file_count"] or 0) for row in manifest_group_rows),
+            }
+            group_manifest_row = manifest_group_rows[0] if manifest_group_rows else manifest_row
+            live_counts = _count_manifest_live_files(group_manifest_row, batch_id=manifest_batch_id)[1]
+            transfer_ready = all(live_counts[key] >= expected_counts[key] for key in ("trn", "era", "html"))
+            if not transfer_ready:
+                transfer_pending_notes = (
+                    "Waiting for ERA/HTML transfer to complete before EDI approval. "
+                    f"Expected TRN/ERA/HTML counts {expected_counts}, found {live_counts}."
+                )
+                _update_edi_batch_manifest(
+                    conn,
+                    manifest_id,
+                    status="TRANSFER_PENDING",
+                    trn_file_count=int(manifest_row["trn_file_count"] or 0),
+                    era_file_count=int(manifest_row["era_file_count"] or 0),
+                    html_file_count=int(manifest_row["html_file_count"] or 0),
+                    accepted_count=int(manifest_row["accepted_count"] or 0),
+                    blocked_count=int(manifest_row["blocked_count"] or 0),
+                    duplicate_count=int(manifest_row["duplicate_count"] or 0),
+                    notes=transfer_pending_notes,
+                    updated_at=approval_timestamp,
+                )
+                conn.commit()
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "message": "ERA/HTML transfer verification failed. EDI was not updated.",
+                        "expectedCounts": expected_counts,
+                        "foundCounts": live_counts,
+                        "manifestId": manifest_id,
+                        "batchId": manifest_batch_id,
+                    },
+                )
+            promoted_manifest = {
+                "manifestId": manifest_id,
+                "batchId": manifest_batch_id,
+                "manifestDir": manifest_dir,
+            }
+
+        conn.execute("BEGIN IMMEDIATE")
         approved_rows = _append_table_from_dataframe(
             conn,
             "EDI",
@@ -3336,12 +4174,46 @@ async def post_835_approval_stage(request: Request):
             """,
             (last_transnum, approval_timestamp, "APPROVED"),
         )
+
+        if manifest_group_rows:
+            manifest_status = "APPROVED_PARTIAL" if int(manifest_row["blocked_count"] or 0) > 0 else "APPROVED"
+            for group_row in manifest_group_rows:
+                cur.execute(
+                    """
+                    UPDATE EDI_BatchManifest
+                    SET status = ?,
+                        notes = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        manifest_status,
+                        "Approved and promoted to live folders." if promoted_manifest else "Approved.",
+                        approval_timestamp,
+                        int(group_row["id"]),
+                    ),
+                )
+                cur.execute(
+                    """
+                    UPDATE EDI_BatchManifestItem
+                    SET row_status = 'APPROVED',
+                        updated_at = ?
+                    WHERE manifest_id = ? AND UPPER(TRIM(row_status)) = 'ACCEPTED'
+                    """,
+                    (approval_timestamp, int(group_row["id"])),
+                )
         conn.commit()
 
         try:
             refresh_result = commit_all_strong_matches()
         except Exception as exc:
             refresh_warning = str(exc)
+
+        if manifest_group_rows:
+            _cleanup_edi_processing_dirs(manifest_group_rows)
+            for group_row in manifest_group_rows:
+                _safe_remove_tree(_edi_manifest_dir(int(group_row["id"])), EDI_PENDING_ROOT)
+            _cleanup_edi_processing_roots_if_idle(conn)
 
         response = {
             "status": "approved",
@@ -3351,6 +4223,10 @@ async def post_835_approval_stage(request: Request):
             "table": "EDI",
             "timestamp": approval_timestamp,
             "tablesReset": ["EDILoad", "EDIStage", "EDIVett"],
+            "manifestId": manifest_id,
+            "manifestBatchId": manifest_batch_id,
+            "manifestGroupSize": len(manifest_group_rows) if manifest_group_rows else 0,
+            "promotedFiles": promoted_manifest_files,
         }
         if refresh_result is not None:
             response["matchRefresh"] = refresh_result
@@ -4373,7 +5249,7 @@ def post_era_convert(payload: dict):
         if not matched_check:
             continue
 
-        new_name = f"{date_prefix}-835-{sequence}-{matched_check}{orig_ext}"
+        new_name = f"{date_prefix}-835-{sequence}---{matched_check}{orig_ext}"
         destination = os.path.join(renamed_folder, new_name)
 
         if os.path.exists(destination):
