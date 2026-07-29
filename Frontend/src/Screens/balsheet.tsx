@@ -8,6 +8,7 @@ import {
   deleteBalsheetEntry,
   getBalsheet,
   getBalsheetNotes,
+  getMisc,
   getBalsheetWorkday,
   importBalsheetFromBanking,
   saveBalsheetEntries,
@@ -15,6 +16,7 @@ import {
   upsertBalsheetNoteText,
   upsertBalsheetNoteMessage,
   type BalsheetEntry,
+  type MiscEntry,
 } from "../api/balsheet_api";
 
 const weekendHeroMessage = "Weekend";
@@ -77,6 +79,16 @@ function formatCurrency(value: unknown) {
   });
 }
 
+function derivePosterSplit(row: Pick<BalsheetEntry, "amount" | "unposted" | "misc" | "poster">) {
+  const posterAmount = parseAmount(row.amount) - parseAmount(row.unposted) - parseAmount(row.misc);
+  const poster = String(row.poster ?? "").trim().toLowerCase();
+
+  return {
+    nick: poster === "raul" ? 0 : posterAmount,
+    raul: poster === "raul" ? posterAmount : 0,
+  };
+}
+
 function compareSheetRows(
   left: BalsheetEntry,
   right: BalsheetEntry,
@@ -101,6 +113,29 @@ function compareSheetRows(
   }
 
   return direction === "asc" ? comparison : -comparison;
+}
+
+function splitMiscTypeValues(value: string) {
+  return Array.from(
+    new Set(
+      String(value ?? "")
+        .split(/\s*\|\s*/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function joinMiscTypeValues(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).join(" | ");
+}
+
+function normalizeMiscTypeOptions(values: string[], currentValue?: string) {
+  const merged = new Set(values.map((value) => value.trim()).filter(Boolean));
+  for (const value of splitMiscTypeValues(currentValue ?? "")) {
+    merged.add(value);
+  }
+  return Array.from(merged).sort((left, right) => left.localeCompare(right));
 }
 
 function normalizeDisplayDate(value: string | null) {
@@ -186,6 +221,7 @@ export default function Balsheet() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [isEditingSelection, setIsEditingSelection] = useState(false);
   const [selectionDraft, setSelectionDraft] = useState("");
+  const [miscTypeOptions, setMiscTypeOptions] = useState<string[]>([]);
   const [sheetLocked, setSheetLocked] = useState(true);
   const [heroNote, setHeroNote] = useState("");
   const [heroMessage, setHeroMessage] = useState("");
@@ -196,7 +232,9 @@ export default function Balsheet() {
   } | null>(null);
   const cellRefs = useRef<Array<Array<HTMLTableCellElement | null>>>([]);
   const selectionInputRef = useRef<HTMLInputElement | null>(null);
+  const selectionSelectRef = useRef<HTMLSelectElement | null>(null);
   const inlineCellInputRef = useRef<HTMLInputElement | null>(null);
+  const inlineCellSelectRef = useRef<HTMLSelectElement | null>(null);
   const cancelInlineEditRef = useRef(false);
 
   const postingDateIso = displayDateToIso(postingDate);
@@ -309,6 +347,10 @@ export default function Balsheet() {
       if (sheetLocked) {
         selectionInputRef.current?.focus();
         selectionInputRef.current?.select();
+      } else if (selectedCell?.columnKey === "misc_type") {
+        selectionSelectRef.current?.focus();
+      } else if (selectedCell?.columnKey === "poster") {
+        inlineCellSelectRef.current?.focus();
       } else {
         inlineCellInputRef.current?.focus();
         inlineCellInputRef.current?.select();
@@ -345,6 +387,12 @@ export default function Balsheet() {
       writableNextRow[selectedCell.columnKey] = nextValue;
     }
 
+    if (["amount", "unposted", "misc", "poster"].includes(String(selectedCell.columnKey))) {
+      const split = derivePosterSplit(writableNextRow as Pick<BalsheetEntry, "amount" | "unposted" | "misc" | "poster">);
+      writableNextRow.nick = split.nick;
+      writableNextRow.raul = split.raul;
+    }
+
     const response = await updateBalsheetEntry(selectedCell.rowId, nextRow);
     setRows((previousRows) =>
       previousRows.map((row) => (row.entry_id === selectedCell.rowId ? response.data : row))
@@ -370,15 +418,16 @@ export default function Balsheet() {
     cancelInlineEditRef.current = false;
   }
 
-  async function commitInlineCellEdit() {
+  async function commitInlineCellEdit(nextValue?: string) {
     if (!selectedCell || sheetLocked) {
       return;
     }
 
+    const valueToSave = nextValue ?? selectionDraft;
     setLoading(true);
     setMessage(null);
     try {
-      await updateSelectedCell(selectionDraft);
+      await updateSelectedCell(valueToSave);
       setError(null);
       setMessage(`Saved ${selectedCell.label} for ${selectedCell.address}.`);
       setIsEditingSelection(false);
@@ -389,7 +438,7 @@ export default function Balsheet() {
     }
   }
 
-  function handleSelectionInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+  function handleSelectionInputKeyDown(event: ReactKeyboardEvent<HTMLInputElement | HTMLSelectElement>) {
     if (!isEditingSelection) {
       return;
     }
@@ -676,6 +725,15 @@ export default function Balsheet() {
       const [rowsResponse, notesResponse] = await Promise.all([getBalsheet(date), getBalsheetNotes(date)]);
       loadedRows = rowsResponse.data;
       setRows(loadedRows);
+      try {
+        const miscResponse = await getMisc();
+        const nextMiscOptions = normalizeMiscTypeOptions(
+          miscResponse.data.map((entry: MiscEntry) => String(entry.misc_type ?? ""))
+        );
+        setMiscTypeOptions(nextMiscOptions);
+      } catch {
+        setMiscTypeOptions([]);
+      }
       const savedNote = String(notesResponse.data[0]?.notes ?? "").trim();
       const savedMessage = String(notesResponse.data[0]?.message ?? "").trim();
       setHeroNote(savedNote);
@@ -832,15 +890,12 @@ export default function Balsheet() {
       .finally(() => setLoading(false));
   }, [day]);
 
-  if (loading) {
-    return <main style={styles.page}>Loading Balsheet...</main>;
-  }
-
   return (
     <AdminShell
       sidebarCopy=""
       onBack={() => navigate("/cash")}
       backButtonFirst
+      priorityNavItemIds={["/balsheet", "/site-review", "/tools"]}
       sidebarAction={
         <div style={{ display: "grid", gap: "8px" }}>
           <div style={styles.sidebarCard}>
@@ -905,7 +960,8 @@ export default function Balsheet() {
         </div>
       }
     >
-      <section style={styles.content}>
+      <section style={styles.content} aria-busy={loading}>
+        {loading && <div style={styles.loadingOverlay}>Loading Balsheet...</div>}
         <section style={styles.heroShell}>
             <div style={styles.heroCopy}>
               <div style={styles.kicker}>Balance Sheet</div>
@@ -1005,15 +1061,49 @@ export default function Balsheet() {
           <div style={styles.selectionInputWrap}>
             <div style={styles.selectionInputLabel}>{selectedCell?.label ?? "Active cell"}</div>
             <div style={styles.selectionInputRow}>
-              <input
-                ref={selectionInputRef}
-                readOnly={!isEditingSelection || sheetLocked}
-                value={selectedCell ? selectionDraft : "Select a cell to view its contents"}
-                onChange={(event) => setSelectionDraft(event.target.value)}
-                onKeyDown={handleSelectionInputKeyDown}
-                style={styles.selectionInput}
-                aria-label="Active cell value"
-              />
+              <div style={styles.selectionInputStack}>
+                {selectedCell?.columnKey === "misc_type" && isEditingSelection && !sheetLocked ? (
+                  <select
+                    ref={selectionSelectRef}
+                    multiple
+                    size={Math.min(6, Math.max(3, normalizeMiscTypeOptions(miscTypeOptions, selectionDraft).length))}
+                    value={splitMiscTypeValues(selectionDraft)}
+                    onChange={(event) => {
+                      const nextValues = Array.from(event.currentTarget.selectedOptions, (option) => option.value);
+                      setSelectionDraft(joinMiscTypeValues(nextValues));
+                    }}
+                    onKeyDown={handleSelectionInputKeyDown}
+                    onBlur={() => {
+                      if (cancelInlineEditRef.current) {
+                        cancelInlineEditRef.current = false;
+                        return;
+                      }
+                      void commitInlineCellEdit();
+                    }}
+                    style={styles.selectionMultiSelect}
+                    aria-label="Active cell value"
+                  >
+                    {normalizeMiscTypeOptions(miscTypeOptions, selectionDraft).map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    ref={selectionInputRef}
+                    readOnly={!isEditingSelection || sheetLocked}
+                    value={selectedCell ? selectionDraft : "Select a cell to view its contents"}
+                    onChange={(event) => setSelectionDraft(event.target.value)}
+                    onKeyDown={handleSelectionInputKeyDown}
+                    style={styles.selectionInput}
+                    aria-label="Active cell value"
+                  />
+                )}
+                {selectedCell?.columnKey === "misc_type" && isEditingSelection && !sheetLocked && (
+                  <div style={styles.selectionHint}>Hold Ctrl or Cmd to pick multiple misc types.</div>
+                )}
+              </div>
               <div style={styles.selectionActionStack}>
                 <button type="button" style={styles.selectionActionDangerButton} onClick={handleClearSelectedCell}>
                   Clear
@@ -1095,21 +1185,73 @@ export default function Balsheet() {
                                   style={getCellStyle(!!column.numeric, rowIndex, columnIndex)}
                                 >
                                   {isInlineEditingCell ? (
-                                    <input
-                                      ref={inlineCellInputRef}
-                                      value={selectionDraft}
-                                      onChange={(event) => setSelectionDraft(event.target.value)}
-                                      onKeyDown={handleSelectionInputKeyDown}
-                                      onBlur={() => {
-                                        if (cancelInlineEditRef.current) {
-                                          cancelInlineEditRef.current = false;
-                                          return;
-                                        }
-                                        void commitInlineCellEdit();
-                                      }}
-                                      style={styles.inlineCellInput}
-                                      aria-label={`Edit ${column.label}`}
-                                    />
+                                      column.key === "poster" ? (
+                                        <select
+                                          ref={inlineCellSelectRef}
+                                          value={selectionDraft}
+                                          onChange={(event) => {
+                                            const nextValue = event.target.value;
+                                            setSelectionDraft(nextValue);
+                                            void commitInlineCellEdit(nextValue);
+                                          }}
+                                          onBlur={() => {
+                                            if (cancelInlineEditRef.current) {
+                                              cancelInlineEditRef.current = false;
+                                              return;
+                                            }
+                                            void commitInlineCellEdit();
+                                          }}
+                                          style={styles.inlineCellSelect}
+                                          aria-label={`Edit ${column.label}`}
+                                        >
+                                          <option value="">Select poster</option>
+                                          <option value="Nick">Nick</option>
+                                          <option value="Raul">Raul</option>
+                                        </select>
+                                      ) : column.key === "misc_type" ? (
+                                        <select
+                                          ref={inlineCellSelectRef}
+                                          multiple
+                                          size={Math.min(6, Math.max(3, normalizeMiscTypeOptions(miscTypeOptions, selectionDraft).length))}
+                                          value={splitMiscTypeValues(selectionDraft)}
+                                          onChange={(event) => {
+                                            const nextValues = Array.from(event.currentTarget.selectedOptions, (option) => option.value);
+                                            setSelectionDraft(joinMiscTypeValues(nextValues));
+                                          }}
+                                          onKeyDown={handleSelectionInputKeyDown}
+                                          onBlur={() => {
+                                            if (cancelInlineEditRef.current) {
+                                              cancelInlineEditRef.current = false;
+                                              return;
+                                            }
+                                            void commitInlineCellEdit();
+                                          }}
+                                          style={styles.inlineCellMultiSelect}
+                                          aria-label={`Edit ${column.label}`}
+                                        >
+                                          {normalizeMiscTypeOptions(miscTypeOptions, selectionDraft).map((option) => (
+                                            <option key={option} value={option}>
+                                              {option}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      ) : (
+                                        <input
+                                          ref={inlineCellInputRef}
+                                          value={selectionDraft}
+                                          onChange={(event) => setSelectionDraft(event.target.value)}
+                                          onKeyDown={handleSelectionInputKeyDown}
+                                          onBlur={() => {
+                                            if (cancelInlineEditRef.current) {
+                                              cancelInlineEditRef.current = false;
+                                              return;
+                                            }
+                                            void commitInlineCellEdit();
+                                          }}
+                                          style={styles.inlineCellInput}
+                                          aria-label={`Edit ${column.label}`}
+                                        />
+                                      )
                                   ) : column.key === "entry_id" ? (
                                     row.entry_id
                                   ) : column.numeric ? (
@@ -1363,6 +1505,23 @@ const styles: Record<string, CSSProperties> = {
     gap: "10px",
     paddingTop: "88px",
   },
+  loadingOverlay: {
+    position: "fixed",
+    inset: "18px",
+    zIndex: 30,
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    padding: "20px 24px",
+    borderRadius: "28px",
+    background: "rgba(246, 249, 252, 0.62)",
+    backdropFilter: "blur(8px)",
+    color: "#17314f",
+    fontSize: "15px",
+    fontWeight: 800,
+    pointerEvents: "auto",
+    cursor: "wait",
+  },
   heroShell: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1.15fr) minmax(260px, 0.85fr)",
@@ -1556,6 +1715,15 @@ const styles: Record<string, CSSProperties> = {
     gap: "10px",
     alignItems: "stretch",
     flexWrap: "nowrap",
+    position: "sticky",
+    top: "18px",
+    zIndex: 5,
+    padding: "10px",
+    borderRadius: "18px",
+    background: "rgba(246, 248, 251, 0.96)",
+    backdropFilter: "blur(12px)",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    boxShadow: "0 16px 30px rgba(52, 84, 120, 0.10)",
   },
   selectionNavCluster: {
     display: "grid",
@@ -1646,6 +1814,11 @@ const styles: Record<string, CSSProperties> = {
     gap: "10px",
     alignItems: "stretch",
   },
+  selectionInputStack: {
+    display: "grid",
+    gap: "6px",
+    minWidth: 0,
+  },
   selectionInputLabel: {
     fontSize: "12px",
     fontWeight: 800,
@@ -1683,6 +1856,25 @@ const styles: Record<string, CSSProperties> = {
     width: "100%",
     boxSizing: "border-box",
   },
+  selectionMultiSelect: {
+    minHeight: "96px",
+    borderRadius: "14px",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    padding: "10px 12px",
+    fontSize: "14px",
+    color: "#17324f",
+    background: "rgba(255,255,255,0.96)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.65)",
+    width: "100%",
+    boxSizing: "border-box",
+    overflowY: "auto",
+  },
+  selectionHint: {
+    fontSize: "12px",
+    color: "#6a7d92",
+    fontWeight: 700,
+    lineHeight: 1.35,
+  },
   inlineCellInput: {
     width: "100%",
     minHeight: "34px",
@@ -1694,6 +1886,31 @@ const styles: Record<string, CSSProperties> = {
     color: "#17324f",
     font: "inherit",
     outline: "none",
+  },
+  inlineCellSelect: {
+    width: "100%",
+    minHeight: "34px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(106, 137, 180, 0.42)",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.98)",
+    padding: "6px 8px",
+    color: "#17324f",
+    font: "inherit",
+    outline: "none",
+  },
+  inlineCellMultiSelect: {
+    width: "100%",
+    minHeight: "82px",
+    boxSizing: "border-box",
+    border: "1px solid rgba(106, 137, 180, 0.42)",
+    borderRadius: "8px",
+    background: "rgba(255,255,255,0.98)",
+    padding: "6px 8px",
+    color: "#17324f",
+    font: "inherit",
+    outline: "none",
+    overflowY: "auto",
   },
   selectionActionStack: {
     display: "grid",
@@ -1724,6 +1941,68 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 10px 18px rgba(188, 84, 116, 0.12)",
+  },
+  sidebarQuickActionsCard: {
+    padding: "12px",
+    borderRadius: "20px",
+    background: "linear-gradient(135deg, rgba(242, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.88) 100%)",
+    border: "1px solid rgba(176, 194, 218, 0.22)",
+    display: "grid",
+    gap: "10px",
+  },
+  sidebarActionDock: {
+    display: "grid",
+    gap: "8px",
+    position: "sticky",
+    top: "112px",
+    alignSelf: "start",
+    zIndex: 2,
+  },
+  sidebarQuickActionsTopRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gap: "6px",
+  },
+  sidebarQuickActionsBottomRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "6px",
+  },
+  sidebarQuickActionButton: {
+    height: "30px",
+    minWidth: 0,
+    borderRadius: "10px",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#36526f",
+    fontSize: "14px",
+    fontWeight: 900,
+    cursor: "pointer",
+    boxShadow: "0 8px 14px rgba(52, 84, 120, 0.06)",
+    padding: 0,
+  },
+  sidebarQuickActionButtonUnlocked: {
+    background: "rgba(235, 247, 255, 0.96)",
+    color: "#2f5f89",
+  },
+  sidebarQuickActionButtonLocked: {
+    background: "linear-gradient(135deg, rgba(255, 236, 241, 0.98) 0%, rgba(255, 215, 226, 0.98) 100%)",
+    color: "#b23361",
+  },
+  sidebarQuickActionWideButton: {
+    height: "32px",
+    minWidth: 0,
+    borderRadius: "10px",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#36526f",
+    fontSize: "11px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 14px rgba(52, 84, 120, 0.06)",
+    padding: "0 8px",
+    textTransform: "uppercase",
+    letterSpacing: "0.04em",
   },
   postingDayLabel: {
     display: "grid",

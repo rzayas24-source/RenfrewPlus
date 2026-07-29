@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { restoreAttachmentToPending } from "../api/attachmentreview_api";
 import { getSiteReviewHistory, type ReviewHistoryRow, type ReviewHistoryView } from "../api/siteReviewHistory_api";
 import { useAppConfig } from "../config/appConfig";
 import { AdminShell } from "../components/AdminShell";
@@ -30,6 +31,7 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
   const [expandedBatchKeys, setExpandedBatchKeys] = useState<Set<string>>(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [restoringId, setRestoringId] = useState<number | null>(null);
   const reviewUi = appConfig?.ui?.siteReview;
   const viewOptions = useMemo(
     () =>
@@ -132,12 +134,34 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
     navigate(`/site-review?view=${view}`);
   };
 
+  const openEmailDownloader = () => {
+    navigate("/email-downloader");
+  };
+
+  const openSnapshotGenerator = () => {
+    navigate("/snapshot-generator");
+  };
+
   const openPendingAttachment = (row: ReviewHistoryRow) => {
     const params = new URLSearchParams({ attachmentId: String(row.id) });
     if (row.batchDate) {
       params.set("day", row.batchDate);
     }
     navigate(`/attachments?${params.toString()}`);
+  };
+
+  const restorePending = async (row: ReviewHistoryRow) => {
+    setRestoringId(row.id);
+    setError(null);
+
+    try {
+      await restoreAttachmentToPending(row.id);
+      await loadRows();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to restore attachment to pending");
+    } finally {
+      setRestoringId(null);
+    }
   };
 
   if (loading) {
@@ -147,6 +171,7 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
         onBack={() => navigate("/cash")}
         hideBackButton
         ribbonTitle={reviewUi?.heroKicker ?? "Site Review History"}
+        hiddenNavItemIds={["/email-downloader", "/snapshot-generator"]}
       >
         <div style={screenStyles.loadingState}>Loading site review history...</div>
       </AdminShell>
@@ -159,6 +184,7 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
       onBack={() => navigate("/cash")}
       hideBackButton
       ribbonTitle={reviewUi?.heroKicker ?? "Site Review History"}
+      hiddenNavItemIds={["/email-downloader", "/snapshot-generator"]}
       sidebarCardLabel="Active view"
       sidebarCardValue={activeOption.label}
       sidebarCardMeta={sidebarMeta}
@@ -176,7 +202,7 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
                   onClick={() => openView(option.id)}
                   style={{
                     ...screenStyles.viewTab,
-                    ...(active ? screenStyles.viewTabActive : null),
+                    ...(active ? (option.id === "complete" ? screenStyles.viewTabCompleteActive : screenStyles.viewTabActive) : null),
                   }}
                 >
                   {option.label}
@@ -188,6 +214,15 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
           <div style={screenStyles.heroBarCopy}>
             <div style={adminStyles.kicker}>Site review history</div>
             <div style={screenStyles.heroBarTitle}>{activeOption.label}</div>
+          </div>
+
+          <div style={screenStyles.heroBarActions}>
+            <button type="button" style={screenStyles.heroBarButton} onClick={openEmailDownloader}>
+              Email Downloader
+            </button>
+            <button type="button" style={screenStyles.heroBarButton} onClick={openSnapshotGenerator}>
+              Snapshot Generator
+            </button>
           </div>
         </section>
 
@@ -283,6 +318,14 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
                         >
                           Open Attachments
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => restorePending(row)}
+                          style={screenStyles.restoreButton}
+                          disabled={restoringId === row.id}
+                        >
+                          {restoringId === row.id ? "Restoring..." : "Restore to Pending"}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -336,6 +379,14 @@ export default function SiteReviewScreen({ initialView = "complete" }: SiteRevie
                           <div style={screenStyles.batchRowActions}>
                             <button type="button" onClick={() => openPendingAttachment(row)} style={screenStyles.openButton}>
                               Open Attachments
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => restorePending(row)}
+                              style={screenStyles.restoreButton}
+                              disabled={restoringId === row.id}
+                            >
+                              {restoringId === row.id ? "Restoring..." : "Restore to Pending"}
                             </button>
                           </div>
                         </div>
@@ -529,6 +580,25 @@ const screenStyles: Record<string, CSSProperties> = {
     minWidth: "220px",
     flex: "1 1 260px",
   },
+  heroBarActions: {
+    display: "flex",
+    gap: "10px",
+    marginLeft: "auto",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  heroBarButton: {
+    height: "42px",
+    padding: "0 14px",
+    borderRadius: "999px",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(243,248,255,0.94) 100%)",
+    color: "#17324f",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 12px 22px rgba(52, 84, 120, 0.08)",
+  },
   heroBarTitle: {
     fontSize: "18px",
     lineHeight: 1.25,
@@ -559,6 +629,12 @@ const screenStyles: Record<string, CSSProperties> = {
     border: "1px solid rgba(106, 137, 180, 0.24)",
     color: "#15304f",
     boxShadow: "0 14px 24px rgba(119, 151, 198, 0.16)",
+  },
+  viewTabCompleteActive: {
+    background: "rgba(255,255,255,0.98)",
+    border: "1px solid rgba(140, 160, 184, 0.55)",
+    color: "#17324f",
+    boxShadow: "0 14px 24px rgba(119, 151, 198, 0.08)",
   },
   errorBanner: {
     marginBottom: "14px",
@@ -612,6 +688,18 @@ const screenStyles: Record<string, CSSProperties> = {
     fontWeight: 800,
     cursor: "pointer",
     boxShadow: "0 8px 18px rgba(31, 54, 77, 0.06)",
+  },
+  restoreButton: {
+    marginLeft: "8px",
+    border: "1px solid rgba(196, 165, 112, 0.28)",
+    background: "rgba(255, 248, 233, 0.98)",
+    color: "#8a5a16",
+    borderRadius: "999px",
+    padding: "8px 12px",
+    fontSize: "12px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 18px rgba(122, 92, 30, 0.06)",
   },
   batchStack: {
     display: "grid",

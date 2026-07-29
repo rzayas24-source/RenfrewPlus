@@ -27,10 +27,13 @@ export type AdminRibbonItem = {
 
 type AdminShellProps = {
   children: ReactNode;
-  sidebarCopy: string;
+  sidebarCopy?: string;
   sidebarTopCard?: ReactNode;
   sidebarMiddleCard?: ReactNode;
   sidebarAction?: ReactNode;
+  sidebarBottomCard?: ReactNode;
+  hiddenNavItemIds?: string[];
+  priorityNavItemIds?: string[];
   sidebarCardLabel?: string;
   sidebarCardValue?: string;
   sidebarCardValueStyle?: CSSProperties;
@@ -38,6 +41,7 @@ type AdminShellProps = {
   backLabel?: string;
   hideBackButton?: boolean;
   backButtonFirst?: boolean;
+  hideSidebar?: boolean;
   hideSidebarBackMenu?: boolean;
   hideSidebarBackStyles?: boolean;
   useGlobalMenuFallback?: boolean;
@@ -110,6 +114,7 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/balsheet/view": { path: "/balsheet/view", label: "Balance Sheet", meta: "Balance sheet" },
   "/keyproof": { path: "/keyproof", label: "Keyproof", meta: "Keyproof review" },
   "/itemization": { path: "/itemization", label: "Itemization", meta: "Itemization" },
+  "/misc-editor": { path: "/misc-editor", label: "Misc Editor", meta: "Misc lookup list" },
   "/itemstoreview": { path: "/itemstoreview", label: "Items to Review", meta: "Items to Review workspace" },
   "/statements": { path: "/statements", label: "Statements", meta: "Statements" },
   "/request": { path: "/request", label: "Request", meta: "Request queue" },
@@ -151,6 +156,36 @@ function compareNavLabels(left: string, right: string) {
   }
 
   return left.localeCompare(right);
+}
+
+function compareNavItems(
+  left: { id: string; label: string },
+  right: { id: string; label: string },
+  priorityNavItemIds: string[] = []
+) {
+  const leftHasBackLabel = left.label === "Back" || left.label === "Previous";
+  const rightHasBackLabel = right.label === "Back" || right.label === "Previous";
+  if (leftHasBackLabel || rightHasBackLabel) {
+    return compareNavLabels(left.label, right.label);
+  }
+
+  const leftPriorityIndex = priorityNavItemIds.indexOf(left.id);
+  const rightPriorityIndex = priorityNavItemIds.indexOf(right.id);
+  if (leftPriorityIndex !== -1 || rightPriorityIndex !== -1) {
+    if (leftPriorityIndex === -1) {
+      return 1;
+    }
+
+    if (rightPriorityIndex === -1) {
+      return -1;
+    }
+
+    if (leftPriorityIndex !== rightPriorityIndex) {
+      return leftPriorityIndex - rightPriorityIndex;
+    }
+  }
+
+  return left.label.localeCompare(right.label);
 }
 
 function normalizePath(pathname: string) {
@@ -243,6 +278,9 @@ export function AdminShell({
   sidebarTopCard,
   sidebarMiddleCard,
   sidebarAction,
+  sidebarBottomCard,
+  hiddenNavItemIds,
+  priorityNavItemIds,
   ribbonItems,
   sidebarCardLabel,
   sidebarCardValue,
@@ -251,6 +289,7 @@ export function AdminShell({
   backLabel,
   hideBackButton,
   backButtonFirst,
+  hideSidebar,
   hideSidebarBackMenu,
   hideSidebarBackStyles,
   useGlobalMenuFallback = true,
@@ -283,6 +322,8 @@ export function AdminShell({
     () => gazeboSelection.map((item) => resolveScreen(item.id, appConfig)).slice(0, MAX_FAVORITES),
     [appConfig, gazeboSelection]
   );
+  const shellPadding = hideSidebar ? "16px" : "16px 16px 16px 282px";
+  const hiddenNavItemSet = useMemo(() => new Set(hiddenNavItemIds ?? []), [hiddenNavItemIds]);
   const navItems = useMemo(
     () => {
       const resolvedItems = effectiveMenuSelection
@@ -298,6 +339,7 @@ export function AdminShell({
 
           return {
             label: resolved.label,
+            id: entry.id,
             onClick: () => {
               if (resolved.isBackAction) {
                 navigate(-1);
@@ -310,11 +352,12 @@ export function AdminShell({
             isBackStyle: resolved.isBackStyle,
           };
         })
-        .filter((item): item is { label: string; onClick: () => void; glyph: string; isBackStyle: boolean } => Boolean(item));
+        .filter((item): item is { label: string; id: string; onClick: () => void; glyph: string; isBackStyle: boolean } => Boolean(item))
+        .filter((item) => !hiddenNavItemSet.has(item.id));
 
-      return resolvedItems.sort((left, right) => compareNavLabels(left.label, right.label));
+      return resolvedItems.sort((left, right) => compareNavItems(left, right, priorityNavItemIds));
     },
-    [appConfig, effectiveMenuSelection, hideSidebarBackMenu, hideSidebarBackStyles, navigate]
+    [appConfig, effectiveMenuSelection, hiddenNavItemSet, hideSidebarBackMenu, hideSidebarBackStyles, navigate, priorityNavItemIds]
   );
   const priorityNavItems = navItems.slice(0, 2);
   const remainingNavItems = navItems.slice(2);
@@ -395,203 +438,216 @@ export function AdminShell({
     }
   };
 
+  const normalizedSidebarCopy = sidebarCopy?.trim() ?? "";
+
   return (
-    <main style={styles.shell}>
+    <main
+      style={{
+        ...styles.shell,
+        padding: shellPadding,
+      }}
+    >
       <div style={styles.glowBlue} />
       <div style={styles.glowPink} />
 
-      <aside style={styles.sidebar}>
-        <div style={styles.brandWrap}>
-          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </WorklistBrandButton>
-          <button
-            type="button"
-            onClick={() => setIsRibbonOpen((current) => !current)}
-            style={styles.brandWomenMark}
-            aria-label={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
-            aria-expanded={isRibbonOpen}
-            title={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
-          >
-            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
-          </button>
-        </div>
-
-        {backButtonFirst && (
-          <nav style={styles.navStack} aria-label="Admin navigation">
-            {priorityNavItems.map((item) => (
+      {!hideSidebar && (
+        <>
+          <aside style={styles.sidebar}>
+            <div style={styles.brandWrap}>
+              <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
+                <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
+              </WorklistBrandButton>
               <button
-                key={item.label}
-                className="sidebar-nav-button"
-                style={{
-                  ...styles.navButton,
-                  ...(item.isBackStyle ? styles.navButtonBack : null),
-                }}
                 type="button"
-                onClick={item.onClick}
+                onClick={() => setIsRibbonOpen((current) => !current)}
+                style={styles.brandWomenMark}
+                aria-label={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
+                aria-expanded={isRibbonOpen}
+                title={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
               >
-                <span style={styles.navButtonLabel}>{item.label}</span>
-                <span
-                  className="sidebar-nav-button__glyph"
-                  style={{
-                    ...styles.navButtonGlyph,
-                    ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
-                  }}
-                >
-                  {item.glyph ?? ">"}
-                </span>
+                <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
               </button>
-            ))}
-          </nav>
-        )}
+            </div>
 
-        {sidebarCopy && <p style={styles.sidebarCopy}>{sidebarCopy}</p>}
-
-        {sidebarTopCard && <div style={styles.sidebarTopCard}>{sidebarTopCard}</div>}
-
-        {!backButtonFirst && (
-          <nav style={styles.navStack} aria-label="Admin navigation">
-            {priorityNavItems.map((item) => (
-              <button
-                key={item.label}
-                className="sidebar-nav-button"
-                style={{
-                  ...styles.navButton,
-                  ...(item.isBackStyle ? styles.navButtonBack : null),
-                }}
-                type="button"
-                onClick={item.onClick}
-              >
-                <span style={styles.navButtonLabel}>{item.label}</span>
-                <span
-                  className="sidebar-nav-button__glyph"
-                  style={{
-                    ...styles.navButtonGlyph,
-                    ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
-                  }}
-                >
-                  {item.glyph ?? ">"}
-                </span>
-              </button>
-            ))}
-          </nav>
-        )}
-
-        {sidebarMiddleCard && <div style={styles.sidebarCard}>{sidebarMiddleCard}</div>}
-
-        {sidebarAction && <div style={styles.sidebarAction}>{sidebarAction}</div>}
-
-        {ribbonItems && ribbonItems.length > 0 && (
-          <div style={styles.sidebarRibbon}>
-            {ribbonItems.map((item) => (
-              <button key={item.title} type="button" onClick={item.onClick} style={styles.sidebarRibbonButton}>
-                <div style={styles.sidebarRibbonTitle}>{item.title}</div>
-                <div style={styles.sidebarRibbonMeta}>{item.meta}</div>
-              </button>
-            ))}
-          </div>
-        )}
-
-        {remainingNavItems.length > 0 && (
-          <nav style={styles.navStack} aria-label="Admin navigation more">
-            {remainingNavItems.map((item) => (
-              <button
-                key={item.label}
-                className="sidebar-nav-button"
-                style={{
-                  ...styles.navButton,
-                  ...(item.isBackStyle ? styles.navButtonBack : null),
-                }}
-                type="button"
-                onClick={item.onClick}
-              >
-                <span style={styles.navButtonLabel}>{item.label}</span>
-                <span
-                  className="sidebar-nav-button__glyph"
-                  style={{
-                    ...styles.navButtonGlyph,
-                    ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
-                  }}
-                >
-                  {item.glyph ?? ">"}
-                </span>
-              </button>
-            ))}
-          </nav>
-        )}
-
-        {(sidebarCardLabel || sidebarCardValue || sidebarCardMeta) && (
-          <div style={styles.sidebarCard}>
-            {sidebarCardLabel && <div style={styles.sidebarCardLabel}>{sidebarCardLabel}</div>}
-            {sidebarCardValue && (
-              <div style={{ ...styles.sidebarCardValue, ...sidebarCardValueStyle }}>{sidebarCardValue}</div>
+            {backButtonFirst && (
+              <nav style={styles.navStack} aria-label="Admin navigation">
+                {priorityNavItems.map((item) => (
+                  <button
+                    key={item.label}
+                    className="sidebar-nav-button"
+                    style={{
+                      ...styles.navButton,
+                      ...(item.isBackStyle ? styles.navButtonBack : null),
+                    }}
+                    type="button"
+                    onClick={item.onClick}
+                  >
+                    <span style={styles.navButtonLabel}>{item.label}</span>
+                    <span
+                      className="sidebar-nav-button__glyph"
+                      style={{
+                        ...styles.navButtonGlyph,
+                        ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
+                      }}
+                    >
+                      {item.glyph ?? ">"}
+                    </span>
+                  </button>
+                ))}
+              </nav>
             )}
-            {sidebarCardMeta && <div style={styles.sidebarCardMeta}>{sidebarCardMeta}</div>}
-          </div>
-        )}
-        <div style={styles.sidebarFooter}>
-          <button
-            type="button"
-            onClick={toggleFavorite}
-            style={{
-              ...styles.favoriteToggle,
-              ...(isFavorite ? styles.favoriteToggleActive : null),
-            }}
-            aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
-            title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-            disabled={!isGazeboLoaded}
-          >
-            <span style={{ ...styles.favoriteGlyph, ...(isFavorite ? styles.favoriteGlyphActive : null) }}>
-              {isFavorite ? String.fromCharCode(9733) : String.fromCharCode(9734)}
-            </span>
-          </button>
 
-          {favoriteNotice && <div style={styles.favoriteNotice}>{favoriteNotice}</div>}
-        </div>
-      </aside>
+            {normalizedSidebarCopy && <p style={styles.sidebarCopy}>{normalizedSidebarCopy}</p>}
 
-      <section
-        style={{
-          ...styles.ribbonShell,
-          ...(isRibbonOpen ? styles.ribbonShellOpen : styles.ribbonShellClosed),
-        }}
-        aria-hidden={!isRibbonOpen}
-      >
-        <div style={styles.ribbonHeader}>
-          <div>
-            <div style={styles.ribbonKicker}>{ribbonTitle}</div>
-          </div>
-          <button
-            type="button"
-            onClick={() => setIsRibbonOpen(false)}
-            style={styles.ribbonCloseButton}
-            aria-label="Close gazebo menu"
-          >
-            X
-          </button>
-        </div>
+            {sidebarTopCard && <div style={styles.sidebarTopCard}>{sidebarTopCard}</div>}
 
-        <div style={styles.ribbonBody}>
-          {favoriteScreens.length > 0 ? (
-            favoriteScreens.map((item, index) => (
+            {!backButtonFirst && (
+              <nav style={styles.navStack} aria-label="Admin navigation">
+                {priorityNavItems.map((item) => (
+                  <button
+                    key={item.label}
+                    className="sidebar-nav-button"
+                    style={{
+                      ...styles.navButton,
+                      ...(item.isBackStyle ? styles.navButtonBack : null),
+                    }}
+                    type="button"
+                    onClick={item.onClick}
+                  >
+                    <span style={styles.navButtonLabel}>{item.label}</span>
+                    <span
+                      className="sidebar-nav-button__glyph"
+                      style={{
+                        ...styles.navButtonGlyph,
+                        ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
+                      }}
+                    >
+                      {item.glyph ?? ">"}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            )}
+
+            {sidebarMiddleCard && <div style={styles.sidebarCard}>{sidebarMiddleCard}</div>}
+
+            {sidebarAction && <div style={styles.sidebarAction}>{sidebarAction}</div>}
+
+            {ribbonItems && ribbonItems.length > 0 && (
+              <div style={styles.sidebarRibbon}>
+                {ribbonItems.map((item) => (
+                  <button key={item.title} type="button" onClick={item.onClick} style={styles.sidebarRibbonButton}>
+                    <div style={styles.sidebarRibbonTitle}>{item.title}</div>
+                    <div style={styles.sidebarRibbonMeta}>{item.meta}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {remainingNavItems.length > 0 && (
+              <nav style={styles.navStack} aria-label="Admin navigation more">
+                {remainingNavItems.map((item) => (
+                  <button
+                    key={item.label}
+                    className="sidebar-nav-button"
+                    style={{
+                      ...styles.navButton,
+                      ...(item.isBackStyle ? styles.navButtonBack : null),
+                    }}
+                    type="button"
+                    onClick={item.onClick}
+                  >
+                    <span style={styles.navButtonLabel}>{item.label}</span>
+                    <span
+                      className="sidebar-nav-button__glyph"
+                      style={{
+                        ...styles.navButtonGlyph,
+                        ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
+                      }}
+                    >
+                      {item.glyph ?? ">"}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            )}
+
+            {(sidebarCardLabel || sidebarCardValue || sidebarCardMeta) && (
+              <div style={styles.sidebarCard}>
+                {sidebarCardLabel && <div style={styles.sidebarCardLabel}>{sidebarCardLabel}</div>}
+                {sidebarCardValue && (
+                  <div style={{ ...styles.sidebarCardValue, ...sidebarCardValueStyle }}>{sidebarCardValue}</div>
+                )}
+                {sidebarCardMeta && <div style={styles.sidebarCardMeta}>{sidebarCardMeta}</div>}
+              </div>
+            )}
+            <div style={styles.sidebarFooter}>
               <button
-                key={item.path}
                 type="button"
+                onClick={toggleFavorite}
                 style={{
-                  ...styles.ribbonButton,
-                  ...RIBBON_PASTELS[index % RIBBON_PASTELS.length],
+                  ...styles.favoriteToggle,
+                  ...(isFavorite ? styles.favoriteToggleActive : null),
                 }}
-                onClick={() => navigate(item.path)}
+                aria-label={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                disabled={!isGazeboLoaded}
               >
-                <div style={styles.ribbonButtonTitle}>{item.label}</div>
-                <div style={styles.ribbonButtonMeta}>{item.meta}</div>
+                <span style={{ ...styles.favoriteGlyph, ...(isFavorite ? styles.favoriteGlyphActive : null) }}>
+                  {isFavorite ? String.fromCharCode(9733) : String.fromCharCode(9734)}
+                </span>
               </button>
-            ))
-          ) : (
-            <div style={styles.ribbonEmptyState}>Star up to 8 screens to pin them here.</div>
-          )}
-        </div>
-      </section>
+
+              {favoriteNotice && <div style={styles.favoriteNotice}>{favoriteNotice}</div>}
+            </div>
+
+            {sidebarBottomCard && <div style={styles.sidebarCard}>{sidebarBottomCard}</div>}
+          </aside>
+
+          <section
+            style={{
+              ...styles.ribbonShell,
+              ...(isRibbonOpen ? styles.ribbonShellOpen : styles.ribbonShellClosed),
+            }}
+            aria-hidden={!isRibbonOpen}
+          >
+            <div style={styles.ribbonHeader}>
+              <div>
+                <div style={styles.ribbonKicker}>{ribbonTitle}</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRibbonOpen(false)}
+                style={styles.ribbonCloseButton}
+                aria-label="Close gazebo menu"
+              >
+                X
+              </button>
+            </div>
+
+            <div style={styles.ribbonBody}>
+              {favoriteScreens.length > 0 ? (
+                favoriteScreens.map((item, index) => (
+                  <button
+                    key={item.path}
+                    type="button"
+                    style={{
+                      ...styles.ribbonButton,
+                      ...RIBBON_PASTELS[index % RIBBON_PASTELS.length],
+                    }}
+                    onClick={() => navigate(item.path)}
+                  >
+                    <div style={styles.ribbonButtonTitle}>{item.label}</div>
+                    <div style={styles.ribbonButtonMeta}>{item.meta}</div>
+                  </button>
+                ))
+              ) : (
+                <div style={styles.ribbonEmptyState}>Star up to 8 screens to pin them here.</div>
+              )}
+            </div>
+          </section>
+        </>
+      )}
 
       <section style={styles.content}>{children}</section>
     </main>
@@ -696,7 +752,7 @@ export const styles: Record<string, CSSProperties> = {
   },
   sidebarCopy: {
     margin: "0 0 14px",
-    fontSize: "13px",
+    fontSize: "12px",
     lineHeight: 1.55,
     color: "#516579",
   },
@@ -850,16 +906,17 @@ export const styles: Record<string, CSSProperties> = {
     marginBottom: "8px",
   },
   sidebarCardMeta: {
-    fontSize: "13px",
+    fontSize: "12px",
     lineHeight: 1.55,
     color: "#5d7187",
+    whiteSpace: "pre-line",
   },
   ribbonShell: {
     position: "fixed",
     top: "18px",
     left: "286px",
-    width: "min(520px, calc(100vw - 304px))",
-    height: "92px",
+    width: "min(980px, calc(100vw - 304px))",
+    minHeight: "92px",
     zIndex: 2,
     borderRadius: "24px",
     border: "1px solid rgba(140, 160, 184, 0.18)",
@@ -889,7 +946,7 @@ export const styles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: "12px",
+    gap: "8px",
   },
   ribbonKicker: {
     fontSize: "12px",
@@ -914,18 +971,18 @@ export const styles: Record<string, CSSProperties> = {
   ribbonBody: {
     display: "flex",
     flexWrap: "nowrap",
-    gap: "10px",
+    gap: "8px",
     alignItems: "stretch",
     overflowX: "auto",
     overflowY: "hidden",
     paddingBottom: "2px",
   },
   ribbonButton: {
-    minHeight: "54px",
-    minWidth: "132px",
+    minHeight: "52px",
+    minWidth: "104px",
     borderRadius: "999px",
     border: "1px solid rgba(168, 182, 204, 0.18)",
-    padding: "12px 14px",
+    padding: "10px 12px",
     textAlign: "center",
     cursor: "pointer",
     boxShadow: "0 10px 20px rgba(52, 84, 120, 0.06)",
@@ -966,6 +1023,7 @@ export const styles: Record<string, CSSProperties> = {
     gap: "18px",
   },
 };
+
 
 
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import {
   getEmailDownloaderDates,
   getEmailDownloaderFolders,
+  getEmailDownloaderLastUploadedDate,
   runEmailDownloader,
   type EmailFolderOption,
   type EmailDownloadResult,
@@ -11,13 +12,106 @@ import {
 import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
 
+const DEFAULT_SOURCE_FOLDER_NAME = "Christine Tracy - New";
+const DEFAULT_DEST_FOLDER_NAME = "Christine Tracy - Archived";
+type DownloadStatus = "ready" | "running" | "success" | "error";
+
+function getControlStatusLabel(status: DownloadStatus) {
+  switch (status) {
+    case "running":
+      return "Running";
+    case "success":
+      return "Completed";
+    case "error":
+      return "Needs attention";
+    case "ready":
+    default:
+      return "Ready";
+  }
+}
+
+function getControlStatusStyle(status: DownloadStatus): CSSProperties {
+  switch (status) {
+    case "running":
+      return {
+        background: "rgba(255, 241, 209, 0.96)",
+        color: "#8b5e00",
+        border: "1px solid rgba(224, 189, 93, 0.22)",
+      };
+    case "success":
+      return {
+        background: "rgba(224, 246, 230, 0.96)",
+        color: "#1f6a3f",
+        border: "1px solid rgba(109, 193, 135, 0.24)",
+      };
+    case "error":
+      return {
+        background: "rgba(255, 235, 235, 0.96)",
+        color: "#a32121",
+        border: "1px solid rgba(234, 147, 147, 0.26)",
+      };
+    case "ready":
+    default:
+      return {
+        background: "rgba(224, 237, 250, 0.95)",
+        color: "#35506d",
+        border: "1px solid rgba(158, 187, 221, 0.26)",
+      };
+  }
+}
+
+function parseLocalYmd(value: string) {
+  const [year, month, day] = value.split("-").map((part) => Number(part));
+  if (!year || !month || !day) {
+    return null;
+  }
+
+  return new Date(year, month - 1, day);
+}
+
+function getClosestDateToToday(values: string[]) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let closest: string | null = null;
+  let closestDistance = Number.POSITIVE_INFINITY;
+
+  for (const value of values) {
+    const parsed = parseLocalYmd(value);
+    if (!parsed) {
+      continue;
+    }
+
+    const distance = Math.abs(parsed.getTime() - today.getTime());
+    if (distance < closestDistance) {
+      closest = value;
+      closestDistance = distance;
+    }
+  }
+
+  return closest;
+}
+
+function formatMonthDay(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = parseLocalYmd(value);
+  if (!parsed) {
+    return value;
+  }
+
+  return `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+}
+
 export default function EmailDownloaderScreen() {
   const navigate = useNavigate();
   const [folders, setFolders] = useState<EmailFolderOption[]>([]);
   const [folderIndex, setFolderIndex] = useState("");
   const [dates, setDates] = useState<string[]>([]);
   const [dateValue, setDateValue] = useState("all");
-  const [moveAfter, setMoveAfter] = useState(false);
+  const [moveAfter, setMoveAfter] = useState(true);
   const [destFolderIndex, setDestFolderIndex] = useState("");
   const [loading, setLoading] = useState(true);
   const [loadingDates, setLoadingDates] = useState(false);
@@ -25,6 +119,8 @@ export default function EmailDownloaderScreen() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [result, setResult] = useState<EmailDownloadResult | null>(null);
+  const [lastUploadedDate, setLastUploadedDate] = useState<string | null>(null);
+  const [controlStatus, setControlStatus] = useState<DownloadStatus>("ready");
 
   useEffect(() => {
     async function loadFolders() {
@@ -32,15 +128,26 @@ export default function EmailDownloaderScreen() {
         const items = await getEmailDownloaderFolders();
         setFolders(items);
 
-        let initialFolder = items[0] || null;
-        let initialDates: string[] = [];
+        const preferredSource = items.find((folder) => folder.name === DEFAULT_SOURCE_FOLDER_NAME) || null;
+        const preferredDestination = items.find((folder) => folder.name === DEFAULT_DEST_FOLDER_NAME) || null;
+        const folderPriority = preferredSource
+          ? [preferredSource, ...items.filter((folder) => folder.index !== preferredSource.index)]
+          : items;
 
-        for (const folder of items) {
-          const folderDates = await getEmailDownloaderDates(folder.index);
-          if (folderDates.length > 0) {
+        let initialFolder = folderPriority[0] || null;
+        let initialDates: string[] = [];
+        let lastDateError: string | null = null;
+
+        for (const folder of folderPriority) {
+          try {
+            const folderDates = await getEmailDownloaderDates(folder.index);
             initialFolder = folder;
             initialDates = folderDates;
-            break;
+            if (folderDates.length > 0) {
+              break;
+            }
+          } catch (error) {
+            lastDateError = error instanceof Error ? error.message : "Failed to load dates";
           }
         }
 
@@ -49,7 +156,18 @@ export default function EmailDownloaderScreen() {
           setDates(initialDates);
         }
 
-        setError(null);
+        if (preferredDestination) {
+          setDestFolderIndex(String(preferredDestination.index));
+        }
+
+        try {
+          const uploadedDate = await getEmailDownloaderLastUploadedDate();
+          setLastUploadedDate(uploadedDate);
+        } catch {
+          setLastUploadedDate(null);
+        }
+
+        setError(initialDates.length > 0 ? null : lastDateError);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load folders");
         setFolders([]);
@@ -86,26 +204,40 @@ export default function EmailDownloaderScreen() {
     if (!moveAfter) {
       return;
     }
-    if (destFolderIndex && destFolderIndex !== folderIndex) {
+    if (destFolderIndex && destFolderIndex !== folderIndex && folders.some((folder) => String(folder.index) === destFolderIndex)) {
       return;
     }
 
+    const preferredFolder = folders.find((folder) => folder.name === DEFAULT_DEST_FOLDER_NAME);
     const nextFolder = folders.find((folder) => String(folder.index) !== folderIndex);
-    setDestFolderIndex(nextFolder ? String(nextFolder.index) : "");
+    setDestFolderIndex(String((preferredFolder || nextFolder)?.index || ""));
   }, [moveAfter, folderIndex, destFolderIndex, folders]);
 
   const selectedFolderName = useMemo(() => {
     return folders.find((folder) => String(folder.index) === folderIndex)?.name || "Select a folder";
   }, [folders, folderIndex]);
 
+  const closestDateToToday = useMemo(() => formatMonthDay(getClosestDateToToday(dates)), [dates]);
+
+  const sidebarCardMeta = useMemo(() => {
+    const availableDates = loadingDates ? "Loading..." : `${dates.length} available date${dates.length === 1 ? "" : "s"}`;
+    const uploadedDate = lastUploadedDate || "No email uploads yet";
+    return `Available dates: ${availableDates}\nLast uploaded: ${uploadedDate}`;
+  }, [dates.length, lastUploadedDate, loadingDates]);
+
+  const controlStatusLabel = getControlStatusLabel(controlStatus);
+  const controlStatusStyle = getControlStatusStyle(controlStatus);
+
   async function handleRun() {
     if (!folderIndex) {
       setError("Please choose a folder first.");
+      setControlStatus("error");
       return;
     }
 
     if (moveAfter && !destFolderIndex) {
       setError("Please choose a destination folder or turn off move after download.");
+      setControlStatus("error");
       return;
     }
 
@@ -113,6 +245,7 @@ export default function EmailDownloaderScreen() {
     setError(null);
     setMessage("Running email downloader...");
     setResult(null);
+    setControlStatus("running");
 
     try {
       const response = await runEmailDownloader({
@@ -126,9 +259,11 @@ export default function EmailDownloaderScreen() {
         `Downloaded ${response.downloaded_count} item(s) from ${selectedFolderName}.` +
           (response.moved_count ? ` Moved ${response.moved_count} email(s) after download.` : "")
       );
+      setControlStatus("success");
     } catch (err) {
       setMessage(null);
       setError(err instanceof Error ? err.message : "Failed to run email downloader");
+      setControlStatus("error");
     } finally {
       setRunning(false);
     }
@@ -137,10 +272,18 @@ export default function EmailDownloaderScreen() {
   return (
     <AdminShell
       onBack={() => navigate("/")}
-      sidebarCopy="A focused workspace for picking the Outlook folder, choosing the day bundle, and running the downloader through the project."
+      backButtonFirst
+      sidebarCopy="A focused workspace for choosing the download folder, the day bundle, and the move target through the project."
+      sidebarTopCard={
+        <div style={adminStyles.sidebarCard}>
+          <div style={adminStyles.sidebarCardLabel}>Date closest to today</div>
+          <div style={adminStyles.sidebarCardValue}>{loadingDates ? "Loading..." : closestDateToToday || "No dates found"}</div>
+          <div style={adminStyles.sidebarCardMeta}>Nearest received date in the selected inbox folder.</div>
+        </div>
+      }
       sidebarCardLabel="Selected folder"
       sidebarCardValue={selectedFolderName}
-      sidebarCardMeta={loadingDates ? "Loading dates..." : `${dates.length} available date${dates.length === 1 ? "" : "s"}`}
+      sidebarCardMeta={sidebarCardMeta}
       ribbonTitle="Email Downloader"
       useGlobalMenuFallback={false}
     >
@@ -149,7 +292,7 @@ export default function EmailDownloaderScreen() {
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Email downloader</div>
             <p style={adminStyles.subtitle}>
-              Choose a folder, choose a day bundle, and let the downloader save files with the day prefix for review.
+              The Christine Tracy folders are prefilled, but you can switch them if you need a different mailbox path.
             </p>
 
             <div style={adminStyles.heroActions}>
@@ -160,9 +303,6 @@ export default function EmailDownloaderScreen() {
                 disabled={running || loading || folders.length === 0}
               >
                 {running ? "Running..." : "Run Download"}
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/site-review")}>
-                Back to Site Review
               </button>
             </div>
           </div>
@@ -205,8 +345,13 @@ export default function EmailDownloaderScreen() {
               <div style={adminStyles.sectionKicker}>Download controls</div>
               <h2 style={adminStyles.sectionTitle}>Select the folder and day bundle to process</h2>
             </div>
-            <div style={adminStyles.sectionMeta}>
-              The downloader keeps its original vetting behavior, but now it runs through the project.
+            <div style={emailStyles.sectionHeaderAside}>
+              <span style={{ ...emailStyles.statusPill, ...controlStatusStyle }} aria-live="polite">
+                {controlStatusLabel}
+              </span>
+              <div style={adminStyles.sectionMeta}>
+                The downloader keeps its original vetting behavior, but now it runs through the project.
+              </div>
             </div>
           </div>
 
@@ -219,12 +364,15 @@ export default function EmailDownloaderScreen() {
               <select
                 style={emailStyles.select}
                 value={folderIndex}
-                onChange={(event) => setFolderIndex(event.target.value)}
+                onChange={(event) => {
+                  setFolderIndex(event.target.value);
+                  setControlStatus("ready");
+                }}
                 disabled={loading || folders.length === 0}
               >
                 {folders.map((folder) => (
                   <option key={folder.index} value={folder.index}>
-                    {folder.name}
+                    {folder.name}{folder.name === DEFAULT_SOURCE_FOLDER_NAME ? " (default)" : ""}
                   </option>
                 ))}
               </select>
@@ -235,7 +383,10 @@ export default function EmailDownloaderScreen() {
               <select
                 style={emailStyles.select}
                 value={dateValue}
-                onChange={(event) => setDateValue(event.target.value)}
+                onChange={(event) => {
+                  setDateValue(event.target.value);
+                  setControlStatus("ready");
+                }}
                 disabled={loading}
               >
                 <option value="all">All dates</option>
@@ -251,7 +402,10 @@ export default function EmailDownloaderScreen() {
               <input
                 type="checkbox"
                 checked={moveAfter}
-                onChange={(event) => setMoveAfter(event.target.checked)}
+                onChange={(event) => {
+                  setMoveAfter(event.target.checked);
+                  setControlStatus("ready");
+                }}
               />
               <span>Move processed emails after download</span>
             </label>
@@ -261,7 +415,10 @@ export default function EmailDownloaderScreen() {
               <select
                 style={emailStyles.select}
                 value={destFolderIndex}
-                onChange={(event) => setDestFolderIndex(event.target.value)}
+                onChange={(event) => {
+                  setDestFolderIndex(event.target.value);
+                  setControlStatus("ready");
+                }}
                 disabled={!moveAfter || folders.length === 0}
               >
                 <option value="">Select destination</option>
@@ -269,7 +426,7 @@ export default function EmailDownloaderScreen() {
                   .filter((folder) => String(folder.index) !== folderIndex)
                   .map((folder) => (
                     <option key={folder.index} value={folder.index}>
-                      {folder.name}
+                      {folder.name}{folder.name === DEFAULT_DEST_FOLDER_NAME ? " (default)" : ""}
                     </option>
                   ))}
               </select>
@@ -336,6 +493,24 @@ const emailStyles: Record<string, CSSProperties> = {
     paddingTop: "18px",
     fontSize: "15px",
     color: "#1f2933",
+  },
+  sectionHeaderAside: {
+    display: "grid",
+    justifyItems: "end",
+    gap: "8px",
+  },
+  statusPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: "28px",
+    padding: "0 10px",
+    borderRadius: "999px",
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
   },
   errorBanner: {
     marginBottom: "14px",

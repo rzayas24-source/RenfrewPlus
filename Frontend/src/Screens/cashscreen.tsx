@@ -8,7 +8,7 @@ export default function CashScreen() {
   return (
     <AdminShell
       ribbonTitle="Cash Menu"
-      sidebarCopy="A soft cash console for deposits, review, and posting work."
+      sidebarCopy=""
       onBack={() => navigate("/")}
       hideBackButton
     >
@@ -32,6 +32,37 @@ export default function CashScreen() {
         </div>
       </section>
 
+      <section style={styles.buttonGrid}>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/835-match")}>
+          <span style={styles.menuButtonTitle}>835 Match</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/balsheet")}>
+          <span style={styles.menuButtonTitle}>Balance Sheet</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/banking")}>
+          <span style={styles.menuButtonTitle}>Banking</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/calendar")}>
+          <span style={styles.menuButtonTitle}>Calendar</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/import")}>
+          <span style={styles.menuButtonTitle}>Import</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/site-review")}>
+          <span style={styles.menuButtonTitle}>Site Review</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+        <button type="button" style={styles.menuButton} onClick={() => navigate("/tools")}>
+          <span style={styles.menuButtonTitle}>Tools</span>
+          <span style={styles.menuButtonGlyph}>&gt;</span>
+        </button>
+      </section>
+
       <div style={styles.contentWatermark} aria-hidden="true">
         <img src="/renfrewplus-banner.png" alt="" style={styles.contentWatermarkImage} />
       </div>
@@ -46,8 +77,8 @@ export const styles: Record<string, CSSProperties> = {
     display: "grid",
     placeItems: "center",
     pointerEvents: "none",
-    marginTop: "12px",
-    padding: "18px 0 4px",
+    marginTop: "8px",
+    padding: "12px 0 2px",
   },
   contentWatermarkImage: {
     width: "min(560px, 72vw)",
@@ -139,5 +170,42 @@ export const styles: Record<string, CSSProperties> = {
     fontSize: "12px",
     lineHeight: 1.45,
     color: "#536579",
+  },
+  buttonGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "12px",
+  },
+  menuButton: {
+    minHeight: "88px",
+    padding: "14px 16px",
+    borderRadius: "20px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(243,248,255,0.96) 48%, rgba(255,239,246,0.94) 100%)",
+    boxShadow: "0 18px 34px rgba(52, 84, 120, 0.08)",
+    cursor: "pointer",
+    textAlign: "left",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  },
+  menuButtonTitle: {
+    fontSize: "15px",
+    fontWeight: 900,
+    color: "#17324f",
+  },
+  menuButtonGlyph: {
+    width: "26px",
+    height: "26px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.76)",
+    color: "#8aa5c6",
+    fontSize: "13px",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
+    flexShrink: 0,
   },
 };

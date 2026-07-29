@@ -24,6 +24,7 @@ export default function DuplicateCheckScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
+  const duplicateSourcePath = "C:\\Renfrew\\Workflow\\3.HTML\\Renamed";
 
   useEffect(() => {
     let active = true;
@@ -78,11 +79,32 @@ export default function DuplicateCheckScreen() {
 
   return (
     <AdminShell
-      sidebarCopy="A soft workspace for duplicate filename review and bank-day checks."
       onBack={() => navigate("/tools")}
-      sidebarCardLabel="Today"
-      sidebarCardValue={data?.currentWorkDay || "Loading..."}
-      sidebarCardMeta="Focused on duplicate filenames for the active bank day."
+      backButtonFirst
+      sidebarTopCard={
+        <div style={{ display: "grid", gap: "12px" }}>
+          <div style={adminStyles.sidebarCard}>
+            <div style={{ ...adminStyles.sidebarCardLabel, textAlign: "center" }}>Today</div>
+            <div style={{ ...adminStyles.sidebarCardValue, fontWeight: 800 }}>{data?.currentWorkDay || "Loading..."}</div>
+            <div style={adminStyles.sidebarCardMeta}>Focused on duplicate filenames for the active bank day.</div>
+          </div>
+          <div style={adminStyles.sidebarCard}>
+            <div style={{ ...adminStyles.sidebarCardLabel, textAlign: "center" }}>Source</div>
+            <div
+              style={{
+                ...adminStyles.sidebarCardValue,
+                fontSize: "0.88rem",
+                lineHeight: 1.3,
+                wordBreak: "break-word",
+                fontWeight: 800,
+              }}
+            >
+              {duplicateSourcePath}
+            </div>
+            <div style={adminStyles.sidebarCardMeta}>Renamed HTML workspace used for duplicate review.</div>
+          </div>
+        </div>
+      }
     >
       <section style={{ ...adminStyles.content, paddingTop: "0" }}>
         <section style={adminStyles.heroShell}>

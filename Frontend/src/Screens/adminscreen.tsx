@@ -34,6 +34,37 @@ export default function AdminScreen() {
         </div>
       </section>
 
+      <section style={styles.quickActions}>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/config")}>
+          <span style={styles.actionTitle}>Config</span>
+          <span style={styles.actionMeta}>Edit live app config</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/worklist-editor")}>
+          <span style={styles.actionTitle}>Daily Worklist</span>
+          <span style={styles.actionMeta}>Manage the daily work queue</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/menus")}>
+          <span style={styles.actionTitle}>Menu Builder</span>
+          <span style={styles.actionMeta}>Shape sidebar navigation</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/sites")}>
+          <span style={styles.actionTitle}>Sites</span>
+          <span style={styles.actionMeta}>Maintain site names</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/tables")}>
+          <span style={styles.actionTitle}>Tables</span>
+          <span style={styles.actionMeta}>Browse database tables</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/users")}>
+          <span style={styles.actionTitle}>Users</span>
+          <span style={styles.actionMeta}>Manage access control</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/misc-editor")}>
+          <span style={styles.actionTitle}>Misc Editor</span>
+          <span style={styles.actionMeta}>Maintain lookup labels</span>
+        </button>
+      </section>
+
       <div style={styles.contentWatermark} aria-hidden="true">
         <img src="/renfrew-womenline.png" alt="" style={styles.contentWatermarkImage} />
       </div>
@@ -48,8 +79,8 @@ export const styles: Record<string, CSSProperties> = {
     display: "grid",
     placeItems: "center",
     pointerEvents: "none",
-    marginTop: "12px",
-    padding: "18px 0 4px",
+    marginTop: "-14px",
+    padding: "8px 0 0",
   },
   contentWatermarkImage: {
     width: "min(560px, 72vw)",
@@ -144,6 +175,36 @@ export const styles: Record<string, CSSProperties> = {
   heroArt: {
     display: "grid",
     alignItems: "stretch",
+  },
+  quickActions: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+    gap: "12px",
+    marginTop: "18px",
+  },
+  actionButton: {
+    minHeight: "88px",
+    padding: "14px 16px",
+    borderRadius: "20px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(243,248,255,0.96) 48%, rgba(255,239,246,0.94) 100%)",
+    boxShadow: "0 18px 34px rgba(52, 84, 120, 0.08)",
+    cursor: "pointer",
+    textAlign: "left",
+    display: "grid",
+    gap: "6px",
+    alignContent: "start",
+  },
+  actionTitle: {
+    fontSize: "15px",
+    fontWeight: 900,
+    color: "#17324f",
+  },
+  actionMeta: {
+    fontSize: "12px",
+    lineHeight: 1.45,
+    color: "#5e7186",
   },
   heroStatusCard: {
     padding: "12px",

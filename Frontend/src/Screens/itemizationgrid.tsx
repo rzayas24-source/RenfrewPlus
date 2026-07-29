@@ -19,6 +19,21 @@ export type ItemizationField =
   | "from"
   | "to";
 
+function splitMultiValue(value: string) {
+  return Array.from(
+    new Set(
+      String(value ?? "")
+        .split(/\s*\|\s*/)
+        .map((part) => part.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function joinMultiValue(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).join(" | ");
+}
+
 interface Item {
   id: number;
   importId: number;
@@ -45,6 +60,7 @@ interface Props {
   selectedRowId: number | null;
   selectedField: ItemizationField;
   sheetLocked: boolean;
+  miscTypeOptions: string[];
   onSelectCell: (rowId: number, field: ItemizationField) => void;
   onCommitCell: (rowId: number, field: ItemizationField, value: string) => void;
   onSort: (field: ItemizationField, direction: "asc" | "desc") => void;
@@ -90,6 +106,8 @@ const columns: Array<{ key: ItemizationField; label: string }> = [
   { key: "to", label: "To" },
 ];
 
+const posterOptions = ["Raul", "Nick"];
+
 const defaultColumnWidths: Record<string, number> = {
   type: 170,
   amount: 140,
@@ -121,8 +139,6 @@ const editableFields = new Set<ItemizationField>([
   "misc",
   "misc_type",
   "notes",
-  "nick",
-  "raul",
   "needs",
   "from",
   "to",
@@ -130,8 +146,13 @@ const editableFields = new Set<ItemizationField>([
 
 const numericFields = new Set<ItemizationField>(["amount", "unposted", "misc", "nick", "raul"]);
 
-function formatAmount(value: number) {
-  return value.toLocaleString(undefined, {
+function parseAmount(value: unknown) {
+  const parsed = Number.parseFloat(String(value ?? "").replace(/[$,]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function formatAmount(value: unknown) {
+  return parseAmount(value).toLocaleString(undefined, {
     style: "currency",
     currency: "USD",
   });
@@ -145,7 +166,7 @@ function formatCellValue(item: Item, key: ItemizationField) {
   }
 
   if (key === "amount" || key === "unposted" || key === "misc" || key === "nick" || key === "raul") {
-    return formatAmount(Number(value || 0));
+    return formatAmount(value);
   }
 
   return String(value);
@@ -299,9 +320,9 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   tdNotes: {
-    whiteSpace: "normal",
+    whiteSpace: "nowrap",
     overflow: "hidden",
-    textOverflow: "clip",
+    textOverflow: "ellipsis",
   },
   tdActions: {
     padding: "10px 12px",
@@ -343,6 +364,32 @@ const styles: Record<string, CSSProperties> = {
     boxSizing: "border-box",
     outline: "none",
   },
+  editingMultiSelect: {
+    width: "100%",
+    minHeight: "90px",
+    border: "1px solid rgba(106, 137, 180, 0.38)",
+    borderRadius: "10px",
+    background: "rgba(255, 255, 255, 0.98)",
+    padding: "8px 10px",
+    color: "#17314f",
+    fontSize: "14px",
+    fontFamily: "inherit",
+    boxSizing: "border-box",
+    outline: "none",
+    overflowY: "auto",
+  },
+  editingSelect: {
+    width: "100%",
+    border: "1px solid rgba(106, 137, 180, 0.38)",
+    borderRadius: "10px",
+    background: "rgba(255, 255, 255, 0.98)",
+    padding: "8px 10px",
+    color: "#17314f",
+    fontSize: "14px",
+    fontFamily: "inherit",
+    boxSizing: "border-box",
+    outline: "none",
+  },
   editingWrap: {
     display: "grid",
     gap: "6px",
@@ -361,6 +408,7 @@ export default function Itemization({
   selectedRowId,
   selectedField,
   sheetLocked,
+  miscTypeOptions,
   onSelectCell,
   onCommitCell,
   onSort,
@@ -380,6 +428,10 @@ export default function Itemization({
         return `${columnWidths[key] ?? defaultColumnWidths[key] ?? 140}px`;
       }),
     [columnWidths]
+  );
+  const miscTypeEditorOptions = useMemo(
+    () => Array.from(new Set([...miscTypeOptions, ...splitMultiValue(draftValue)])).sort((left, right) => left.localeCompare(right)),
+    [draftValue, miscTypeOptions]
   );
 
   const scrollBy = (left: number, top: number) => {
@@ -578,24 +630,74 @@ export default function Itemization({
                         >
                           {isEditing ? (
                             <div style={styles.editingWrap}>
-                              <input
-                                autoFocus
-                                value={draftValue}
-                                onChange={(event) => setDraftValue(event.target.value)}
-                                onBlur={commitEditor}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Enter") {
-                                    event.preventDefault();
-                                    commitEditor();
+                              {field === "poster" ? (
+                                <select
+                                  autoFocus
+                                  value={draftValue}
+                                  onChange={(event) => setDraftValue(event.target.value)}
+                                  onBlur={commitEditor}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      setEditingCell(null);
+                                    }
+                                  }}
+                                  style={styles.editingSelect}
+                                  aria-label="poster cell editor"
+                                >
+                                  <option value="">Select poster</option>
+                                  {posterOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : field === "misc_type" ? (
+                                <select
+                                  multiple
+                                  autoFocus
+                                  value={splitMultiValue(draftValue)}
+                                  onChange={(event) =>
+                                    setDraftValue(
+                                      joinMultiValue(Array.from(event.currentTarget.selectedOptions).map((option) => option.value))
+                                    )
                                   }
-                                  if (event.key === "Escape") {
-                                    event.preventDefault();
-                                    setEditingCell(null);
-                                  }
-                                }}
-                                style={styles.editingInput}
-                                aria-label={`${field} cell editor`}
-                              />
+                                  onBlur={commitEditor}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      setEditingCell(null);
+                                    }
+                                  }}
+                                  style={styles.editingMultiSelect}
+                                  aria-label="misc type cell editor"
+                                >
+                                  {miscTypeEditorOptions.map((option) => (
+                                    <option key={option} value={option}>
+                                      {option}
+                                    </option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <input
+                                  autoFocus
+                                  value={draftValue}
+                                  onChange={(event) => setDraftValue(event.target.value)}
+                                  onBlur={commitEditor}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      commitEditor();
+                                    }
+                                    if (event.key === "Escape") {
+                                      event.preventDefault();
+                                      setEditingCell(null);
+                                    }
+                                  }}
+                                  style={styles.editingInput}
+                                  aria-label={`${field} cell editor`}
+                                />
+                              )}
                               <div style={styles.editingHint}>{sheetLocked ? "Locked" : "Editing"}</div>
                             </div>
                           ) : (

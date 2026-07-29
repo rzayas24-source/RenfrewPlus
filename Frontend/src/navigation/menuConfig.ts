@@ -83,6 +83,7 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/balsheet", label: "Balance Sheet", meta: "Balance sheet.", kind: "screen", path: "/balsheet" },
   { id: "/keyproof", label: "Keyproof", meta: "Keyproof review.", kind: "screen", path: "/keyproof" },
   { id: "/itemization", label: "Itemization", meta: "Itemization.", kind: "screen", path: "/itemization" },
+  { id: "/misc-editor", label: "Misc Editor", meta: "Misc lookup list.", kind: "screen", path: "/misc-editor" },
   { id: "/itemstoreview", label: "Items to Review", meta: "Items to Review workspace.", kind: "screen", path: "/itemstoreview" },
   { id: "/statements", label: "Statements", meta: "Statements.", kind: "screen", path: "/statements" },
   { id: "/request", label: "Request", meta: "Request queue.", kind: "screen", path: "/request" },

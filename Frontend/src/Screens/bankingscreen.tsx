@@ -337,7 +337,7 @@ export default function BankingScreen() {
             </p>
 
             <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={() => void loadSpreadsheet()}>
+              <button style={adminStyles.secondaryButton} type="button" onClick={() => void loadSpreadsheet()}>
                 {refreshing ? "Refreshing..." : "Refresh Spreadsheet"}
               </button>
             </div>

@@ -43,6 +43,23 @@ export interface BalsheetWorkday {
   message?: string;
 }
 
+export interface MiscEntry {
+  misc_id: string;
+  posting_date: string;
+  amount: number;
+  misc_type: string;
+  details: string;
+  created_at: string;
+}
+
+export interface MiscEntryPayload {
+  posting_date: string;
+  amount: number;
+  misc_type: string;
+  details: string;
+  created_at?: string;
+}
+
 export function getBalsheet(postingDate?: string) {
   const params = postingDate ? { posting_date: postingDate } : undefined;
   return axios.get<BalsheetEntry[]>(`${API_BASE}/balsheet`, { params });
@@ -133,5 +150,22 @@ export function createBalsheetEntry(entry: BalsheetEntry) {
 
 export function deleteBalsheetEntry(entryId: string) {
   return axios.delete<{ status: string; entry_id: string }>(`${API_BASE}/balsheet/${entryId}`);
+}
+
+export function getMisc(postingDate?: string) {
+  const params = postingDate ? { posting_date: postingDate } : undefined;
+  return axios.get<MiscEntry[]>(`${API_BASE}/misc`, { params });
+}
+
+export function createMiscEntry(payload: MiscEntryPayload) {
+  return axios.post<MiscEntry>(`${API_BASE}/misc`, payload);
+}
+
+export function updateMiscEntry(miscId: string, payload: MiscEntryPayload) {
+  return axios.put<MiscEntry>(`${API_BASE}/misc/${miscId}`, payload);
+}
+
+export function deleteMiscEntry(miscId: string) {
+  return axios.delete<{ status: string; misc_id: string }>(`${API_BASE}/misc/${miscId}`);
 }
 

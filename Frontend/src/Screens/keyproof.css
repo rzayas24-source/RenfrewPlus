@@ -131,12 +131,95 @@
     gap: 12px;
 }
 
+.keyproof-header-titleWrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
 .keyproof-title {
     margin: 0;
     font-size: 34px;
     line-height: 1.05;
     font-weight: 900;
     color: #17314f;
+}
+
+.keyproof-complete-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(151, 207, 158, 0.75);
+    background: rgba(243, 255, 245, 0.98);
+    color: #1f6b2a;
+    box-shadow: 0 10px 18px rgba(119, 151, 198, 0.08);
+    flex-shrink: 0;
+}
+
+.keyproof-complete-check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    background: #97cf9e;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.keyproof-complete-text {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.keyproof-save-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(188, 193, 203, 0.68);
+    background: rgba(255, 255, 255, 0.96);
+    color: #35506d;
+    box-shadow: 0 10px 18px rgba(119, 151, 198, 0.08);
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.keyproof-save-badge-saved {
+    border-color: rgba(151, 207, 158, 0.75);
+    background: rgba(243, 255, 245, 0.98);
+    color: #1f6b2a;
+}
+
+.keyproof-save-badge-dirty {
+    border-color: rgba(232, 194, 110, 0.72);
+    background: rgba(255, 250, 240, 0.98);
+    color: #8a5b00;
+}
+
+.keyproof-save-badge-saving {
+    border-color: rgba(176, 214, 255, 0.82);
+    background: rgba(245, 250, 255, 0.98);
+    color: #1f4e91;
+}
+
+.keyproof-save-badge-not_saved {
+    border-color: rgba(240, 180, 180, 0.82);
+    background: rgba(255, 247, 247, 0.98);
+    color: #a32121;
 }
 
 .keyproof-menu {
@@ -239,6 +322,239 @@
     font-weight: 800;
 }
 
+.keyproof-balsheet-card {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(158, 176, 204, 0.24);
+    background:
+        radial-gradient(circle at top left, rgba(214, 230, 255, 0.72) 0%, rgba(214, 230, 255, 0) 42%),
+        radial-gradient(circle at top right, rgba(255, 224, 236, 0.58) 0%, rgba(255, 224, 236, 0) 38%),
+        linear-gradient(145deg, rgba(251, 253, 255, 0.98) 0%, rgba(242, 247, 253, 0.98) 100%);
+    box-shadow: 0 16px 32px rgba(52, 84, 120, 0.08);
+}
+
+.keyproof-summary-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
+    gap: 14px;
+    align-items: start;
+    margin-bottom: 16px;
+}
+
+.keyproof-balsheet-cardHeader {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.keyproof-balsheet-headerActions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.keyproof-balsheet-refreshButton {
+    height: 34px;
+    padding: 0 12px;
+    border: 1px solid rgba(188, 193, 203, 0.68);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.96);
+    color: #15304f;
+    font-size: 13px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 10px 18px rgba(119, 151, 198, 0.08);
+}
+
+.keyproof-balsheet-refreshButton:hover:not(:disabled) {
+    background: #ffffff;
+}
+
+.keyproof-balsheet-refreshButton:disabled {
+    opacity: 0.7;
+    cursor: wait;
+}
+
+.keyproof-balsheet-kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #75849a;
+    font-weight: 800;
+}
+
+.keyproof-balsheet-title {
+    margin-top: 4px;
+    font-size: 16px;
+    line-height: 1.2;
+    color: #1a3553;
+    font-weight: 900;
+}
+
+.keyproof-balsheet-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #8ec4ff;
+    box-shadow: 0 0 0 6px rgba(142, 196, 255, 0.18);
+    flex-shrink: 0;
+    margin-top: 6px;
+}
+
+.keyproof-balsheet-context {
+    display: grid;
+    gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-bottom: 10px;
+}
+
+.keyproof-balsheet-label {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5f748a;
+    margin-bottom: 4px;
+}
+
+.keyproof-balsheet-value {
+    font-size: 13px;
+    line-height: 1.25;
+    color: #183553;
+    font-weight: 800;
+    word-break: break-word;
+}
+
+.keyproof-balsheet-amount {
+    padding: 7px 10px;
+    border-radius: 14px;
+    border: 1px solid rgba(176, 194, 218, 0.24);
+    background: rgba(255, 255, 255, 0.92);
+    box-shadow: 0 12px 24px rgba(119, 151, 198, 0.08);
+    font-size: 16px;
+    font-weight: 900;
+    color: #17314f;
+}
+
+.keyproof-balsheet-reconcile {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    border: 1px solid rgba(176, 194, 218, 0.18);
+    background: rgba(255, 255, 255, 0.74);
+}
+
+.keyproof-balsheet-reconcileRow {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: baseline;
+}
+
+.keyproof-balsheet-meta {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.3;
+    color: #5d7187;
+}
+
+.keyproof-reconcile-card {
+    margin-bottom: 0;
+    padding: 12px 14px;
+    border-radius: 18px;
+    border: 1px solid rgba(158, 176, 204, 0.24);
+    background:
+        radial-gradient(circle at top left, rgba(214, 230, 255, 0.72) 0%, rgba(214, 230, 255, 0) 42%),
+        radial-gradient(circle at top right, rgba(255, 224, 236, 0.58) 0%, rgba(255, 224, 236, 0) 38%),
+        linear-gradient(145deg, rgba(251, 253, 255, 0.98) 0%, rgba(242, 247, 253, 0.98) 100%);
+    box-shadow: 0 16px 32px rgba(52, 84, 120, 0.08);
+}
+
+.keyproof-reconcile-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.keyproof-reconcile-titleWrap {
+    display: grid;
+    gap: 4px;
+}
+
+.keyproof-reconcile-kicker {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: #75849a;
+    font-weight: 800;
+}
+
+.keyproof-reconcile-title {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.2;
+    color: #1a3553;
+    font-weight: 900;
+}
+
+.keyproof-reconcile-grid {
+    display: grid;
+    gap: 10px;
+}
+
+.keyproof-reconcile-row {
+    display: grid;
+    gap: 6px;
+}
+
+.keyproof-reconcile-row-wide {
+    padding-top: 4px;
+}
+
+.keyproof-reconcile-label {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5f748a;
+}
+
+.keyproof-reconcile-value {
+    font-size: 16px;
+    line-height: 1.25;
+    color: #183553;
+}
+
+.keyproof-reconcile-value-alert {
+    color: #2a5ea8;
+}
+
+.keyproof-reconcile-input {
+    padding: 10px 11px;
+    border: 1px solid rgba(176, 194, 218, 0.82);
+    border-radius: 12px;
+    font-size: 15px;
+    color: #17314f;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.75),
+        0 10px 18px rgba(119, 151, 198, 0.05);
+}
+
+.keyproof-reconcile-input:focus {
+    outline: none;
+    border-color: rgba(130, 165, 214, 0.86);
+    box-shadow: 0 0 0 3px rgba(176, 214, 255, 0.28);
+}
+
 .keyproof-field {
     margin-bottom: 15px;
     display: flex;
@@ -281,12 +597,37 @@
 }
 
 .keyproof-section summary {
+    position: relative;
     padding: 13px 15px;
+    padding-right: 52px;
     background: linear-gradient(180deg, rgba(251, 252, 254, 0.98) 0%, rgba(246, 249, 252, 0.98) 100%);
     cursor: pointer;
     font-weight: 800;
     color: #17314f;
     border-bottom: 1px solid rgba(233, 238, 244, 0.95);
+}
+
+.keyproof-section-summaryText {
+    display: inline-block;
+}
+
+.keyproof-section-check {
+    position: absolute;
+    top: 50%;
+    right: 14px;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: rgba(151, 207, 158, 0.96);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 900;
+    line-height: 1;
+    box-shadow: 0 8px 16px rgba(119, 151, 198, 0.12);
 }
 
 .keyproof-section[open] summary {
@@ -483,6 +824,30 @@
     margin-top: 0;
 }
 
+.keyproof-bottom-status {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    margin-top: 18px;
+    padding: 12px;
+    border: 1px solid rgba(188, 193, 203, 0.72);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 14px 28px rgba(52, 84, 120, 0.10);
+}
+
+.keyproof-bottom-statusHeader {
+    display: flex;
+    justify-content: flex-start;
+    margin-bottom: 10px;
+}
+
+.keyproof-bottom-status .keyproof-warning,
+.keyproof-bottom-status .keyproof-success {
+    margin-bottom: 10px;
+}
+
 .keyproof-confirm-action {
     border-color: rgba(188, 193, 203, 0.68);
 }
@@ -504,6 +869,10 @@
     .keyproof-right {
         overflow: visible;
     }
+
+    .keyproof-summary-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 720px) {
@@ -522,6 +891,31 @@
         font-size: 28px;
     }
 
+    .keyproof-complete-badge {
+        padding: 5px 8px;
+    }
+
+    .keyproof-complete-text {
+        font-size: 11px;
+    }
+
+    .keyproof-reconcile-card {
+        padding: 14px;
+    }
+
+    .keyproof-summary-grid {
+        gap: 12px;
+    }
+
+    .keyproof-bottom-status {
+        padding: 10px;
+        border-radius: 16px;
+    }
+
+    .keyproof-balsheet-cardHeader {
+        flex-wrap: wrap;
+    }
+
     .keyproof-grid {
         grid-template-columns: 1fr;
     }
@@ -532,5 +926,17 @@
 
     .keyproof-flywire-rowTop {
         flex-direction: column;
+    }
+
+    .keyproof-section summary {
+        padding: 12px 14px;
+        padding-right: 48px;
+    }
+
+    .keyproof-section-check {
+        right: 12px;
+        width: 20px;
+        height: 20px;
+        font-size: 13px;
     }
 }

@@ -32,6 +32,7 @@ import AdminTableScreen from "./Screens/admintablescreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
 import AdminConfigScreen from "./Screens/adminconfigscreen";
 import WorklistEditorScreen from "./Screens/worklisteditor";
+import MiscEditorScreen from "./Screens/miscbuilder";
 import SitesScreen from "./Screens/sitescreen";
 import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
 
@@ -159,6 +160,7 @@ export default function ScreenManager() {
         <Route path="/balsheet/view" element={<Balsheet />} />
         <Route path="/keyproof" element={<Keyproof />} />
         <Route path="/itemization" element={<Itemization />} />
+        <Route path="/misc-editor" element={<MiscEditorScreen />} />
         <Route path="/itemstoreview" element={<IntroScreen />} />
         <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
         <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />

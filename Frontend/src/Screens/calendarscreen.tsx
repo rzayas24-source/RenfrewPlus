@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import {
@@ -14,17 +14,6 @@ import {
   type CalendarRangeRow,
   type CalendarStatus,
 } from "../api/calendar_api";
-
-type WidgetTone = "blue" | "pink" | "mist" | "pearl";
-
-interface WidgetCard {
-  title: string;
-  meta: string;
-  tone: WidgetTone;
-  action: string;
-  onClick: () => void;
-  footnote: string;
-}
 
 function parseMmddyyyy(value: string) {
   const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value.trim());
@@ -132,44 +121,7 @@ export default function CalendarScreen() {
   const [loadingRange, setLoadingRange] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const widgets: WidgetCard[] = useMemo(
-    () => [
-      {
-        title: "Setup",
-        meta: "Reset the calendar and anchor the first open post day.",
-        tone: "blue",
-        action: "Prepare Setup",
-        onClick: () => runSetup(),
-        footnote: "Destructive",
-      },
-      {
-        title: "Add Calendar Days",
-        meta: "Extend the calendar by the chosen number of days.",
-        tone: "pink",
-        action: "Add Days",
-        onClick: () => runAddDays(),
-        footnote: "Build",
-      },
-      {
-        title: "Build From",
-        meta: "Reset and build a new calendar run from the anchor day.",
-        tone: "mist",
-        action: "Build Calendar",
-        onClick: () => runBuildFrom(),
-        footnote: "Destructive",
-      },
-      {
-        title: "Posting Day",
-        meta: "Set or advance the current posting day.",
-        tone: "pearl",
-        action: "Open Posting Day",
-        onClick: () => runSetPostDay(),
-        footnote: "Flow",
-      },
-    ],
-    [addDaysCount, buildDaysCount, dangerConfirm, deleteEnd, deleteStart, setupDate, postDay, rangeStart, rangeEnd, status]
-  );
+  const [advanceStatus, setAdvanceStatus] = useState("Ready to advance");
 
   useEffect(() => {
     refreshStatus();
@@ -335,11 +287,14 @@ export default function CalendarScreen() {
 
   async function runAdvancePostDay() {
     try {
+      setAdvanceStatus("Advancing...");
       const response = await advanceCalendarWorkDay();
       setStatus(response.data);
       setMessage("Advanced to the next open posting day.");
+      setAdvanceStatus(`Advanced to ${response.data.currentWorkDay ?? "the next open day"}`);
       await refreshRange();
     } catch (err) {
+      setAdvanceStatus("Advance failed");
       setError(err instanceof Error ? err.message : "Failed to advance posting day");
     }
   }
@@ -385,12 +340,16 @@ export default function CalendarScreen() {
             </p>
 
             <div style={styles.heroActions}>
-              <button style={styles.primaryButton} type="button" onClick={() => refreshStatus()}>
+              <button style={styles.secondaryButton} type="button" onClick={() => refreshStatus()}>
                 Refresh Status
               </button>
               <button style={styles.secondaryButton} type="button" onClick={() => refreshRange()}>
                 Refresh Range
               </button>
+              <button style={styles.secondaryButton} type="button" onClick={runAdvancePostDay}>
+                Advance Post Day
+              </button>
+              <span style={styles.statusPill}>{advanceStatus}</span>
             </div>
           </div>
 
@@ -416,41 +375,6 @@ export default function CalendarScreen() {
               <div style={styles.statDetail}>{stat.detail}</div>
             </article>
           ))}
-        </section>
-
-        <section style={styles.widgetSection}>
-          <div style={styles.sectionHeader}>
-            <div>
-              <div style={styles.sectionKicker}>Calendar actions</div>
-              <h2 style={styles.sectionTitle}>Manager controls</h2>
-            </div>
-            <div style={styles.sectionMeta}>
-              Setup and build actions require the word `confirm`. Add and work-day actions are immediate.
-            </div>
-          </div>
-
-          <div style={styles.widgetGrid}>
-            {widgets.map((widget) => (
-              <button
-                key={widget.title}
-                type="button"
-                onClick={widget.onClick}
-                style={{
-                  ...styles.widgetCard,
-                  ...toneStyles[widget.tone],
-                }}
-              >
-                <div style={styles.widgetTop}>
-                  <div style={styles.widgetBadge}>{widget.footnote}</div>
-                </div>
-                <div style={styles.widgetBody}>
-                  <div style={styles.widgetTitle}>{widget.title}</div>
-                  <div style={styles.widgetMeta}>{widget.meta}</div>
-                </div>
-                <div style={styles.widgetAction}>{widget.action}</div>
-              </button>
-            ))}
-          </div>
         </section>
 
         <section style={styles.controlsGrid}>
@@ -525,9 +449,6 @@ export default function CalendarScreen() {
             <div style={styles.rowActions}>
               <button type="button" style={styles.primaryButton} onClick={runSetPostDay}>
                 Set Post Day
-              </button>
-              <button type="button" style={styles.secondaryButton} onClick={runAdvancePostDay}>
-                Advance Post Day
               </button>
             </div>
           </article>
@@ -988,96 +909,6 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.6,
     color: "#597085",
   },
-  widgetSection: {
-    padding: "20px",
-    borderRadius: "30px",
-    background: "rgba(255,255,255,0.74)",
-    border: "1px solid rgba(140, 160, 184, 0.16)",
-    boxShadow: "0 20px 42px rgba(52, 84, 120, 0.06)",
-  },
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "16px",
-    marginBottom: "16px",
-  },
-  sectionKicker: {
-    fontSize: "12px",
-    textTransform: "uppercase",
-    letterSpacing: "0.14em",
-    color: "#74879c",
-    fontWeight: 800,
-    marginBottom: "8px",
-  },
-  sectionTitle: {
-    margin: 0,
-    fontSize: "24px",
-    color: "#17324f",
-  },
-  sectionMeta: {
-    maxWidth: "420px",
-    fontSize: "14px",
-    lineHeight: 1.6,
-    color: "#5e7186",
-    textAlign: "right",
-  },
-  widgetGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "14px",
-  },
-  widgetCard: {
-    minHeight: "168px",
-    borderRadius: "24px",
-    border: "1px solid rgba(140, 160, 184, 0.16)",
-    padding: "18px",
-    textAlign: "left",
-    cursor: "pointer",
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    boxShadow: "0 16px 34px rgba(52, 84, 120, 0.06)",
-  },
-  widgetTop: {
-    display: "flex",
-    justifyContent: "flex-start",
-  },
-  widgetBadge: {
-    display: "inline-flex",
-    alignItems: "center",
-    height: "28px",
-    padding: "0 12px",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.7)",
-    border: "1px solid rgba(140, 160, 184, 0.16)",
-    color: "#50657a",
-    fontSize: "12px",
-    fontWeight: 800,
-    textTransform: "uppercase",
-    letterSpacing: "0.08em",
-  },
-  widgetBody: {
-    display: "grid",
-    gap: "8px",
-  },
-  widgetTitle: {
-    fontSize: "22px",
-    fontWeight: 800,
-    color: "#17324f",
-  },
-  widgetMeta: {
-    fontSize: "14px",
-    lineHeight: 1.6,
-    color: "#566a7f",
-  },
-  widgetAction: {
-    fontSize: "13px",
-    fontWeight: 800,
-    color: "#35506d",
-    textTransform: "uppercase",
-    letterSpacing: "0.1em",
-  },
   controlsGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
@@ -1205,20 +1036,4 @@ const styles: Record<string, CSSProperties> = {
     fontSize: "14px",
   },
 };
-
-const toneStyles: Record<WidgetTone, CSSProperties> = {
-  blue: {
-    background: "linear-gradient(145deg, rgba(229, 244, 255, 0.96) 0%, rgba(252, 252, 255, 0.92) 100%)",
-  },
-  pink: {
-    background: "linear-gradient(145deg, rgba(255, 235, 245, 0.96) 0%, rgba(255, 252, 254, 0.92) 100%)",
-  },
-  mist: {
-    background: "linear-gradient(145deg, rgba(240, 245, 250, 0.96) 0%, rgba(252, 253, 255, 0.92) 100%)",
-  },
-  pearl: {
-    background: "linear-gradient(145deg, rgba(251, 247, 242, 0.96) 0%, rgba(255, 254, 252, 0.92) 100%)",
-  },
-};
-
 

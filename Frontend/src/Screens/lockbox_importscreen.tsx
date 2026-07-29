@@ -235,50 +235,14 @@ export default function LockboxImportScreen() {
       sidebarCardValue="Lockbox import ready"
       sidebarCardMeta="The same calm shell keeps lockbox work in the same visual family as the import window."
     >
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
-          <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>Lockbox import screen</div>
-            <p style={adminStyles.subtitle}>
-              A calm workspace for staging lockbox rows, checking progress, and following import work through the system.
-            </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.secondaryButton} type="button" onClick={openFilePicker} disabled={uploading}>
-                {uploading ? "Uploading..." : "Upload SearchResults.xls"}
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/attachments")}>
-                Open Attachments
-              </button>
-              <button style={adminStyles.secondaryButton} type="button" onClick={() => navigate("/banking")}>
-                Open Banking
-              </button>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xls,.xlsx"
-              onChange={(event) => void handleFileChange(event)}
-              style={lockboxImportStyles.hiddenInput}
-            />
-            <div style={lockboxImportStyles.uploadHint}>
-              Choose <strong>SearchResults.xls</strong> from your Downloads folder.
-            </div>
-          </div>
-
-          <div style={adminStyles.heroArt}>
-            <div style={adminStyles.heroStatusCard}>
-              <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>Lockbox window</span>
-                <span style={adminStyles.statusDot} />
-              </div>
-              <div style={adminStyles.heroStatusTitle}>Same shell, lockbox focus</div>
-              <div style={adminStyles.heroStatusText}>
-                This page uses the import styling so the new lockbox area feels native to the workspace.
-              </div>
-            </div>
-          </div>
-        </section>
+      <section style={{ ...adminStyles.content, paddingTop: 0, gap: "16px" }}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xls,.xlsx"
+          onChange={(event) => void handleFileChange(event)}
+          style={lockboxImportStyles.hiddenInput}
+        />
 
         <section style={adminStyles.statsGrid}>
           {metrics.map((metric) => (

@@ -33,6 +33,17 @@ function formatDay(day: string) {
   });
 }
 
+function compareDayStrings(left: string, right: string) {
+  const leftTime = new Date(`${left}T00:00:00`).getTime();
+  const rightTime = new Date(`${right}T00:00:00`).getTime();
+
+  if (!Number.isNaN(leftTime) && !Number.isNaN(rightTime) && leftTime !== rightTime) {
+    return leftTime - rightTime;
+  }
+
+  return right.localeCompare(left);
+}
+
 export default function IntroScreen() {
   const navigate = useNavigate();
   const appConfig = useAppConfig();
@@ -66,7 +77,7 @@ export default function IntroScreen() {
       });
   }, []);
 
-  const days = useMemo(() => Object.keys(pending), [pending]);
+  const days = useMemo(() => Object.keys(pending).sort((left, right) => compareDayStrings(right, left)), [pending]);
   const totalPending = useMemo(
     () => days.reduce((total, day) => total + pending[day].length, 0),
     [days, pending]

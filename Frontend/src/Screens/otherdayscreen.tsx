@@ -83,6 +83,22 @@ export default function OtherDayScreen() {
     <AdminShell
       sidebarCopy="A soft workspace for other-day check review and count comparison."
       onBack={() => navigate("/tools")}
+      backButtonFirst
+      sidebarTopCard={
+        <div style={adminStyles.sidebarCard}>
+          <div style={{ ...adminStyles.sidebarCardLabel, textAlign: "center" }}>Sources</div>
+          <div style={{ display: "grid", gap: "10px", marginTop: "8px" }}>
+            <div>
+              <div style={{ ...otherDayStyles.sourceLabel, ...otherDayStyles.sourceLabelFirst }}>3.HTML\Renamed</div>
+              <div style={otherDayStyles.sourcePath}>C:\Renfrew\Workflow\3.HTML\Renamed</div>
+            </div>
+            <div>
+              <div style={otherDayStyles.sourceLabel}>2.ERA\Renamed</div>
+              <div style={otherDayStyles.sourcePath}>C:\Renfrew\Workflow\2.ERA\Renamed</div>
+            </div>
+          </div>
+        </div>
+      }
       sidebarCardLabel="Current Work Day"
       sidebarCardValue={data?.currentWorkDay || "Loading..."}
       sidebarCardMeta={`Mapped bank day: ${data?.bankDay || "Loading..."}`}
@@ -340,6 +356,24 @@ const otherDayStyles: Record<string, CSSProperties> = {
   },
   subtotalValue: {
     fontSize: "14px",
+    fontWeight: 800,
+    color: "#17324f",
+  },
+  sourceLabel: {
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    color: "#6a7f95",
+    marginBottom: "4px",
+  },
+  sourceLabelFirst: {
+    marginTop: "2px",
+  },
+  sourcePath: {
+    fontSize: "0.88rem",
+    lineHeight: 1.35,
+    wordBreak: "break-word",
     fontWeight: 800,
     color: "#17324f",
   },

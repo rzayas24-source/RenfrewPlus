@@ -35,6 +35,14 @@ export async function getEmailDownloaderDates(folderIndex: number) {
   return (await response.json()) as string[];
 }
 
+export async function getEmailDownloaderLastUploadedDate() {
+  const response = await fetch(`${API_BASE}/email-downloader/last-uploaded`);
+  if (!response.ok) {
+    throw new Error("Failed to load last uploaded date");
+  }
+  return (await response.json()) as string | null;
+}
+
 export async function runEmailDownloader(payload: {
   folder_index: number;
   date_value?: string | null;

@@ -1,166 +1,134 @@
-﻿import type { CSSProperties } from "react";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { WorklistBrandButton } from "../worklist/worklist";
+import { AdminShell } from "../components/AdminShell";
+import { getBankingSpreadsheet, type BankingSpreadsheetResponse } from "../api/banking_api";
 
-type WidgetTone = "blue" | "pink" | "mist" | "pearl";
+type MonthlyBankPoint = {
+  day: string;
+  iso: string;
+  amount: number;
+  count: number;
+  eftAmount: number;
+  lockboxAmount: number;
+};
 
-interface WidgetCard {
-  title: string;
-  meta: string;
-  tone: WidgetTone;
-  action: string;
-  path: string;
-  footnote: string;
-}
-
-interface StatCard {
-  label: string;
-  value: string;
-  detail: string;
-}
+const moneyFmt = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+});
 
 export default function MainScreen() {
   const navigate = useNavigate();
-  const openAdminWindow = () => {
-    window.open("/admin", "renfrew-admin", "noopener,noreferrer");
-  };
+  const [bankingData, setBankingData] = useState<BankingSpreadsheetResponse | null>(null);
+  const [chartLoading, setChartLoading] = useState(true);
+  const [chartError, setChartError] = useState<string | null>(null);
 
-  const widgets: WidgetCard[] = [
-    {
-      title: "Collections",
-      meta: "Open the collections workspace for follow-up and receivables tracking.",
-      tone: "pearl",
-      action: "Open Collections",
-      path: "/collections",
-      footnote: "Menu item",
-    },
-    {
-      title: "Finance",
-      meta: "Open finance-related workflow tools and review screens.",
-      tone: "pearl",
-      action: "Open Finance",
-      path: "/finance",
-      footnote: "Menu item",
-    },
-    {
-      title: "Business",
-      meta: "Open business-related workflow tools and review screens.",
-      tone: "blue",
-      action: "Open Business",
-      path: "/business",
-      footnote: "Menu item",
-    },
-    {
-      title: "Site Review",
-      meta: "Open review batches, review attachments, and keep the queue moving.",
-      tone: "blue",
-      action: "Open Site",
-      path: "/site",
-      footnote: "Review queue",
-    },
-    {
-      title: "Balance Sheet",
-      meta: "Jump into Balsheet tools, entries, and the bulk posting flow.",
-      tone: "pink",
-      action: "Open Balance Sheet",
-      path: "/balsheet/view",
-      footnote: "Worksheet hub",
-    },
-    {
-      title: "Calendar",
-      meta: "Open the calendar workspace for scheduling, daily views, and related module links.",
-      tone: "mist",
-      action: "Open Calendar",
-      path: "/calendar",
-      footnote: "Schedule",
-    },
-    {
-      title: "Approved Batches",
-      meta: "Check completed files, confirmations, and review history.",
-      tone: "pearl",
-      action: "Open Approved",
-      path: "/site-review?view=approved",
-      footnote: "Review complete",
-    },
-    {
-      title: "Image Renfrew",
-      meta: "A preview tile for the restored icon and banner system.",
-      tone: "mist",
-      action: "View Preview",
-      path: "/site",
-      footnote: "Brand tile",
-    },
-  ];
+  useEffect(() => {
+    let active = true;
 
-  const stats: StatCard[] = [
-    {
-      label: "Focus",
-      value: "Review queue",
-      detail: "Keep the attachment queue moving with a calmer workspace.",
-    },
-    {
-      label: "Flow",
-      value: "Keyproof + Itemization",
-      detail: "One smooth route from review to balance check.",
-    },
-    {
-      label: "Theme",
-      value: "Baby blue / pink / grey",
-      detail: "Soft contrast, airy spacing, and a more premium feel.",
-    },
-  ];
+    const loadBanking = async () => {
+      setChartLoading(true);
+      setChartError(null);
+
+      try {
+        const response = await getBankingSpreadsheet();
+        if (active) {
+          setBankingData(response.data);
+        }
+      } catch {
+        if (active) {
+          setBankingData(null);
+          setChartError("Banking chart unavailable right now.");
+        }
+      } finally {
+        if (active) {
+          setChartLoading(false);
+        }
+      }
+    };
+
+    void loadBanking();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const chartData = useMemo(() => {
+    const now = new Date();
+    const monthIndex = now.getMonth();
+    const year = now.getFullYear();
+    const points = new Map<string, MonthlyBankPoint>();
+
+    for (const group of bankingData?.groups ?? []) {
+      for (const row of group.rows) {
+        const parsed = parseBankDate(row.date);
+        if (!parsed) continue;
+        if (parsed.getMonth() !== monthIndex || parsed.getFullYear() !== year) continue;
+
+        const iso = toIsoDate(parsed);
+        const existing = points.get(iso) ?? {
+          day: String(parsed.getDate()).padStart(2, "0"),
+          iso,
+          amount: 0,
+          count: 0,
+          eftAmount: 0,
+          lockboxAmount: 0,
+        };
+
+        const amount = parseMoney(row.amount);
+        existing.amount += amount;
+        existing.count += 1;
+        if (row.source === "EFT") {
+          existing.eftAmount += amount;
+        } else {
+          existing.lockboxAmount += amount;
+        }
+        points.set(iso, existing);
+      }
+    }
+
+    return Array.from(points.values()).sort((left, right) => left.iso.localeCompare(right.iso));
+  }, [bankingData]);
+
+  const chartMax = useMemo(() => {
+    const max = Math.max(0, ...chartData.map((point) => point.amount));
+    return max > 0 ? max : 1;
+  }, [chartData]);
+
+  const currentMonthLabel = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+
+  const chartTotals = useMemo(() => {
+    return chartData.reduce(
+      (acc, point) => {
+        acc.amount += point.amount;
+        acc.count += point.count;
+        return acc;
+      },
+      { amount: 0, count: 0 }
+    );
+  }, [chartData]);
+
+  const chartLayout = useMemo(() => {
+    const leftPad = 18;
+    const usableWidth = 940 - leftPad * 2;
+    const step = chartData.length > 0 ? usableWidth / chartData.length : usableWidth;
+    const barWidth = Math.max(12, Math.min(26, step * 0.7));
+    return { leftPad, step, barWidth };
+  }, [chartData.length]);
 
   return (
-    <main style={styles.shell}>
-      <div style={styles.glowBlue} />
-      <div style={styles.glowPink} />
-
-      <aside style={styles.sidebar}>
-        <div style={styles.brandWrap}>
-          <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={styles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={styles.sidebarCopy}>
-          A soft, polished command center for the review flow, balance sheet, and completed batches.
-        </p>
-
-        <nav style={styles.navStack} aria-label="Main navigation">
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={styles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/collections")}>
-            <span style={styles.navButtonLabel}>Collections</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/finance")}>
-            <span style={styles.navButtonLabel}>Finance</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={() => navigate("/business")}>
-            <span style={styles.navButtonLabel}>Business</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={styles.navButton} type="button" onClick={openAdminWindow}>
-            <span style={styles.navButtonLabel}>Admin</span>
-            <span className="sidebar-nav-button__glyph" style={styles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={styles.sidebarCard}>
-          <div style={styles.sidebarCardLabel}>Today</div>
-          <div style={styles.sidebarCardValue}>Gentle, focused, clear</div>
-          <div style={styles.sidebarCardMeta}>
-            The whole workspace is tuned to feel lighter and more modern without losing the workflow.
-          </div>
-        </div>
-      </aside>
-
+    <AdminShell
+      sidebarCopy="A soft, polished command center for the review flow, balance sheet, and completed batches."
+      onBack={() => navigate("/")}
+      hideBackButton
+      useGlobalMenuFallback={false}
+      ribbonTitle="Main Menu"
+    >
       <section style={styles.content}>
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
@@ -196,53 +164,152 @@ export default function MainScreen() {
           </div>
         </section>
 
-        <section style={styles.statsGrid}>
-          {stats.map((stat) => (
-            <article key={stat.label} style={styles.statCard}>
-              <div style={styles.statLabel}>{stat.label}</div>
-              <div style={styles.statValue}>{stat.value}</div>
-              <div style={styles.statDetail}>{stat.detail}</div>
-            </article>
-          ))}
-        </section>
-
-        <section style={styles.widgetSection}>
-            <div style={styles.sectionHeader}>
+        <section style={styles.chartCard}>
+          <div style={styles.chartHeader}>
             <div>
-              <div style={styles.sectionKicker}>Widgets</div>
-              <h2 style={styles.sectionTitle}>Everything feels connected</h2>
+              <div style={styles.chartKicker}>Current month</div>
+              <h2 style={styles.chartTitle}>{currentMonthLabel} banking trend</h2>
             </div>
-            <div style={styles.sectionMeta}>
-              The main paths stay focused on the core workspace while Collections holds the follow-up group.
+            <div style={styles.chartHeaderMeta}>
+              <div style={styles.chartHeaderValue}>{formatCurrency(chartTotals.amount)}</div>
+              <div style={styles.chartHeaderLabel}>{chartTotals.count} rows this month</div>
             </div>
           </div>
 
-          <div style={styles.widgetGrid}>
-            {widgets.map((widget) => (
-              <button
-                key={widget.title}
-                type="button"
-                onClick={() => navigate(widget.path)}
-                style={{
-                  ...styles.widgetCard,
-                  ...toneStyles[widget.tone],
-                }}
-              >
-                <div style={styles.widgetTop}>
-                  <div style={styles.widgetBadge}>{widget.footnote}</div>
-                </div>
-                <div style={styles.widgetBody}>
-                  <div style={styles.widgetTitle}>{widget.title}</div>
-                  <div style={styles.widgetMeta}>{widget.meta}</div>
-                </div>
-                <div style={styles.widgetAction}>{widget.action}</div>
-              </button>
-            ))}
+          <div style={styles.chartLegend}>
+            <span style={styles.legendItem}>
+              <span style={{ ...styles.legendSwatch, background: "linear-gradient(135deg, #8ec5ff 0%, #cfe7ff 100%)" }} />
+              EFT
+            </span>
+            <span style={styles.legendItem}>
+              <span style={{ ...styles.legendSwatch, background: "linear-gradient(135deg, #ffb4d2 0%, #ffe0ec 100%)" }} />
+              Lockbox
+            </span>
+            <span style={styles.legendItem}>
+              <span style={{ ...styles.legendSwatch, background: "linear-gradient(135deg, #d7dee8 0%, #eef2f7 100%)" }} />
+              Total
+            </span>
+          </div>
+
+          <div style={styles.chartFrame}>
+            {chartLoading ? (
+              <div style={styles.chartState}>Loading monthly banking data...</div>
+            ) : chartError ? (
+              <div style={styles.chartState}>{chartError}</div>
+            ) : chartData.length === 0 ? (
+              <div style={styles.chartState}>No banking rows were found for the current month.</div>
+            ) : (
+                <svg viewBox="0 0 940 270" preserveAspectRatio="none" style={styles.chartSvg} aria-label={`${currentMonthLabel} banking chart`}>
+                  <defs>
+                  <linearGradient id="banking-total-gradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#8ec5ff" />
+                    <stop offset="100%" stopColor="#d7ebff" />
+                  </linearGradient>
+                  <linearGradient id="banking-eft-gradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#69aef8" />
+                    <stop offset="100%" stopColor="#bfe0ff" />
+                  </linearGradient>
+                  <linearGradient id="banking-lockbox-gradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#ff9ec5" />
+                    <stop offset="100%" stopColor="#ffd8e7" />
+                  </linearGradient>
+                </defs>
+
+                <line x1="0" y1="220" x2="940" y2="220" stroke="rgba(120, 140, 164, 0.18)" strokeWidth="2" />
+
+                {chartData.map((point, index) => {
+                  const left = chartLayout.leftPad + index * chartLayout.step + (chartLayout.step - chartLayout.barWidth) / 2;
+                  const barHeight = Math.max(10, (point.amount / chartMax) * 156);
+                  const eftHeight = Math.max(4, (point.eftAmount / chartMax) * 156);
+                  const lockboxHeight = Math.max(4, (point.lockboxAmount / chartMax) * 156);
+                  const isCurrent = index === chartData.length - 1;
+                  const splitWidth = Math.max(4, (chartLayout.barWidth - 4) / 2);
+
+                  return (
+                    <g key={point.iso}>
+                      <rect
+                        x={left}
+                        y={210 - barHeight}
+                        width={chartLayout.barWidth}
+                        height={barHeight}
+                        rx="12"
+                        fill="url(#banking-total-gradient)"
+                        opacity={isCurrent ? 1 : 0.72}
+                      />
+                      <rect
+                        x={left}
+                        y={210 - eftHeight}
+                        width={splitWidth}
+                        height={eftHeight}
+                        rx="10"
+                        fill="url(#banking-eft-gradient)"
+                        opacity={point.eftAmount > 0 ? 1 : 0.22}
+                      />
+                      <rect
+                        x={left + splitWidth + 4}
+                        y={210 - lockboxHeight}
+                        width={splitWidth}
+                        height={lockboxHeight}
+                        rx="10"
+                        fill="url(#banking-lockbox-gradient)"
+                        opacity={point.lockboxAmount > 0 ? 1 : 0.22}
+                      />
+                      <circle cx={left + chartLayout.barWidth / 2} cy={210 - barHeight - 10} r={4} fill="#7a93ad" opacity={0.45} />
+                      <text x={left + chartLayout.barWidth / 2} y="236" textAnchor="middle" style={styles.chartDayLabel}>
+                        {point.day}
+                      </text>
+                    </g>
+                  );
+                })}
+              </svg>
+            )}
+          </div>
+
+          <div style={styles.chartFootnote}>
+            <span>Month to date total</span>
+            <strong>{formatCurrency(chartTotals.amount)}</strong>
+            <span>{chartTotals.count} rows across EFT and Lockbox</span>
           </div>
         </section>
+
       </section>
-    </main>
+    </AdminShell>
   );
+}
+
+function parseMoney(value: string) {
+  if (value.trim() === "") return 0;
+  const parsed = Number(String(value).replace(/,/g, ""));
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+function formatCurrency(value: number) {
+  return moneyFmt.format(value);
+}
+
+function parseBankDate(value: string) {
+  const trimmed = value.trim();
+  const mmddyyyy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (mmddyyyy) {
+    const [, month, day, year] = mmddyyyy;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const [, year, month, day] = iso;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(trimmed);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toIsoDate(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export const styles: Record<string, CSSProperties> = {
@@ -411,16 +478,17 @@ export const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
-    gap: "18px",
+    gap: "12px",
+    minHeight: "calc(100vh - 32px)",
   },
   heroShell: {
     position: "relative",
     zIndex: 1,
     display: "grid",
     gridTemplateColumns: "minmax(0, 1.2fr) minmax(300px, 0.9fr)",
-    gap: "18px",
+    gap: "12px",
     alignItems: "stretch",
-    padding: "24px",
+    padding: "16px",
     borderRadius: "32px",
     border: "1px solid rgba(140, 160, 184, 0.20)",
     background: "linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(248,250,253,0.88) 50%, rgba(255,244,248,0.92) 100%)",
@@ -433,8 +501,8 @@ export const styles: Record<string, CSSProperties> = {
     minWidth: 0,
   },
   heroWordmarkWrap: {
-    maxWidth: "540px",
-    padding: "0 0 6px",
+    maxWidth: "500px",
+    padding: "0 0 4px",
   },
   heroWordmark: {
     display: "block",
@@ -444,27 +512,27 @@ export const styles: Record<string, CSSProperties> = {
   kicker: {
     textTransform: "uppercase",
     letterSpacing: "0.2em",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 800,
     color: "#74879c",
-    marginBottom: "10px",
+    marginBottom: "8px",
   },
   subtitle: {
-    margin: "8px 0 0",
+    margin: "6px 0 0",
     maxWidth: "760px",
-    fontSize: "16px",
-    lineHeight: 1.7,
+    fontSize: "14px",
+    lineHeight: 1.55,
     color: "#536579",
   },
   heroArt: {
     display: "flex",
     flexDirection: "column",
-    gap: "14px",
+    gap: "10px",
   },
   heroLogoCard: {
     flex: 1,
-    minHeight: "210px",
-    padding: "18px",
+    minHeight: "160px",
+    padding: "14px",
     borderRadius: "28px",
     background: "rgba(255,255,255,0.94)",
     border: "1px solid rgba(140, 160, 184, 0.12)",
@@ -474,12 +542,12 @@ export const styles: Record<string, CSSProperties> = {
   },
   heroLogoImage: {
     width: "100%",
-    maxWidth: "320px",
+    maxWidth: "280px",
     height: "auto",
     display: "block",
   },
   heroStatusCard: {
-    padding: "16px 18px",
+    padding: "12px 14px",
     borderRadius: "24px",
     background: "linear-gradient(135deg, rgba(226, 243, 255, 0.98) 0%, rgba(255, 235, 244, 0.96) 100%)",
     border: "1px solid rgba(140, 160, 184, 0.18)",
@@ -489,7 +557,7 @@ export const styles: Record<string, CSSProperties> = {
     alignItems: "center",
     justifyContent: "space-between",
     gap: "10px",
-    marginBottom: "10px",
+    marginBottom: "8px",
   },
   statusPill: {
     display: "inline-flex",
@@ -512,14 +580,14 @@ export const styles: Record<string, CSSProperties> = {
     flexShrink: 0,
   },
   heroStatusTitle: {
-    fontSize: "18px",
+    fontSize: "16px",
     fontWeight: 800,
-    marginBottom: "8px",
+    marginBottom: "6px",
     color: "#16304d",
   },
   heroStatusText: {
-    fontSize: "14px",
-    lineHeight: 1.6,
+    fontSize: "13px",
+    lineHeight: 1.45,
     color: "#5d7187",
   },
   statsGrid: {
@@ -645,28 +713,114 @@ export const styles: Record<string, CSSProperties> = {
     fontWeight: 800,
     color: "#10253d",
   },
+  chartCard: {
+    padding: "14px 16px 12px",
+    borderRadius: "28px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(247,250,254,0.92) 52%, rgba(255,242,247,0.92) 100%)",
+    boxShadow: "0 22px 44px rgba(52, 84, 120, 0.08)",
+    display: "grid",
+    gap: "10px",
+    width: "100%",
+    minWidth: 0,
+    marginTop: "auto",
+  },
+  chartHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    gap: "12px",
+    alignItems: "flex-end",
+    flexWrap: "wrap",
+  },
+  chartKicker: {
+    textTransform: "uppercase",
+    letterSpacing: "0.16em",
+    fontSize: "10px",
+    color: "#74879c",
+    fontWeight: 800,
+    marginBottom: "6px",
+  },
+  chartTitle: {
+    margin: 0,
+    fontSize: "19px",
+    lineHeight: 1.08,
+    letterSpacing: "-0.03em",
+    color: "#10253d",
+  },
+  chartHeaderMeta: {
+    display: "grid",
+    justifyItems: "end",
+    gap: "2px",
+  },
+  chartHeaderValue: {
+    fontSize: "18px",
+    fontWeight: 800,
+    color: "#10253d",
+  },
+  chartHeaderLabel: {
+    fontSize: "11px",
+    color: "#5d7187",
+    fontWeight: 700,
+  },
+  chartLegend: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "8px 12px",
+    alignItems: "center",
+  },
+  legendItem: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    fontSize: "11px",
+    fontWeight: 800,
+    color: "#4f647a",
+  },
+  legendSwatch: {
+    width: "12px",
+    height: "12px",
+    borderRadius: "999px",
+    boxShadow: "0 0 0 4px rgba(255,255,255,0.7)",
+    flexShrink: 0,
+  },
+  chartFrame: {
+    width: "100%",
+    minWidth: 0,
+    height: "180px",
+    borderRadius: "24px",
+    border: "1px solid rgba(140, 160, 184, 0.12)",
+    background: "linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(245,248,252,0.86) 100%)",
+    overflow: "hidden",
+  },
+  chartSvg: {
+    width: "100%",
+    height: "100%",
+    display: "block",
+  },
+  chartDayLabel: {
+    fontSize: "10px",
+    fill: "#6b7f94",
+    fontWeight: 700,
+  },
+  chartState: {
+    height: "100%",
+    display: "grid",
+    placeItems: "center",
+    color: "#5d7187",
+    fontSize: "12px",
+    padding: "12px",
+    textAlign: "center",
+  },
+  chartFootnote: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "6px 10px",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: "0",
+    fontSize: "11px",
+    color: "#5d7187",
+  },
 };
 
-const toneStyles: Record<WidgetTone, CSSProperties> = {
-  blue: {
-    background:
-      "linear-gradient(135deg, rgba(220, 239, 255, 0.98) 0%, rgba(246, 251, 255, 0.98) 100%)",
-    border: "1px solid rgba(143, 200, 255, 0.22)",
-  },
-  pink: {
-    background:
-      "linear-gradient(135deg, rgba(255, 228, 240, 0.98) 0%, rgba(255, 248, 251, 0.98) 100%)",
-    border: "1px solid rgba(255, 184, 214, 0.20)",
-  },
-  mist: {
-    background:
-      "linear-gradient(135deg, rgba(232, 244, 247, 0.98) 0%, rgba(249, 253, 254, 0.98) 100%)",
-    border: "1px solid rgba(175, 215, 224, 0.18)",
-  },
-  pearl: {
-    background:
-      "linear-gradient(135deg, rgba(241, 242, 247, 0.98) 0%, rgba(252, 252, 255, 0.98) 100%)",
-    border: "1px solid rgba(176, 194, 218, 0.20)",
-  },
-};
 

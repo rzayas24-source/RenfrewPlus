@@ -21,6 +21,12 @@ const phaseOneSteps = [
 
 type StatusKind = "idle" | "success" | "error";
 
+type EFTUploadMetric = {
+  label: string;
+  value: string;
+  detail: string;
+};
+
 export default function EFTUploadScreen() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -50,6 +56,23 @@ export default function EFTUploadScreen() {
     text: "Approve the vetted EFT rows or reject the upload.",
   });
   const [approvalPreview, setApprovalPreview] = useState<EftApprovalResponse | null>(null);
+  const metrics: EFTUploadMetric[] = [
+    {
+      label: "Mode",
+      value: "EFT upload",
+      detail: "A calm place for bringing EFT rows into the workflow.",
+    },
+    {
+      label: "Focus",
+      value: "Staging + review",
+      detail: "Keep EFT upload visible without changing the shell language.",
+    },
+    {
+      label: "Style",
+      value: "Matches import",
+      detail: "Same cards, same spacing, same soft shell treatment.",
+    },
+  ];
 
   const openFilePicker = () => {
     fileInputRef.current?.click();
@@ -244,35 +267,15 @@ export default function EFTUploadScreen() {
       sidebarCardValue="EFT upload ready"
       sidebarCardMeta="This screen is ready for upload logic, but for now it stays focused on layout and navigation."
     >
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
-          <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>EFT upload workspace</div>
-            <p style={adminStyles.subtitle}>
-              Load DEP_1101_TRAN.xlsx into EFTLoad, review the imported workbook, and keep the staging controls below for the
-              next step.
-            </p>
-
-            <div style={adminStyles.heroActions}>
-              <button style={adminStyles.primaryButton} type="button" onClick={runStage} disabled={staging}>
-                {staging ? "Staging..." : "Load to Staging"}
-              </button>
-            </div>
-          </div>
-
-          <div style={adminStyles.heroArt}>
-            <div style={adminStyles.heroStatusCard}>
-              <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>{stageStatus.kind === "idle" ? "Upload ready" : stageStatus.kind.toUpperCase()}</span>
-                <span style={adminStyles.statusDot} />
-              </div>
-              <div style={adminStyles.heroStatusTitle}>Upload workbook to EFTLoad</div>
-              <div style={adminStyles.heroStatusText}>
-                Choose the DEP_1101_TRAN workbook, load it into EFTLoad, and use the staging section below when you are ready
-                to move those rows forward.
-              </div>
-            </div>
-          </div>
+      <section style={{ ...adminStyles.content, paddingTop: 0, gap: "16px" }}>
+        <section style={adminStyles.statsGrid}>
+          {metrics.map((metric) => (
+            <article key={metric.label} style={adminStyles.statCard}>
+              <div style={adminStyles.statLabel}>{metric.label}</div>
+              <div style={adminStyles.statValue}>{metric.value}</div>
+              <div style={adminStyles.statDetail}>{metric.detail}</div>
+            </article>
+          ))}
         </section>
 
         <section style={adminStyles.widgetSection}>

@@ -12,7 +12,6 @@ export interface KeyproofDraft {
   foreignCheck: string;
   wireTransfer: string;
   misc: string;
-  miscDescription: string;
 }
 
 export interface SiteOption {
@@ -77,10 +76,39 @@ export interface FlywirePayload {
   rows: FlywireRow[];
 }
 
-export const getKeyproof = () => axios.get(`${API_BASE}/keyproof`);
-export const addKeyproof = (data: KeyproofDraft) => axios.post(`${API_BASE}/keyproof`, data);
-export const updateKeyproof = (id: number, data: KeyproofDraft) => axios.put(`${API_BASE}/keyproof/${id}`, data);
-export const deleteKeyproof = (id: number) => axios.delete(`${API_BASE}/keyproof/${id}`);
+export interface PersistedStateResponse<TPayload = unknown> {
+  attachment_id: number;
+  payload: TPayload | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface KeyproofSavedPayload {
+  form: Omit<KeyproofDraft, "attachmentId">;
+  batchDate: string;
+  paperworkTotal: string;
+}
+
+export interface ItemizationSavedPayload {
+  items: Array<Record<string, unknown>>;
+}
+
+export const getKeyproof = (attachmentId: number) =>
+  axios.get<PersistedStateResponse<KeyproofSavedPayload>>(`${API_BASE}/keyproof/${attachmentId}`);
+export const addKeyproof = (attachmentId: number, data: KeyproofSavedPayload) =>
+  axios.put<PersistedStateResponse<KeyproofSavedPayload>>(`${API_BASE}/keyproof/${attachmentId}`, data);
+export const updateKeyproof = (attachmentId: number, data: KeyproofSavedPayload) =>
+  axios.put<PersistedStateResponse<KeyproofSavedPayload>>(`${API_BASE}/keyproof/${attachmentId}`, data);
+export const deleteKeyproof = (attachmentId: number) => axios.delete(`${API_BASE}/keyproof/${attachmentId}`);
+
+export const getItemization = (attachmentId: number) =>
+  axios.get<PersistedStateResponse<ItemizationSavedPayload>>(`${API_BASE}/itemization/${attachmentId}`);
+export const addItemization = (attachmentId: number, data: ItemizationSavedPayload) =>
+  axios.put<PersistedStateResponse<ItemizationSavedPayload>>(`${API_BASE}/itemization/${attachmentId}`, data);
+export const updateItemization = (attachmentId: number, data: ItemizationSavedPayload) =>
+  axios.put<PersistedStateResponse<ItemizationSavedPayload>>(`${API_BASE}/itemization/${attachmentId}`, data);
+export const deleteItemization = (attachmentId: number) =>
+  axios.delete(`${API_BASE}/itemization/${attachmentId}`);
 export const getSites = () => axios.get<SiteOption[]>(`${API_BASE}/sites`);
 export const loadFlywire = (attachmentId: number) => axios.get<FlywirePayload>(`${API_BASE}/keyproof/flywire/${attachmentId}`);
 export const autofindFlywire = (attachmentId: number) =>
