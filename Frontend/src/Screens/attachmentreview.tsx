@@ -1,5 +1,5 @@
 import type { ChangeEvent, CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import {
@@ -8,6 +8,7 @@ import {
   getPendingAttachment,
   getPreviousAttachment,
   rejectAttachment,
+  repairAttachmentSnapshot,
   updateAttachmentSite,
 } from "../api/attachmentreview_api";
 import type { PendingAttachment } from "../api/attachmentreview_api";
@@ -18,6 +19,8 @@ import { styles as adminStyles } from "./adminscreen";
 
 const snapshotUrl = (id: number) => `${API_BASE}/attachments/${id}/snapshot`;
 
+type SnapshotStatus = "loading" | "ready" | "missing" | "repairing";
+
 export default function AttachmentReviewScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -27,12 +30,17 @@ export default function AttachmentReviewScreen() {
   const [sites, setSites] = useState<SiteOption[]>([]);
   const [site, setSite] = useState("");
   const [zoom, setZoom] = useState(1);
+  const [isHeroMenuOpen, setIsHeroMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadingSites, setLoadingSites] = useState(true);
-  const [batchCount, setBatchCount] = useState<number | null>(null);
+  const [pendingByDay, setPendingByDay] = useState<Record<string, Array<{ id: number; filename: string }>>>({});
   const [error, setError] = useState<string | null>(null);
   const [siteError, setSiteError] = useState<string | null>(null);
   const [savingSite, setSavingSite] = useState(false);
+  const [repairingSnapshots, setRepairingSnapshots] = useState(false);
+  const [snapshotRefreshToken, setSnapshotRefreshToken] = useState(0);
+  const [snapshotStatus, setSnapshotStatus] = useState<SnapshotStatus>("loading");
+  const heroMenuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     getSites()
@@ -70,15 +78,76 @@ export default function AttachmentReviewScreen() {
   useEffect(() => {
     fetchPendingByDay()
       .then((data) => {
-        const dayKey = day || "Unknown";
-        setBatchCount(Array.isArray(data?.[dayKey]) ? data[dayKey].length : 0);
+        setPendingByDay(data ?? {});
       })
       .catch(() => {
-        setBatchCount(null);
+        setPendingByDay({});
       });
   }, [day]);
 
+  useEffect(() => {
+    if (!attachment) {
+      setSnapshotStatus("missing");
+      return;
+    }
+
+    setSnapshotStatus("loading");
+  }, [attachment?.id, snapshotRefreshToken]);
+
+  useEffect(() => {
+    function handleDocumentClick(event: MouseEvent) {
+      if (!isHeroMenuOpen) {
+        return;
+      }
+
+      const target = event.target as Node | null;
+      if (target && heroMenuRef.current?.contains(target)) {
+        return;
+      }
+
+      setIsHeroMenuOpen(false);
+    }
+
+    window.addEventListener("mousedown", handleDocumentClick);
+    return () => window.removeEventListener("mousedown", handleDocumentClick);
+  }, [isHeroMenuOpen]);
+
   const siteOptions = useMemo(() => sites, [sites]);
+  const currentDayBatch = useMemo(() => {
+    if (!day) {
+      return [];
+    }
+
+    return Array.isArray(pendingByDay[day]) ? pendingByDay[day] : [];
+  }, [day, pendingByDay]);
+  const batchCount = currentDayBatch.length;
+  const batchPosition = useMemo(() => {
+    if (!attachment || currentDayBatch.length === 0) {
+      return null;
+    }
+
+    const currentIndex = currentDayBatch.findIndex((item) => item.id === attachment.id);
+    return currentIndex >= 0 ? currentIndex + 1 : null;
+  }, [attachment, currentDayBatch]);
+  const batchPositionLabel = useMemo(() => {
+    if (!attachment) {
+      return day ? "Loading day bundle position..." : "Loading batch position...";
+    }
+
+    if (!day) {
+      return "Batch position available when a day is selected.";
+    }
+
+    if (!batchCount) {
+      return "No items found in this day bundle.";
+    }
+
+    if (!batchPosition) {
+      return `Item not found in this batch.`;
+    }
+
+    return `Item ${batchPosition} of ${batchCount}`;
+  }, [attachment, batchCount, batchPosition, day]);
 
   function zoomIn() {
     setZoom((current) => Math.min(current + 0.25, 3));
@@ -92,9 +161,36 @@ export default function AttachmentReviewScreen() {
     setZoom(1);
   }
 
+  function openSites() {
+    setIsHeroMenuOpen(false);
+    navigate("/sites");
+  }
+
+  async function repairSnapshot() {
+    if (!attachment) {
+      return;
+    }
+
+    setIsHeroMenuOpen(false);
+    setRepairingSnapshots(true);
+    setError(null);
+    setSnapshotStatus("repairing");
+
+    try {
+      await repairAttachmentSnapshot(attachment.id);
+      setSnapshotRefreshToken((current) => current + 1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to run snapshot repair");
+      setSnapshotStatus("missing");
+    } finally {
+      setRepairingSnapshots(false);
+    }
+  }
+
   async function saveSite(nextSite: string, currentId: number) {
     setSavingSite(true);
     setSiteError(null);
+    setError(null);
     try {
       await updateAttachmentSite(currentId, nextSite);
       setAttachment((current) => (current ? { ...current, site: nextSite } : current));
@@ -108,6 +204,7 @@ export default function AttachmentReviewScreen() {
   async function handleSiteChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextSite = event.target.value;
     setSite(nextSite);
+    setError(null);
 
     if (!attachment || !nextSite) {
       return;
@@ -117,23 +214,33 @@ export default function AttachmentReviewScreen() {
   }
 
   async function moveToNext(currentId: number) {
+    if (!site) {
+      setError("Please define Site first");
+      return;
+    }
+
     const next = await getNextAttachment(currentId, day);
     const nextAttachment = next.done ? null : next;
     setAttachment(nextAttachment);
-    setSite(nextAttachment?.site || site);
+    setSite(nextAttachment?.site || "");
   }
 
   async function moveToPrevious(currentId: number) {
+    if (!site) {
+      setError("Please define Site first");
+      return;
+    }
+
     const previous = await getPreviousAttachment(currentId, day);
     const previousAttachment = previous.done ? null : previous;
     setAttachment(previousAttachment);
-    setSite(previousAttachment?.site || site);
+    setSite(previousAttachment?.site || "");
   }
 
   async function handleReview() {
     if (!attachment) return;
     if (!site) {
-      setError("Please choose a site before continuing.");
+      setError("Please define Site first");
       return;
     }
 
@@ -154,10 +261,70 @@ export default function AttachmentReviewScreen() {
 
   async function handleReject() {
     if (!attachment) return;
+    if (!site) {
+      setError("Please define Site first");
+      return;
+    }
+
     const currentId = attachment.id;
     await rejectAttachment(currentId);
     await moveToNext(currentId);
   }
+
+  const snapshotStatusLabel = useMemo(() => {
+    if (!attachment) {
+      return "No attachment";
+    }
+
+    switch (snapshotStatus) {
+      case "ready":
+        return "Snapshot ready";
+      case "missing":
+        return "Snapshot missing";
+      case "repairing":
+        return "Repairing snapshot";
+      case "loading":
+      default:
+        return "Snapshot loading";
+    }
+  }, [attachment, snapshotStatus]);
+
+  const snapshotStatusStyle = useMemo<CSSProperties>(() => {
+    const base: CSSProperties = {
+      ...adminStyles.statusPill,
+      padding: "6px 12px",
+      textTransform: "none",
+      letterSpacing: "0.02em",
+    };
+
+    switch (snapshotStatus) {
+      case "ready":
+        return {
+          ...base,
+          background: "rgba(228, 247, 237, 0.98)",
+          color: "#1f6f43",
+        };
+      case "missing":
+        return {
+          ...base,
+          background: "rgba(255, 235, 235, 0.98)",
+          color: "#a32121",
+        };
+      case "repairing":
+        return {
+          ...base,
+          background: "rgba(255, 246, 220, 0.98)",
+          color: "#8a5a00",
+        };
+      case "loading":
+      default:
+        return {
+          ...base,
+          background: "rgba(224, 237, 250, 0.95)",
+          color: "#35506d",
+        };
+    }
+  }, [snapshotStatus]);
 
   if (loading) {
     return (
@@ -196,7 +363,13 @@ export default function AttachmentReviewScreen() {
       sidebarCardMeta={day ? "Counted from the current batch day." : "Counted from all items in the flow."}
     >
       <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
+        <section
+          style={{
+            ...adminStyles.heroShell,
+            overflow: "visible",
+            zIndex: 5,
+          }}
+        >
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Attachment review</div>
             <p style={adminStyles.subtitle}>
@@ -208,7 +381,7 @@ export default function AttachmentReviewScreen() {
                 style={adminStyles.secondaryButton}
                 type="button"
                 onClick={() => void moveToPrevious(attachment?.id || 0)}
-                disabled={!attachment || !site || savingSite}
+                disabled={!attachment || savingSite}
               >
                 Previous
               </button>
@@ -216,27 +389,86 @@ export default function AttachmentReviewScreen() {
                 style={adminStyles.secondaryButton}
                 type="button"
                 onClick={() => void moveToNext(attachment?.id || 0)}
-                disabled={!attachment || !site || savingSite}
+                disabled={!attachment || savingSite}
               >
                 Next
+              </button>
+              <button
+                style={adminStyles.primaryButton}
+                type="button"
+                onClick={() => void handleReview()}
+                disabled={!attachment || savingSite}
+              >
+                Review
+              </button>
+              <button
+                style={attachmentStyles.rejectButton}
+                type="button"
+                onClick={() => void handleReject()}
+                disabled={!attachment || savingSite}
+              >
+                Reject
               </button>
             </div>
           </div>
 
-          <div style={adminStyles.heroArt}>
+          <div
+            style={{
+              ...adminStyles.heroArt,
+              position: "relative",
+              zIndex: 6,
+            }}
+          >
             <div style={adminStyles.heroStatusCard}>
               <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>Batch {day || "all"}</span>
-                <div style={attachmentStyles.heroMenuWrap}>
+                <div style={attachmentStyles.statusPillRow}>
+                  <span style={adminStyles.statusPill}>Batch {day || "all"}</span>
+                  <span style={snapshotStatusStyle}>{snapshotStatusLabel}</span>
+                </div>
+                <div
+                  ref={heroMenuRef}
+                  style={{
+                    ...attachmentStyles.heroMenuWrap,
+                    zIndex: 20,
+                  }}
+                >
                   <span style={adminStyles.statusDot} />
                   <button
                     style={attachmentStyles.heroMenuButton}
                     type="button"
-                    onClick={resetZoom}
-                    aria-label="Reset zoom"
+                    onClick={() => setIsHeroMenuOpen((current) => !current)}
+                    aria-label="Open actions"
+                    aria-expanded={isHeroMenuOpen}
                   >
                     ...
                   </button>
+                  {isHeroMenuOpen && (
+                    <div style={attachmentStyles.heroMenuDropdown} role="menu" aria-label="Attachment actions">
+                      <button style={attachmentStyles.heroMenuItem} type="button" onClick={openSites} role="menuitem">
+                        Sites
+                      </button>
+                      <button
+                        style={attachmentStyles.heroMenuItem}
+                        type="button"
+                        onClick={() => void repairSnapshot()}
+                        role="menuitem"
+                        disabled={repairingSnapshots}
+                      >
+                        {repairingSnapshots ? "Repairing snapshot..." : "Repair snapshot"}
+                      </button>
+                      <button
+                        style={attachmentStyles.heroMenuItem}
+                        type="button"
+                        onClick={() => {
+                          resetZoom();
+                          setIsHeroMenuOpen(false);
+                        }}
+                        role="menuitem"
+                      >
+                        Reset zoom
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
               <div style={adminStyles.heroStatusTitle}>
@@ -256,7 +488,7 @@ export default function AttachmentReviewScreen() {
               <h2 style={adminStyles.sectionTitle}>Review the snapshot with zoom</h2>
             </div>
             <div style={adminStyles.sectionMeta}>
-              The reviewer keeps the same day bundle together while you step through each file.
+              <strong>{batchPositionLabel}.</strong> The reviewer keeps the same day bundle together while you step through each file.
             </div>
           </div>
 
@@ -284,8 +516,10 @@ export default function AttachmentReviewScreen() {
 
                 <div style={attachmentStyles.snapshotCard}>
                   <img
-                    src={snapshotUrl(attachment.id)}
+                    src={`${snapshotUrl(attachment.id)}?v=${snapshotRefreshToken}`}
                     alt={attachment.filename}
+                    onLoad={() => setSnapshotStatus("ready")}
+                    onError={() => setSnapshotStatus("missing")}
                     style={{
                       ...attachmentStyles.snapshot,
                       transform: `scale(${zoom})`,
@@ -297,7 +531,7 @@ export default function AttachmentReviewScreen() {
                   <button
                     style={adminStyles.secondaryButton}
                     onClick={() => void moveToPrevious(attachment.id)}
-                    disabled={!site || savingSite}
+                    disabled={savingSite || repairingSnapshots}
                     type="button"
                   >
                     Previous
@@ -305,7 +539,7 @@ export default function AttachmentReviewScreen() {
                   <button
                     style={adminStyles.primaryButton}
                     onClick={() => void handleReview()}
-                    disabled={!site || savingSite}
+                    disabled={savingSite || repairingSnapshots}
                     type="button"
                   >
                     Review
@@ -313,7 +547,7 @@ export default function AttachmentReviewScreen() {
                   <button
                     style={attachmentStyles.rejectButton}
                     onClick={() => void handleReject()}
-                    disabled={!site || savingSite}
+                    disabled={savingSite || repairingSnapshots}
                     type="button"
                   >
                     Reject
@@ -321,7 +555,7 @@ export default function AttachmentReviewScreen() {
                   <button
                     style={adminStyles.secondaryButton}
                     onClick={() => void moveToNext(attachment.id)}
-                    disabled={!site || savingSite}
+                    disabled={savingSite || repairingSnapshots}
                     type="button"
                   >
                     Next
@@ -372,11 +606,18 @@ const attachmentStyles: Record<string, CSSProperties> = {
     gap: "8px",
     marginTop: "10px",
   },
+  statusPillRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
   heroMenuWrap: {
     position: "relative",
     display: "inline-flex",
     alignItems: "center",
     gap: "8px",
+    overflow: "visible",
   },
   heroMenuButton: {
     width: "34px",
@@ -395,7 +636,7 @@ const attachmentStyles: Record<string, CSSProperties> = {
     position: "absolute",
     top: "42px",
     right: 0,
-    zIndex: 8,
+    zIndex: 30,
     minWidth: "180px",
     borderRadius: "16px",
     border: "1px solid rgba(140, 160, 184, 0.22)",

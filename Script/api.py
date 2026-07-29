@@ -143,12 +143,15 @@ def _ensure_source_table_columns_on_startup():
     try:
         ensure_imported_files_table(conn)
         backfill_imported_file_batches(conn)
+        ensure_keyproof_table(conn)
+        ensure_itemization_table(conn)
         ensure_flywire_tables(conn)
         ensure_source_table_columns(conn)
         ensure_edi_manifest_tables(conn)
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
+        ensure_misc_table(conn)
         ensure_tasks_table(conn)
         ensure_auth_tables(conn)
         ensure_menu_table(conn)
@@ -396,6 +399,166 @@ def ensure_flywire_tables(conn=None):
 
     if close_conn:
         conn.close()
+
+
+SAVED_ATTACHMENT_TABLE_COLUMNS = [
+    ("attachment_id", "INTEGER PRIMARY KEY REFERENCES imported_files(id) ON DELETE CASCADE"),
+    ("payload_json", "TEXT NOT NULL"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
+
+def _ensure_saved_attachment_table(conn, table_name: str):
+    cur = conn.cursor()
+    required_columns = [name.lower() for name, _ in SAVED_ATTACHMENT_TABLE_COLUMNS]
+    existing_tables = {
+        row[0].lower()
+        for row in cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+    }
+
+    if table_name.lower() in existing_tables:
+        existing_columns = [
+            row[1].lower()
+            for row in cur.execute(f'PRAGMA table_info({_quote_identifier(table_name)})').fetchall()
+        ]
+        has_saved_schema = all(column in existing_columns for column in required_columns)
+        if not has_saved_schema:
+            legacy_name = f"{table_name}_legacy"
+            suffix = 1
+            while legacy_name.lower() in existing_tables:
+                suffix += 1
+                legacy_name = f"{table_name}_legacy_{suffix}"
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier(table_name)} RENAME TO {_quote_identifier(legacy_name)}'
+            )
+            existing_tables.add(legacy_name.lower())
+
+    column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in SAVED_ATTACHMENT_TABLE_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier(table_name)} ({column_defs})')
+
+
+def ensure_keyproof_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    _ensure_saved_attachment_table(conn, "keyproof")
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def ensure_itemization_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    _ensure_saved_attachment_table(conn, "itemization")
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def _ensure_attachment_exists(conn, attachment_id: int):
+    row = conn.execute(
+        f'SELECT {_quote_identifier("id")} FROM {_quote_identifier("imported_files")} WHERE {_quote_identifier("id")} = ?',
+        (attachment_id,),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+
+def _load_saved_payload(conn, table_name: str, attachment_id: int):
+    row = conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier(table_name)}
+        WHERE {_quote_identifier("attachment_id")} = ?
+        ''',
+        (attachment_id,),
+    ).fetchone()
+
+    if not row:
+        return {
+            "attachment_id": attachment_id,
+            "payload": None,
+            "created_at": None,
+            "updated_at": None,
+        }
+
+    try:
+        payload = json.loads(row["payload_json"])
+    except Exception:
+        payload = None
+
+    return {
+        "attachment_id": attachment_id,
+        "payload": payload,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def _save_saved_payload(conn, table_name: str, attachment_id: int, payload: dict):
+    now = datetime.now().isoformat(timespec="seconds")
+    payload_json = json.dumps(payload, ensure_ascii=False)
+    existing = conn.execute(
+        f'''
+        SELECT {_quote_identifier("created_at")}
+        FROM {_quote_identifier(table_name)}
+        WHERE {_quote_identifier("attachment_id")} = ?
+        ''',
+        (attachment_id,),
+    ).fetchone()
+    created_at = existing[0] if existing else now
+
+    conn.execute(
+        f'''
+        INSERT INTO {_quote_identifier(table_name)} (
+            {_quote_identifier("attachment_id")},
+            {_quote_identifier("payload_json")},
+            {_quote_identifier("created_at")},
+            {_quote_identifier("updated_at")}
+        ) VALUES (?, ?, ?, ?)
+        ON CONFLICT({_quote_identifier("attachment_id")}) DO UPDATE SET
+            {_quote_identifier("payload_json")} = excluded.{_quote_identifier("payload_json")},
+            {_quote_identifier("updated_at")} = excluded.{_quote_identifier("updated_at")}
+        ''',
+        (attachment_id, payload_json, created_at, now),
+    )
+    conn.commit()
+    return _load_saved_payload(conn, table_name, attachment_id)
+
+
+def _delete_saved_payload(conn, table_name: str, attachment_id: int):
+    conn.execute(
+        f'''
+        DELETE FROM {_quote_identifier(table_name)}
+        WHERE {_quote_identifier("attachment_id")} = ?
+        ''',
+        (attachment_id,),
+    )
+    conn.commit()
+    return {"ok": True, "attachment_id": attachment_id}
+
+
+def _keyproof_total_from_payload(payload):
+    if not isinstance(payload, dict):
+        return 0.0
+
+    form = payload.get("form")
+    if not isinstance(form, dict):
+        return 0.0
+
+    total = 0.0
+    for field in ("cash", "check", "creditCard", "foreignCheck", "wireTransfer", "misc"):
+        total += _parse_amount(form.get(field))
+    return round(total, 2)
 
 
 def _normalize_flywire_text(value):
@@ -796,7 +959,7 @@ def _import_flywire_document(conn, attachment_row, file_name, file_bytes):
             {_quote_identifier("billing_name")},
             {_quote_identifier("application")},
             {_quote_identifier("raw_json")}
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''',
         [
             (
@@ -1036,6 +1199,40 @@ def ensure_balsheet_notes_table(conn=None):
         cur.execute(
             f'ALTER TABLE {_quote_identifier("Balsheet_notes")} ADD COLUMN {_quote_identifier("message")} TEXT'
         )
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+MISC_TABLE_COLUMNS = [
+    ("misc_id", "TEXT PRIMARY KEY"),
+    ("posting_date", "TEXT NOT NULL"),
+    ("amount", "REAL NOT NULL DEFAULT 0"),
+    ("misc_type", "TEXT NOT NULL DEFAULT ''"),
+    ("details", "TEXT NOT NULL DEFAULT ''"),
+    ("created_at", "TEXT NOT NULL DEFAULT ''"),
+]
+
+
+def ensure_misc_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in MISC_TABLE_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Misc")} ({column_defs})')
+
+    existing_columns = [row[1] for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Misc")})').fetchall()]
+    existing_columns_lower = {column.lower() for column in existing_columns}
+    for column_name, definition in MISC_TABLE_COLUMNS:
+        if column_name.lower() not in existing_columns_lower:
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier("Misc")} ADD COLUMN {_quote_identifier(column_name)} {definition}'
+            )
+
     conn.commit()
 
     if close_conn:
@@ -1744,7 +1941,7 @@ def _parse_amount(value):
     try:
         if value in (None, ""):
             return 0.0
-        return float(str(value).replace(",", "").strip())
+        return float(str(value).replace("$", "").replace(",", "").strip())
     except Exception:
         return 0.0
 
@@ -2178,6 +2375,24 @@ def get_email_downloader_dates(folder_index: int):
         raise HTTPException(status_code=500, detail=f"Failed to load dates: {exc}") from exc
 
 
+@app.get("/email-downloader/last-uploaded")
+def get_email_downloader_last_uploaded():
+    conn = get_conn()
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT date(MAX(processed_at))
+            FROM imported_files
+            WHERE source_type = 'email' AND processed_at IS NOT NULL AND processed_at != ''
+            """
+        )
+        row = cur.fetchone()
+        return row[0] if row and row[0] else None
+    finally:
+        conn.close()
+
+
 @app.post("/email-downloader/run")
 def run_email_downloader(payload: dict):
     try:
@@ -2302,8 +2517,20 @@ def get_site_review_history(view: str | None = None):
     cur = conn.cursor()
 
     query = """
-        SELECT id, filename, site, detail, review_notes, amount, review_status, processed_at, batch_id, batch_date
-        FROM imported_files
+        SELECT
+            f.id,
+            f.filename,
+            f.site,
+            f.detail,
+            f.review_notes,
+            f.amount,
+            f.review_status,
+            f.processed_at,
+            f.batch_id,
+            f.batch_date,
+            k.payload_json AS keyproof_payload_json
+        FROM imported_files f
+        LEFT JOIN keyproof k ON k.attachment_id = f.id
     """
     params = []
     if status_filter:
@@ -2317,21 +2544,32 @@ def get_site_review_history(view: str | None = None):
     rows = cur.fetchall()
     conn.close()
 
-    return [
-        {
-            "id": row[0],
-            "filename": row[1],
-            "site": row[2],
-            "detail": row[3],
-            "reason": row[4],
-            "total": row[5] or 0,
-            "status": row[6],
-            "processedAt": row[7],
-            "batchId": row[8],
-            "batchDate": row[9],
-        }
-        for row in rows
-    ]
+    result = []
+    for row in rows:
+        amount = float(row[5] or 0)
+        if amount == 0 and row[10]:
+            try:
+                payload = json.loads(row[10])
+            except Exception:
+                payload = None
+            amount = _keyproof_total_from_payload(payload)
+
+        result.append(
+            {
+                "id": row[0],
+                "filename": row[1],
+                "site": row[2],
+                "detail": row[3],
+                "reason": row[4],
+                "total": amount,
+                "status": row[6],
+                "processedAt": row[7],
+                "batchId": row[8],
+                "batchDate": row[9],
+            }
+        )
+
+    return result
 
 
 @app.get("/calendar/status")
@@ -5973,6 +6211,143 @@ def delete_balsheet_note(rowid: int):
         conn.close()
 
 
+def _generate_misc_id() -> str:
+    return f"MISC-{datetime.now().strftime('%m%d%Y-%H%M%S%f')}"
+
+
+def _misc_row_to_payload(row):
+    return {
+        "misc_id": str(row["misc_id"] or ""),
+        "posting_date": normalize_mmddyyyy(row["posting_date"]) or str(row["posting_date"] or ""),
+        "amount": row["amount"],
+        "misc_type": str(row["misc_type"] or ""),
+        "details": str(row["details"] or ""),
+        "created_at": str(row["created_at"] or ""),
+    }
+
+
+def _normalize_misc_payload(payload: dict, misc_id: str | None = None):
+    posting_date = normalize_mmddyyyy(payload.get("posting_date")) or ""
+    if not posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    return {
+        "misc_id": misc_id or str(payload.get("misc_id") or "").strip() or _generate_misc_id(),
+        "posting_date": posting_date,
+        "amount": _normalize_balsheet_amount(payload.get("amount")),
+        "misc_type": str(payload.get("misc_type") or "").strip(),
+        "details": str(payload.get("details") or "").strip(),
+        "created_at": str(payload.get("created_at") or "").strip() or datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+@app.get("/misc")
+def get_misc(posting_date: str | None = None):
+    init_db()
+    conn = get_conn()
+    ensure_misc_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        normalized_posting_date = normalize_mmddyyyy(posting_date) if posting_date else None
+        if normalized_posting_date:
+            rows = conn.execute(
+                f'SELECT * FROM {_quote_identifier("Misc")} WHERE {_quote_identifier("posting_date")} = ? ORDER BY {_quote_identifier("created_at")} ASC, {_quote_identifier("misc_id")} ASC',
+                (normalized_posting_date,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f'SELECT * FROM {_quote_identifier("Misc")} ORDER BY {_quote_identifier("posting_date")} ASC, {_quote_identifier("created_at")} ASC, {_quote_identifier("misc_id")} ASC'
+            ).fetchall()
+        return [_misc_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/misc")
+def post_misc(payload: dict):
+    init_db()
+    conn = get_conn()
+    ensure_misc_table(conn)
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Misc payload must be an object")
+
+    try:
+        normalized = _normalize_misc_payload(payload)
+        columns = [name for name, _ in MISC_TABLE_COLUMNS]
+        conn.execute(
+            f'INSERT INTO {_quote_identifier("Misc")} ({", ".join(_quote_identifier(name) for name in columns)}) VALUES ({", ".join(["?"] * len(columns))})',
+            tuple(normalized[name] for name in columns),
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Misc")} WHERE {_quote_identifier("misc_id")} = ?',
+            (normalized["misc_id"],),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to save Misc entry")
+        return _misc_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.put("/misc/{misc_id}")
+def put_misc(misc_id: str, payload: dict):
+    init_db()
+    conn = get_conn()
+    ensure_misc_table(conn)
+
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Misc payload must be an object")
+
+    try:
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Misc")} WHERE {_quote_identifier("misc_id")} = ?',
+            (misc_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Misc entry not found")
+
+        normalized = _normalize_misc_payload(payload, misc_id=misc_id)
+        set_clause = ", ".join(f'{_quote_identifier(name)} = ?' for name, _ in MISC_TABLE_COLUMNS[1:])
+        conn.execute(
+            f'UPDATE {_quote_identifier("Misc")} SET {set_clause} WHERE {_quote_identifier("misc_id")} = ?',
+            tuple(normalized[name] for name, _ in MISC_TABLE_COLUMNS[1:]) + (misc_id,),
+        )
+        conn.commit()
+
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Misc")} WHERE {_quote_identifier("misc_id")} = ?',
+            (misc_id,),
+        ).fetchone()
+        return _misc_row_to_payload(row)
+    finally:
+        conn.close()
+
+
+@app.delete("/misc/{misc_id}")
+def delete_misc(misc_id: str):
+    init_db()
+    conn = get_conn()
+    ensure_misc_table(conn)
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("Misc")} WHERE {_quote_identifier("misc_id")} = ?',
+            (misc_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Misc entry not found")
+        conn.commit()
+        return {"status": "ok", "misc_id": misc_id}
+    finally:
+        conn.close()
+
+
 @app.post("/balsheet")
 def post_balsheet(entry: dict):
     init_db()
@@ -6226,6 +6601,120 @@ def get_snapshot(attachment_id: int):
     return FileResponse(snapshot_path)
 
 
+@app.post("/attachments/{attachment_id}/repair-snapshot")
+def repair_snapshot(attachment_id: int):
+    conn = get_conn()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        SELECT id, filename, original_filename, moved_to, snapshot_path
+        FROM imported_files
+        WHERE id = ?
+        """,
+        (attachment_id,),
+    )
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    _, filename, original_filename, moved_to, snapshot_path = row
+    target_path = os.path.join(SNAPSHOTS_FOLDER, f"{attachment_id}.png")
+
+    if snapshot_path and os.path.exists(snapshot_path):
+        conn.close()
+        return {
+            "status": "ok",
+            "mode": "existing",
+            "id": attachment_id,
+            "snapshot_path": snapshot_path,
+            "source_path": snapshot_path,
+        }
+
+    candidate_paths = []
+    for candidate in (
+        moved_to,
+        os.path.join(EMAILS_FOLDER, original_filename) if original_filename else None,
+        os.path.join(EMAILS_FOLDER, filename) if filename else None,
+    ):
+        if candidate and os.path.exists(candidate):
+            candidate_paths.append(candidate)
+
+    if candidate_paths:
+        try:
+            from site_snapshotgenerator import _snapshot_for_file
+
+            _snapshot_for_file(candidate_paths[0], target_path, original_filename or filename or os.path.basename(candidate_paths[0]))
+        except Exception as exc:
+            conn.close()
+            raise HTTPException(status_code=500, detail=f"Failed to repair snapshot: {exc}") from exc
+
+        cur.execute(
+            """
+            UPDATE imported_files
+            SET snapshot_path = ?
+            WHERE id = ?
+            """,
+            (target_path, attachment_id),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "status": "ok",
+            "mode": "generated",
+            "id": attachment_id,
+            "snapshot_path": target_path,
+            "source_path": candidate_paths[0],
+        }
+
+    cur.execute(
+        """
+        SELECT snapshot_path
+        FROM imported_files
+        WHERE id != ?
+          AND snapshot_path IS NOT NULL
+          AND snapshot_path != ''
+          AND (
+            filename = ?
+            OR original_filename = ?
+          )
+        ORDER BY CASE WHEN original_filename = ? THEN 0 ELSE 1 END, id ASC
+        LIMIT 1
+        """,
+        (attachment_id, filename, original_filename, original_filename),
+    )
+    sibling = cur.fetchone()
+
+    if sibling and sibling[0] and os.path.exists(sibling[0]):
+        try:
+            shutil.copy2(sibling[0], target_path)
+        except Exception as exc:
+            conn.close()
+            raise HTTPException(status_code=500, detail=f"Failed to copy snapshot: {exc}") from exc
+
+        cur.execute(
+            """
+            UPDATE imported_files
+            SET snapshot_path = ?
+            WHERE id = ?
+            """,
+            (target_path, attachment_id),
+        )
+        conn.commit()
+        conn.close()
+        return {
+            "status": "ok",
+            "mode": "copied",
+            "id": attachment_id,
+            "snapshot_path": target_path,
+            "source_path": sibling[0],
+        }
+
+    conn.close()
+    raise HTTPException(status_code=404, detail="Snapshot source not found")
+
+
 @app.get("/attachments/{attachment_id}/original")
 def get_original_attachment(attachment_id: int):
     conn = get_conn()
@@ -6253,6 +6742,86 @@ def get_original_attachment(attachment_id: int):
 
     conn.close()
     raise HTTPException(status_code=404, detail="Original file not found")
+
+
+@app.get("/keyproof/{attachment_id}")
+def get_keyproof_saved_state(attachment_id: int):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_attachment_exists(conn, attachment_id)
+        return _load_saved_payload(conn, "keyproof", attachment_id)
+    finally:
+        conn.close()
+
+
+@app.put("/keyproof/{attachment_id}")
+def save_keyproof_saved_state(attachment_id: int, payload: dict):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Keyproof payload must be an object")
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_attachment_exists(conn, attachment_id)
+        saved = _save_saved_payload(conn, "keyproof", attachment_id, payload)
+        conn.execute(
+            f'''
+            UPDATE {_quote_identifier("imported_files")}
+            SET {_quote_identifier("amount")} = ?
+            WHERE {_quote_identifier("id")} = ?
+            ''',
+            (_keyproof_total_from_payload(payload), attachment_id),
+        )
+        conn.commit()
+        return saved
+    finally:
+        conn.close()
+
+
+@app.delete("/keyproof/{attachment_id}")
+def delete_keyproof_saved_state(attachment_id: int):
+    conn = get_conn()
+    try:
+        _ensure_attachment_exists(conn, attachment_id)
+        return _delete_saved_payload(conn, "keyproof", attachment_id)
+    finally:
+        conn.close()
+
+
+@app.get("/itemization/{attachment_id}")
+def get_itemization_saved_state(attachment_id: int):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_attachment_exists(conn, attachment_id)
+        return _load_saved_payload(conn, "itemization", attachment_id)
+    finally:
+        conn.close()
+
+
+@app.put("/itemization/{attachment_id}")
+def save_itemization_saved_state(attachment_id: int, payload: dict):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Itemization payload must be an object")
+
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        _ensure_attachment_exists(conn, attachment_id)
+        return _save_saved_payload(conn, "itemization", attachment_id, payload)
+    finally:
+        conn.close()
+
+
+@app.delete("/itemization/{attachment_id}")
+def delete_itemization_saved_state(attachment_id: int):
+    conn = get_conn()
+    try:
+        _ensure_attachment_exists(conn, attachment_id)
+        return _delete_saved_payload(conn, "itemization", attachment_id)
+    finally:
+        conn.close()
 
 
 @app.get("/keyproof/flywire/{attachment_id}")

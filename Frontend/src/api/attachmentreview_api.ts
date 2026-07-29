@@ -17,6 +17,14 @@ export interface DoneResponse {
 
 export type PendingResponse = PendingAttachment | DoneResponse;
 
+export interface RepairSnapshotResult {
+  status: string;
+  mode: "existing" | "generated" | "copied";
+  id: number;
+  snapshot_path: string;
+  source_path: string;
+}
+
 function dayQuery(day?: string | null) {
   return day ? `?day=${encodeURIComponent(day)}` : "";
 }
@@ -105,5 +113,17 @@ export async function restoreAttachmentToPending(id: number) {
   }
 
   return await response.json();
+}
+
+export async function repairAttachmentSnapshot(id: number) {
+  const response = await fetch(`${API_BASE}/attachments/${id}/repair-snapshot`, {
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to repair attachment snapshot");
+  }
+
+  return (await response.json()) as RepairSnapshotResult;
 }
 
