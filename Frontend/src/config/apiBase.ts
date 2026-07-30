@@ -1,1 +1,9 @@
-export const API_BASE = (import.meta.env.VITE_API_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
+function resolveDefaultApiBase() {
+  if (typeof window === "undefined") {
+    return "/api";
+  }
+
+  return "/api";
+}
+
+export const API_BASE = (import.meta.env.VITE_API_URL || resolveDefaultApiBase()).replace(/\/$/, "");

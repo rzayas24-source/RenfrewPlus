@@ -15,6 +15,7 @@ from io import BytesIO, StringIO
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
+from urllib.parse import quote
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -151,6 +152,7 @@ def _ensure_source_table_columns_on_startup():
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
+        ensure_imaging_tables(conn)
         ensure_misc_table(conn)
         ensure_tasks_table(conn)
         ensure_auth_tables(conn)
@@ -1239,6 +1241,455 @@ def ensure_misc_table(conn=None):
         conn.close()
 
 
+IMAGING_DOCUMENT_INDEX_COLUMNS = [
+    ("file_path", "TEXT PRIMARY KEY"),
+    ("file_name", "TEXT NOT NULL"),
+    ("file_ext", "TEXT NOT NULL"),
+    ("normalized_name", "TEXT NOT NULL"),
+    ("check_numbers_json", "TEXT NOT NULL"),
+    ("is_archived", "INTEGER NOT NULL DEFAULT 0"),
+    ("source_folder", "TEXT NOT NULL DEFAULT ''"),
+    ("size_bytes", "INTEGER NOT NULL DEFAULT 0"),
+    ("scanned_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
+IMAGING_BALSHEET_LINK_COLUMNS = [
+    ("link_id", "TEXT PRIMARY KEY"),
+    ("entry_id", "TEXT NOT NULL"),
+    ("posting_date", "TEXT NOT NULL"),
+    ("amount", "REAL NOT NULL DEFAULT 0"),
+    ("payer", "TEXT NOT NULL DEFAULT ''"),
+    ("check_number", "TEXT NOT NULL DEFAULT ''"),
+    ("file_path", "TEXT NOT NULL"),
+    ("file_name", "TEXT NOT NULL DEFAULT ''"),
+    ("match_method", "TEXT NOT NULL DEFAULT 'manual'"),
+    ("confidence", "REAL NOT NULL DEFAULT 0"),
+    ("confirmed", "INTEGER NOT NULL DEFAULT 1"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
+
+def _normalize_imaging_check_number(value):
+    return re.sub(r"[^A-Z0-9]", "", str(value or "").upper().strip())
+
+
+def _extract_imaging_filename_checks(path: Path) -> list[str]:
+    tokens = re.split(r"[^A-Z0-9]+", path.stem.upper())
+    checks: list[str] = []
+    for token in tokens:
+        normalized = _normalize_imaging_check_number(token)
+        if not normalized:
+            continue
+        if normalized.isdigit():
+            if len(normalized) < 4:
+                continue
+        elif len(normalized) < 5:
+            continue
+        if not any(char.isdigit() for char in normalized):
+            continue
+        if normalized not in checks:
+            checks.append(normalized)
+    return checks
+
+
+def _extract_imaging_filename_tokens(file_name: str) -> list[str]:
+    tokens = re.split(r"[^A-Z0-9]+", str(file_name or "").upper())
+    normalized_tokens: list[str] = []
+    for token in tokens:
+        normalized = _normalize_imaging_check_number(token)
+        if not normalized:
+            continue
+        if normalized.isdigit():
+            if len(normalized) < 4:
+                continue
+        elif len(normalized) < 5:
+            continue
+        if not any(char.isdigit() for char in normalized):
+            continue
+        if normalized not in normalized_tokens:
+            normalized_tokens.append(normalized)
+    return normalized_tokens
+
+
+def _imaging_filename_has_exact_check(file_name: str, check_number: str) -> bool:
+    normalized_check = _normalize_imaging_check_number(check_number)
+    if not normalized_check:
+        return False
+
+    normalized_file_name = str(file_name or "").upper()
+    return re.search(rf"(?<![A-Z0-9]){re.escape(normalized_check)}(?![A-Z0-9])", normalized_file_name) is not None
+
+
+def _imaging_filename_partial_check_score(file_name: str, check_number: str) -> float:
+    normalized_check = _normalize_imaging_check_number(check_number)
+    if not normalized_check:
+        return 0.0
+
+    normalized_file_name = _normalize_imaging_check_number(file_name)
+    if normalized_check not in normalized_file_name:
+        return 0.0
+
+    tokens = _extract_imaging_filename_tokens(file_name)
+    best_score = 0.0
+    for token in tokens:
+        if normalized_check not in token:
+            continue
+
+        # If the check number is embedded inside a longer alphanumeric token,
+        # keep it as a weaker signal than an exact token boundary match.
+        if token == normalized_check:
+            return 1.0
+
+        ratio = len(normalized_check) / max(len(token), 1)
+        best_score = max(best_score, 0.55 + (0.35 * ratio))
+
+    return min(best_score, 0.94)
+
+
+def _imaging_posting_date_tokens(posting_date: str) -> set[str]:
+    normalized = normalize_mmddyyyy(posting_date)
+    if not normalized:
+        return set()
+
+    try:
+        parsed = datetime.strptime(normalized, "%m/%d/%Y")
+    except ValueError:
+        return { _normalize_imaging_check_number(normalized) }
+
+    month = parsed.strftime("%m")
+    day = parsed.strftime("%d")
+    year = parsed.strftime("%Y")
+    year_short = parsed.strftime("%y")
+    return {
+        f"{year}{month}{day}",
+        f"{month}{day}{year}",
+        f"{month}{day}{year_short}",
+    }
+
+
+def _imaging_root_folder() -> Path:
+    return Path(ZIP_835_HTML_FOLDER).resolve()
+
+
+def _is_within_root(candidate_path: str, root_path: Path) -> bool:
+    try:
+        Path(candidate_path).resolve().relative_to(root_path.resolve())
+        return True
+    except Exception:
+        return False
+
+
+def ensure_imaging_tables(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+
+    index_column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in IMAGING_DOCUMENT_INDEX_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Imaging_DocumentFileIndex")} ({index_column_defs})')
+
+    index_columns = {row[1].lower() for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Imaging_DocumentFileIndex")})').fetchall()}
+    for column_name, column_type in IMAGING_DOCUMENT_INDEX_COLUMNS:
+        if column_name.lower() not in index_columns:
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier("Imaging_DocumentFileIndex")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+            )
+
+    link_column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in IMAGING_BALSHEET_LINK_COLUMNS)
+    cur.execute(
+        f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Imaging_BalsheetDocumentLinks")} '
+        f'({link_column_defs}, UNIQUE({_quote_identifier("entry_id")}, {_quote_identifier("file_path")}))'
+    )
+
+    link_columns = {row[1].lower() for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Imaging_BalsheetDocumentLinks")})').fetchall()}
+    for column_name, column_type in IMAGING_BALSHEET_LINK_COLUMNS:
+        if column_name.lower() not in link_columns:
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier("Imaging_BalsheetDocumentLinks")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+            )
+
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS {_quote_identifier("idx_imaging_links_posting_date")} '
+        f'ON {_quote_identifier("Imaging_BalsheetDocumentLinks")} ({_quote_identifier("posting_date")})'
+    )
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS {_quote_identifier("idx_imaging_links_check_number")} '
+        f'ON {_quote_identifier("Imaging_BalsheetDocumentLinks")} ({_quote_identifier("check_number")})'
+    )
+
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+def rebuild_imaging_document_index(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    ensure_imaging_tables(conn)
+
+    cur = conn.cursor()
+    root = _imaging_root_folder()
+    scanned_at = datetime.now().isoformat(timespec="seconds")
+    rows: list[tuple] = []
+
+    cur.execute(f'DELETE FROM {_quote_identifier("Imaging_DocumentFileIndex")}')
+
+    if root.exists():
+        for path in root.rglob("*"):
+            if not path.is_file():
+                continue
+
+            suffix = path.suffix.lower()
+            if suffix not in {".pdf", ".html", ".htm"}:
+                continue
+
+            try:
+                resolved_path = str(path.resolve())
+                stat = path.stat()
+            except Exception:
+                continue
+
+            check_numbers = _extract_imaging_filename_checks(path)
+            normalized_name = _normalize_imaging_check_number(path.stem)
+            is_archived = 1 if any(part.lower() == "archived" for part in path.parts) else 0
+            try:
+                source_folder = str(path.parent.resolve().relative_to(root))
+            except Exception:
+                source_folder = str(path.parent)
+
+            rows.append(
+                (
+                    resolved_path,
+                    path.name,
+                    suffix.lstrip("."),
+                    normalized_name,
+                    json.dumps(check_numbers),
+                    is_archived,
+                    source_folder,
+                    int(stat.st_size),
+                    scanned_at,
+                    scanned_at,
+                )
+            )
+
+    if rows:
+        cur.executemany(
+            f"""
+            INSERT INTO {_quote_identifier("Imaging_DocumentFileIndex")} (
+                {_quote_identifier("file_path")},
+                {_quote_identifier("file_name")},
+                {_quote_identifier("file_ext")},
+                {_quote_identifier("normalized_name")},
+                {_quote_identifier("check_numbers_json")},
+                {_quote_identifier("is_archived")},
+                {_quote_identifier("source_folder")},
+                {_quote_identifier("size_bytes")},
+                {_quote_identifier("scanned_at")},
+                {_quote_identifier("updated_at")}
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
+
+    conn.commit()
+    result = len(rows)
+
+    if close_conn:
+        conn.close()
+
+    return result
+
+
+def _load_imaging_document_index(conn):
+    ensure_imaging_tables(conn)
+    row_count = conn.execute(f'SELECT COUNT(*) FROM {_quote_identifier("Imaging_DocumentFileIndex")}').fetchone()[0]
+    if not row_count:
+        rebuild_imaging_document_index(conn)
+
+    conn.row_factory = sqlite3.Row
+    return conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier("Imaging_DocumentFileIndex")}
+        ORDER BY {_quote_identifier("is_archived")} ASC, {_quote_identifier("file_name")} ASC
+        '''
+    ).fetchall()
+
+
+def _imaging_match_score(entry_check: str, posting_date: str, document_row) -> tuple[float, str]:
+    if not entry_check:
+        return 0.0, "none"
+
+    try:
+        file_checks = json.loads(document_row["check_numbers_json"] or "[]")
+    except Exception:
+        file_checks = []
+
+    normalized_name = str(document_row["normalized_name"] or "").upper()
+    file_name = str(document_row["file_name"] or "").upper()
+    filename_tokens = _extract_imaging_filename_tokens(file_name)
+    posting_date_tokens = _imaging_posting_date_tokens(posting_date)
+    has_posting_date = any(token and token in normalized_name for token in posting_date_tokens)
+    exact_filename_check = _imaging_filename_has_exact_check(file_name, entry_check)
+    partial_filename_check_score = _imaging_filename_partial_check_score(file_name, entry_check)
+
+    if exact_filename_check:
+        score = 1.0
+        match_method = "filename-token"
+
+        if filename_tokens and filename_tokens[-1] == entry_check:
+            match_method = "filename-schema"
+
+        if has_posting_date:
+            match_method = "filename-schema-date" if match_method != "filename-token" else "filename-token-date"
+
+        return score, match_method
+
+    if entry_check in file_checks and partial_filename_check_score > 0:
+        score = max(partial_filename_check_score, 0.85 if document_row["file_ext"].lower() == "pdf" else 0.77)
+        match_method = "filename-token-partial"
+
+        if has_posting_date:
+            score = min(1.0, score + 0.03)
+            match_method = "filename-token-partial-date"
+
+        return score, match_method
+
+    if entry_check in file_checks:
+        score = 0.98 if document_row["file_ext"].lower() == "pdf" else 0.92
+        match_method = "filename-token"
+
+        if filename_tokens and filename_tokens[-1] == entry_check:
+            score = min(1.0, score + 0.01)
+            match_method = "filename-schema"
+
+        if has_posting_date:
+            score = min(1.0, score + 0.02)
+            match_method = "filename-schema-date" if match_method != "filename-token" else "filename-token-date"
+
+        return score, match_method
+
+    if entry_check in normalized_name:
+        score = 0.9 if document_row["file_ext"].lower() == "pdf" else 0.82
+        match_method = "filename"
+
+        if filename_tokens and entry_check in filename_tokens:
+            score = max(score, 0.92 if document_row["file_ext"].lower() == "pdf" else 0.86)
+            match_method = "filename-token"
+
+        if has_posting_date:
+            score = min(1.0, score + 0.05)
+            match_method = "filename-schema-date"
+
+        return score, match_method
+
+    if has_posting_date and entry_check in _normalize_imaging_check_number(file_name):
+        return (0.86 if document_row["file_ext"].lower() == "pdf" else 0.78), "filename-schema"
+
+    return 0.0, "none"
+
+
+def _build_imaging_association_payload(conn, posting_date: str):
+    balsheet_rows = _load_balsheet_review_day_rows(conn, posting_date)
+    index_rows = _load_imaging_document_index(conn)
+
+    link_rows = conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")}
+        WHERE {_quote_identifier("posting_date")} = ?
+        ORDER BY {_quote_identifier("updated_at")} DESC
+        ''',
+        (posting_date,),
+    ).fetchall()
+
+    confirmed_links_by_entry: dict[str, list[sqlite3.Row]] = {}
+    for link_row in link_rows:
+        confirmed_links_by_entry.setdefault(str(link_row["entry_id"]), []).append(link_row)
+
+    rows = []
+    for balsheet_row in balsheet_rows:
+        entry_id = str(balsheet_row.get("entry_id") or "")
+        entry_check = _normalize_imaging_check_number(balsheet_row.get("check_number"))
+        matches = []
+        for document_row in index_rows:
+            score, match_method = _imaging_match_score(entry_check, posting_date, document_row)
+            if score <= 0:
+                continue
+
+            matches.append(
+                {
+                    "filePath": document_row["file_path"],
+                    "fileName": document_row["file_name"],
+                    "fileExt": document_row["file_ext"],
+                    "isArchived": bool(document_row["is_archived"]),
+                    "sourceFolder": document_row["source_folder"],
+                    "confidence": round(score, 2),
+                    "matchMethod": match_method,
+                }
+            )
+
+        matches.sort(key=lambda item: (item["confidence"], item["fileExt"].lower() == "pdf", not item["isArchived"], item["fileName"]), reverse=True)
+        linked_rows = confirmed_links_by_entry.get(entry_id, [])
+
+        rows.append(
+            {
+                "entryId": entry_id,
+                "postingDate": balsheet_row.get("posting_date") or "",
+                "amount": float(balsheet_row.get("amount") or 0),
+                "payer": str(balsheet_row.get("payer") or ""),
+                "checkNumber": str(balsheet_row.get("check_number") or ""),
+                "linkedFiles": [
+                    {
+                        "linkId": link_row["link_id"],
+                        "filePath": link_row["file_path"],
+                        "fileName": link_row["file_name"],
+                        "matchMethod": link_row["match_method"],
+                        "confidence": float(link_row["confidence"] or 0),
+                        "confirmed": bool(link_row["confirmed"]),
+                        "openUrl": f"/imaging/balsheet-links/{link_row['link_id']}/open",
+                    }
+                    for link_row in linked_rows
+                ],
+                "matches": [
+                {
+                    **match,
+                    "openUrl": f"/imaging/files/open?path={quote(match['filePath'], safe='')}",
+                }
+                    for match in matches[:5]
+                ],
+            }
+        )
+
+    return {
+        "postingDate": posting_date,
+        "rowCount": len(rows),
+        "indexCount": len(index_rows),
+        "rows": rows,
+    }
+
+
+def _safe_imaging_file_response(file_path: str):
+    root = _imaging_root_folder()
+    if not _is_within_root(file_path, root):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    resolved = Path(file_path).resolve()
+    if not resolved.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(str(resolved))
+
+
 TASK_TABLE_COLUMNS = [
     ("task_id", "TEXT PRIMARY KEY"),
     ("task_list", "TEXT NOT NULL"),
@@ -1877,6 +2328,7 @@ def _load_saved_itemization_rows(conn, attachment_id: int):
 
 
 def _load_balsheet_review_day_rows(conn, posting_date: str):
+    conn.row_factory = sqlite3.Row
     rows = conn.execute(
         f'''
         SELECT *
@@ -6320,6 +6772,237 @@ def get_balsheet(posting_date: str | None = None):
         return [_balsheet_row_to_payload(row) for row in rows]
     finally:
         conn.close()
+
+
+@app.get("/imaging/balsheet-associations")
+def get_imaging_balsheet_associations(posting_date: str):
+    normalized_posting_date = normalize_mmddyyyy(posting_date)
+    if not normalized_posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        return _build_imaging_association_payload(conn, normalized_posting_date)
+    finally:
+        conn.close()
+
+
+@app.post("/imaging/balsheet-associations/refresh")
+def refresh_imaging_balsheet_associations(payload: dict | None = None):
+    payload = payload or {}
+    normalized_posting_date = normalize_mmddyyyy(payload.get("posting_date"))
+    if not normalized_posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        rebuild_imaging_document_index(conn)
+        return _build_imaging_association_payload(conn, normalized_posting_date)
+    finally:
+        conn.close()
+
+
+@app.post("/imaging/balsheet-links/confirm")
+def confirm_imaging_balsheet_link(payload: dict | None = None):
+    payload = payload or {}
+    entry_id = str(payload.get("entry_id") or "").strip()
+    file_path = str(payload.get("file_path") or "").strip()
+    if not entry_id or not file_path:
+        raise HTTPException(status_code=400, detail="entry_id and file_path are required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        conn.row_factory = sqlite3.Row
+
+        result = _upsert_imaging_balsheet_link(
+            conn=conn,
+            entry_id=entry_id,
+            file_path=file_path,
+            link_id=str(payload.get("link_id") or "").strip() or f"IML-{uuid.uuid4().hex[:12].upper()}",
+            check_number=str(payload.get("check_number") or ""),
+            match_method=str(payload.get("match_method") or "manual").strip() or "manual",
+            confidence=float(payload.get("confidence") or 1),
+        )
+        conn.commit()
+        return {
+            "status": "ok",
+            "linkId": result["linkId"],
+            "entryId": entry_id,
+            "filePath": file_path,
+        }
+    finally:
+        conn.close()
+
+
+def _upsert_imaging_balsheet_link(
+    *,
+    conn,
+    entry_id: str,
+    file_path: str,
+    link_id: str,
+    check_number: str,
+    match_method: str,
+    confidence: float,
+):
+    balsheet_row = conn.execute(
+        f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+        (entry_id,),
+    ).fetchone()
+    if not balsheet_row:
+        raise HTTPException(status_code=404, detail="Balsheet row not found")
+
+    document_row = conn.execute(
+        f'SELECT * FROM {_quote_identifier("Imaging_DocumentFileIndex")} WHERE {_quote_identifier("file_path")} = ?',
+        (file_path,),
+    ).fetchone()
+    if not document_row:
+        rebuild_imaging_document_index(conn)
+        document_row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Imaging_DocumentFileIndex")} WHERE {_quote_identifier("file_path")} = ?',
+            (file_path,),
+        ).fetchone()
+    if not document_row:
+        raise HTTPException(status_code=404, detail="Document file not found")
+
+    now = datetime.now().isoformat(timespec="seconds")
+    normalized_posting_date = normalize_mmddyyyy(balsheet_row["PostingDate"]) or str(balsheet_row["PostingDate"] or "")
+    conn.execute(
+        f"""
+        INSERT INTO {_quote_identifier("Imaging_BalsheetDocumentLinks")} (
+            {_quote_identifier("link_id")},
+            {_quote_identifier("entry_id")},
+            {_quote_identifier("posting_date")},
+            {_quote_identifier("amount")},
+            {_quote_identifier("payer")},
+            {_quote_identifier("check_number")},
+            {_quote_identifier("file_path")},
+            {_quote_identifier("file_name")},
+            {_quote_identifier("match_method")},
+            {_quote_identifier("confidence")},
+            {_quote_identifier("confirmed")},
+            {_quote_identifier("created_at")},
+            {_quote_identifier("updated_at")}
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        ON CONFLICT({_quote_identifier("entry_id")}, {_quote_identifier("file_path")}) DO UPDATE SET
+            {_quote_identifier("posting_date")} = excluded.{_quote_identifier("posting_date")},
+            {_quote_identifier("amount")} = excluded.{_quote_identifier("amount")},
+            {_quote_identifier("payer")} = excluded.{_quote_identifier("payer")},
+            {_quote_identifier("check_number")} = excluded.{_quote_identifier("check_number")},
+            {_quote_identifier("file_name")} = excluded.{_quote_identifier("file_name")},
+            {_quote_identifier("match_method")} = excluded.{_quote_identifier("match_method")},
+            {_quote_identifier("confidence")} = excluded.{_quote_identifier("confidence")},
+            {_quote_identifier("confirmed")} = excluded.{_quote_identifier("confirmed")},
+            {_quote_identifier("updated_at")} = excluded.{_quote_identifier("updated_at")}
+        """,
+        (
+            link_id,
+            entry_id,
+            normalized_posting_date,
+            float(balsheet_row["Amount"] or 0),
+            str(balsheet_row["Payer"] or ""),
+            _normalize_imaging_check_number(check_number or balsheet_row["Check Number"] or ""),
+            file_path,
+            str(document_row["file_name"] or ""),
+            match_method,
+            confidence,
+            now,
+            now,
+        ),
+    )
+
+    return {
+        "linkId": link_id,
+        "entryId": entry_id,
+        "filePath": file_path,
+        "documentFileName": str(document_row["file_name"] or ""),
+    }
+
+
+@app.post("/imaging/balsheet-associations/confirm-exact")
+def confirm_imaging_balsheet_exact_matches(payload: dict | None = None):
+    payload = payload or {}
+    posting_date = normalize_mmddyyyy(payload.get("posting_date"))
+    if not posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        conn.row_factory = sqlite3.Row
+
+        association_payload = _build_imaging_association_payload(conn, posting_date)
+        committed = []
+        skipped = []
+
+        for row in association_payload["rows"]:
+            if row["linkedFiles"]:
+                skipped.append({"entryId": row["entryId"], "reason": "already_linked"})
+                continue
+
+            top_match = row["matches"][0] if row["matches"] else None
+            if not top_match or float(top_match.get("confidence") or 0) < 1.0:
+                skipped.append({"entryId": row["entryId"], "reason": "no_exact_match"})
+                continue
+
+            result = _upsert_imaging_balsheet_link(
+                conn=conn,
+                entry_id=row["entryId"],
+                file_path=str(top_match["filePath"]),
+                link_id=f"IML-{uuid.uuid4().hex[:12].upper()}",
+                check_number=row["checkNumber"],
+                match_method=str(top_match.get("matchMethod") or "exact"),
+                confidence=float(top_match.get("confidence") or 1),
+            )
+            committed.append(result)
+
+        conn.commit()
+        refreshed = _build_imaging_association_payload(conn, posting_date)
+        return {
+            "status": "ok",
+            "postingDate": posting_date,
+            "committedCount": len(committed),
+            "skippedCount": len(skipped),
+            "committed": committed,
+            "skipped": skipped,
+            "data": refreshed,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/imaging/balsheet-links/{link_id}/open")
+def open_imaging_balsheet_link(link_id: str):
+    conn = get_conn()
+    try:
+        ensure_imaging_tables(conn)
+        row = conn.execute(
+            f'SELECT {_quote_identifier("file_path")} FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")} WHERE {_quote_identifier("link_id")} = ?',
+            (link_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Link not found")
+        return _safe_imaging_file_response(str(row[0]))
+    finally:
+        conn.close()
+
+
+@app.get("/imaging/files/open")
+def open_imaging_file(path: str):
+    if not path:
+        raise HTTPException(status_code=400, detail="path is required")
+    return _safe_imaging_file_response(path)
 
 
 @app.post("/balsheet/import-banking")

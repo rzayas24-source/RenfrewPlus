@@ -120,6 +120,64 @@ export interface BalsheetKeyproofIssueResponse {
   rows: BalsheetKeyproofIssueRow[];
 }
 
+export interface ImagingDocumentSuggestion {
+  filePath: string;
+  fileName: string;
+  fileExt: string;
+  isArchived: boolean;
+  sourceFolder: string;
+  confidence: number;
+  matchMethod: string;
+  openUrl: string;
+}
+
+export interface ImagingDocumentLink {
+  linkId: string;
+  filePath: string;
+  fileName: string;
+  matchMethod: string;
+  confidence: number;
+  confirmed: boolean;
+  openUrl: string;
+}
+
+export interface ImagingBalsheetAssociationRow {
+  entryId: string;
+  postingDate: string;
+  amount: number;
+  payer: string;
+  checkNumber: string;
+  linkedFiles: ImagingDocumentLink[];
+  matches: ImagingDocumentSuggestion[];
+}
+
+export interface ImagingBalsheetAssociationResponse {
+  postingDate: string;
+  rowCount: number;
+  indexCount: number;
+  rows: ImagingBalsheetAssociationRow[];
+}
+
+export interface ImagingLinkConfirmPayload {
+  entryId: string;
+  filePath: string;
+  linkId?: string;
+  checkNumber?: string;
+  matchMethod?: string;
+  confidence?: number;
+  postingDate?: string;
+  payer?: string;
+  amount?: number;
+}
+
+export interface ImagingBulkCommitExactResponse {
+  status: string;
+  postingDate: string;
+  committedCount: number;
+  skippedCount: number;
+  data: ImagingBalsheetAssociationResponse;
+}
+
 export function getBalsheet(postingDate?: string) {
   const params = postingDate ? { posting_date: postingDate } : undefined;
   return axios.get<BalsheetEntry[]>(`${API_BASE}/balsheet`, { params });
@@ -220,6 +278,49 @@ export function getBalsheetKeyproofReview(postingDate?: string) {
 
 export function getBalsheetKeyproofIssues() {
   return axios.get<BalsheetKeyproofIssueResponse>(`${API_BASE}/balsheet/keyproof-review-open`);
+}
+
+export function getImagingBalsheetAssociations(postingDate: string) {
+  return axios.get<ImagingBalsheetAssociationResponse>(`${API_BASE}/imaging/balsheet-associations`, {
+    params: { posting_date: postingDate },
+  });
+}
+
+export function refreshImagingBalsheetAssociations(postingDate: string) {
+  return axios.post<ImagingBalsheetAssociationResponse>(`${API_BASE}/imaging/balsheet-associations/refresh`, {
+    posting_date: postingDate,
+  });
+}
+
+export function commitImagingExactMatches(postingDate: string) {
+  return axios.post<ImagingBulkCommitExactResponse>(`${API_BASE}/imaging/balsheet-associations/confirm-exact`, {
+    posting_date: postingDate,
+  });
+}
+
+export function confirmImagingBalsheetLink(payload: ImagingLinkConfirmPayload) {
+  return axios.post<{ status: string; linkId: string; entryId: string; filePath: string }>(
+    `${API_BASE}/imaging/balsheet-links/confirm`,
+    {
+      entry_id: payload.entryId,
+      file_path: payload.filePath,
+      link_id: payload.linkId,
+      check_number: payload.checkNumber,
+      match_method: payload.matchMethod,
+      confidence: payload.confidence,
+      posting_date: payload.postingDate,
+      payer: payload.payer,
+      amount: payload.amount,
+    }
+  );
+}
+
+export function buildImagingFileOpenUrl(filePath: string) {
+  return `${API_BASE}/imaging/files/open?path=${encodeURIComponent(filePath)}`;
+}
+
+export function buildImagingLinkOpenUrl(linkId: string) {
+  return `${API_BASE}/imaging/balsheet-links/${encodeURIComponent(linkId)}/open`;
 }
 
 export function getMisc(postingDate?: string) {

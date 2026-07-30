@@ -35,6 +35,7 @@ import WorklistEditorScreen from "./Screens/worklisteditor";
 import MiscEditorScreen from "./Screens/miscbuilder";
 import SitesScreen from "./Screens/sitescreen";
 import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
+import ViewImagesScreen from "./Screens/viewimagesscreen";
 
 function parseAmount(value: unknown) {
   const parsed = Number.parseFloat(String(value || "").replace(/[$,]/g, ""));
@@ -138,7 +139,7 @@ export default function ScreenManager() {
         <Route path="/aux-posting" element={<SectionPlaceholderScreen title="Aux Posting" description="Aux Posting tools will live here." />} />
         <Route path="/collections" element={<CollectionsScreen />} />
         <Route path="/check-search" element={<SectionPlaceholderScreen title="Check Search" description="Check Search tools will live here." />} />
-        <Route path="/view-images" element={<SectionPlaceholderScreen title="View Images" description="View Images tools will live here." />} />
+        <Route path="/view-images" element={<ViewImagesScreen />} />
         <Route path="/era-convert" element={<ERAConvertScreen />} />
         <Route path="/html-convert" element={<HTMLConvertScreen />} />
         <Route path="/otherday" element={<OtherDayScreen />} />
