@@ -60,6 +60,66 @@ export interface MiscEntryPayload {
   created_at?: string;
 }
 
+export interface BalsheetKeyproofReviewRow {
+  attachmentId: number;
+  filename: string;
+  site: string;
+  batchDate: string;
+  reviewStatus: string;
+  keyproofTotal: number;
+  eftExpectedTotal: number;
+  lockboxExpectedTotal: number;
+  eftBalsheetTotal: number;
+  lockboxBalsheetTotal: number;
+  springLaneExpectedTotal: number;
+  springLaneBalsheetTotal: number;
+  springLaneDifference: number;
+  springLaneStatus: "matched" | "partial" | "missing" | "not_applicable";
+  itemizationDifference: number;
+  itemizationBalsheetTotal: number;
+  itemizationStatus: "matched" | "partial" | "no_itemization";
+  balsheetActualTotal: number;
+  balsheetDifference: number;
+  balsheetStatus: "matched" | "partial" | "missing" | "not_applicable";
+  balsheetRowCount: number;
+  status: "matched" | "partial" | "no_itemization";
+}
+
+export interface BalsheetKeyproofReviewResponse {
+  postingDate: string;
+  balsheetRowCount: number;
+  keyproofCount: number;
+  needsReviewCount: number;
+  itemizationMatchedCount: number;
+  itemizationPartialCount: number;
+  itemizationMissingCount: number;
+  balsheetMatchedCount: number;
+  balsheetPartialCount: number;
+  balsheetMissingCount: number;
+  springLaneMatchedCount: number;
+  springLanePartialCount: number;
+  springLaneMissingCount: number;
+  rows: BalsheetKeyproofReviewRow[];
+}
+
+export interface BalsheetKeyproofIssueRow {
+  attachmentId: number;
+  filename: string;
+  site: string;
+  batchDate: string;
+  reviewStatus: string;
+  keyproofTotal: number;
+  balsheetActualTotal: number;
+  difference: number;
+}
+
+export interface BalsheetKeyproofIssueResponse {
+  openCount: number;
+  postingDateCount: number;
+  openBalanceTotal: number;
+  rows: BalsheetKeyproofIssueRow[];
+}
+
 export function getBalsheet(postingDate?: string) {
   const params = postingDate ? { posting_date: postingDate } : undefined;
   return axios.get<BalsheetEntry[]>(`${API_BASE}/balsheet`, { params });
@@ -134,9 +194,10 @@ export function clearBalsheet(postingDate: string) {
   });
 }
 
-export function saveBalsheetEntries(entries: BalsheetEntry[]) {
+export function saveBalsheetEntries(entries: BalsheetEntry[], postingDate?: string) {
   return axios.post<{ status: string; rowsImported: number; sourceAttachmentId?: string }>(`${API_BASE}/balsheet/bulk`, {
     entries,
+    posting_date: postingDate,
   });
 }
 
@@ -150,6 +211,15 @@ export function createBalsheetEntry(entry: BalsheetEntry) {
 
 export function deleteBalsheetEntry(entryId: string) {
   return axios.delete<{ status: string; entry_id: string }>(`${API_BASE}/balsheet/${entryId}`);
+}
+
+export function getBalsheetKeyproofReview(postingDate?: string) {
+  const params = postingDate ? { posting_date: postingDate } : undefined;
+  return axios.get<BalsheetKeyproofReviewResponse>(`${API_BASE}/balsheet/keyproof-review`, { params });
+}
+
+export function getBalsheetKeyproofIssues() {
+  return axios.get<BalsheetKeyproofIssueResponse>(`${API_BASE}/balsheet/keyproof-review-open`);
 }
 
 export function getMisc(postingDate?: string) {

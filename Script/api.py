@@ -1840,6 +1840,322 @@ def _balsheet_row_to_payload(row):
     }
 
 
+def _normalize_review_value(field_name: str, value):
+    if field_name in {"amount", "unposted", "misc", "nick", "raul"}:
+        return round(_normalize_balsheet_amount(value), 2)
+    return str(value or "").strip()
+
+
+def _normalize_review_keyproof_payload(payload):
+    if not isinstance(payload, dict):
+        return {}
+
+    form = payload.get("form")
+    return form if isinstance(form, dict) else {}
+
+
+def _load_saved_itemization_rows(conn, attachment_id: int):
+    row = conn.execute(
+        f'''
+        SELECT payload_json
+        FROM {_quote_identifier("itemization")}
+        WHERE {_quote_identifier("attachment_id")} = ?
+        ''',
+        (attachment_id,),
+    ).fetchone()
+
+    if not row or not row[0]:
+        return []
+
+    try:
+        payload = json.loads(row[0])
+    except Exception:
+        return []
+
+    items = payload.get("items", []) if isinstance(payload, dict) else []
+    return items if isinstance(items, list) else []
+
+
+def _load_balsheet_review_day_rows(conn, posting_date: str):
+    rows = conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier("Balsheet")}
+        WHERE {_quote_identifier("PostingDate")} = ?
+        {_balsheet_order_clause()}
+        ''',
+        (posting_date,),
+    ).fetchall()
+    return [_balsheet_row_to_payload(row) for row in rows]
+
+
+def _normalize_review_site_key(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _live_balsheet_total_for_site(balsheet_rows, site_name):
+    normalized_site = _normalize_review_site_key(site_name)
+    total = 0.0
+
+    for row in balsheet_rows:
+        row_type = _normalize_review_site_key(row.get("type"))
+        if row_type == normalized_site:
+            total += _normalize_balsheet_amount(row.get("amount"))
+        elif "spring lane" in normalized_site and row_type in {"eft", "lockbox"}:
+            total += _normalize_balsheet_amount(row.get("amount"))
+
+    return round(total, 2)
+
+
+def _is_close_to_zero(value: float, tolerance: float = 0.005) -> bool:
+    return abs(round(value, 2)) < tolerance
+
+
+@app.get("/balsheet/keyproof-review")
+def get_balsheet_keyproof_review(posting_date: str | None = None):
+    init_db()
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    ensure_balsheet_table(conn)
+    ensure_keyproof_table(conn)
+    ensure_itemization_table(conn)
+
+    try:
+        normalized_posting_date = normalize_mmddyyyy(posting_date) if posting_date else normalize_mmddyyyy(get_current_work_day() or "") or normalize_mmddyyyy(get_current_bank_day() or "") or datetime.today().strftime("%m/%d/%Y")
+        if not normalized_posting_date:
+            raise HTTPException(status_code=400, detail="posting_date is required")
+
+        balsheet_rows = _load_balsheet_review_day_rows(conn, normalized_posting_date)
+
+        candidates = conn.execute(
+            f'''
+            SELECT
+                f.id,
+                f.filename,
+                f.site,
+                f.batch_date,
+                f.review_status,
+                k.payload_json AS keyproof_payload_json
+            FROM {_quote_identifier("imported_files")} f
+            INNER JOIN {_quote_identifier("keyproof")} k ON k.attachment_id = f.id
+            WHERE {_quote_identifier("batch_date")} IS NOT NULL
+            ORDER BY f.batch_date ASC, f.site ASC, f.id ASC
+            '''
+        ).fetchall()
+
+        review_rows = []
+        for candidate in candidates:
+            candidate_day = normalize_mmddyyyy(candidate["batch_date"]) or str(candidate["batch_date"] or "")
+            if candidate_day != normalized_posting_date:
+                continue
+
+            try:
+                keyproof_payload = json.loads(candidate["keyproof_payload_json"]) if candidate["keyproof_payload_json"] else None
+            except Exception:
+                keyproof_payload = None
+
+            keyproof_form = _normalize_review_keyproof_payload(keyproof_payload)
+            keyproof_total = _keyproof_total_from_payload(keyproof_payload)
+            eft_expected = _normalize_balsheet_amount(keyproof_form.get("eft"))
+            lockbox_expected = _normalize_balsheet_amount(keyproof_form.get("lockbox"))
+
+            itemization_rows = _load_saved_itemization_rows(conn, candidate["id"])
+            itemization_total = 0.0
+            for item in itemization_rows:
+                if isinstance(item, dict):
+                    itemization_total += _normalize_balsheet_amount(item.get("amount"))
+
+            itemization_difference = round(itemization_total - keyproof_total, 2)
+            itemization_status = "no_itemization" if not itemization_rows else ("matched" if _is_close_to_zero(itemization_difference) else "partial")
+
+            eft_balsheet_total = 0.0
+            lockbox_balsheet_total = 0.0
+            for row in balsheet_rows:
+                row_type = str(row.get("type") or "").strip().lower()
+                if row_type == "eft":
+                    eft_balsheet_total += _normalize_balsheet_amount(row.get("amount"))
+                elif row_type == "lockbox":
+                    lockbox_balsheet_total += _normalize_balsheet_amount(row.get("amount"))
+
+            balsheet_total = _live_balsheet_total_for_site(balsheet_rows, candidate["site"])
+            balsheet_difference = round(keyproof_total - balsheet_total, 2)
+            balsheet_needed = not (_is_close_to_zero(keyproof_total) and _is_close_to_zero(balsheet_total))
+            if not balsheet_needed:
+                balsheet_status = "not_applicable"
+            elif _is_close_to_zero(balsheet_difference):
+                balsheet_status = "matched"
+            elif keyproof_total > 0 and balsheet_total > 0:
+                balsheet_status = "partial"
+            elif keyproof_total > 0 and _is_close_to_zero(balsheet_total):
+                balsheet_status = "missing"
+            else:
+                balsheet_status = "partial"
+
+            spring_lane_expected_total = round(eft_expected + lockbox_expected, 2)
+            spring_lane_balsheet_total = round(eft_balsheet_total + lockbox_balsheet_total, 2)
+            spring_lane_difference = round(spring_lane_balsheet_total - spring_lane_expected_total, 2)
+            spring_lane_needed = not (_is_close_to_zero(spring_lane_expected_total) and _is_close_to_zero(spring_lane_balsheet_total))
+            if not spring_lane_needed:
+                spring_lane_status = "not_applicable"
+            elif _is_close_to_zero(spring_lane_difference):
+                spring_lane_status = "matched"
+            elif spring_lane_balsheet_total > 0 and spring_lane_expected_total > 0:
+                spring_lane_status = "partial"
+            elif spring_lane_expected_total > 0 and _is_close_to_zero(spring_lane_balsheet_total):
+                spring_lane_status = "missing"
+            else:
+                spring_lane_status = "partial"
+
+            if balsheet_status == "not_applicable":
+                status = "no_itemization"
+            elif balsheet_status == "partial" or balsheet_status == "missing" or spring_lane_status in {"partial", "missing"}:
+                status = "partial"
+            else:
+                status = "matched"
+
+            site_row = {
+                "attachmentId": candidate["id"],
+                "filename": candidate["filename"],
+                "site": candidate["site"],
+                "sourceSite": candidate["site"],
+                "rowKind": "site",
+                "batchDate": normalize_mmddyyyy(candidate["batch_date"]) or str(candidate["batch_date"] or ""),
+                "reviewStatus": candidate["review_status"],
+                "keyproofTotal": round(keyproof_total, 2),
+                "eftExpectedTotal": round(eft_expected, 2),
+                "lockboxExpectedTotal": round(lockbox_expected, 2),
+                "eftBalsheetTotal": round(eft_balsheet_total, 2),
+                "lockboxBalsheetTotal": round(lockbox_balsheet_total, 2),
+                "itemizationBalsheetTotal": round(itemization_total, 2),
+                "itemizationDifference": itemization_difference,
+                "itemizationStatus": itemization_status,
+                "balsheetActualTotal": round(balsheet_total, 2),
+                "balsheetDifference": balsheet_difference,
+                "balsheetStatus": balsheet_status,
+                "springLaneExpectedTotal": spring_lane_expected_total,
+                "springLaneBalsheetTotal": spring_lane_balsheet_total,
+                "springLaneDifference": spring_lane_difference,
+                "springLaneStatus": spring_lane_status,
+                "balsheetRowCount": len(balsheet_rows),
+                "status": status,
+            }
+            review_rows.append(site_row)
+
+        itemization_matched_count = sum(1 for row in review_rows if row["itemizationStatus"] == "matched")
+        itemization_partial_count = sum(1 for row in review_rows if row["itemizationStatus"] == "partial")
+        itemization_missing_count = sum(1 for row in review_rows if row["itemizationStatus"] == "no_itemization")
+        balsheet_matched_count = sum(1 for row in review_rows if row["balsheetStatus"] == "matched")
+        balsheet_partial_count = sum(1 for row in review_rows if row["balsheetStatus"] == "partial")
+        balsheet_missing_count = sum(1 for row in review_rows if row["balsheetStatus"] == "missing")
+        spring_lane_matched_count = sum(1 for row in review_rows if row["springLaneStatus"] == "matched")
+        spring_lane_partial_count = sum(1 for row in review_rows if row["springLaneStatus"] == "partial")
+        spring_lane_missing_count = sum(1 for row in review_rows if row["springLaneStatus"] == "missing")
+        needs_review_count = sum(1 for row in review_rows if row["status"] != "matched")
+
+        return {
+            "postingDate": normalized_posting_date,
+            "balsheetRowCount": len(balsheet_rows),
+            "keyproofCount": len(review_rows),
+            "needsReviewCount": needs_review_count,
+            "itemizationMatchedCount": itemization_matched_count,
+            "itemizationPartialCount": itemization_partial_count,
+            "itemizationMissingCount": itemization_missing_count,
+            "balsheetMatchedCount": balsheet_matched_count,
+            "balsheetPartialCount": balsheet_partial_count,
+            "balsheetMissingCount": balsheet_missing_count,
+            "springLaneMatchedCount": spring_lane_matched_count,
+            "springLanePartialCount": spring_lane_partial_count,
+            "springLaneMissingCount": spring_lane_missing_count,
+            "rows": review_rows,
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/balsheet/keyproof-review-open")
+def get_balsheet_keyproof_review_open():
+    init_db()
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    ensure_balsheet_table(conn)
+    ensure_keyproof_table(conn)
+
+    try:
+        candidates = conn.execute(
+            f'''
+            SELECT
+                f.id,
+                f.filename,
+                f.site,
+                f.batch_date,
+                f.review_status,
+                k.payload_json AS keyproof_payload_json
+            FROM {_quote_identifier("imported_files")} f
+            INNER JOIN {_quote_identifier("keyproof")} k ON k.attachment_id = f.id
+            WHERE {_quote_identifier("batch_date")} IS NOT NULL
+            ORDER BY f.batch_date DESC, f.site ASC, f.id ASC
+            '''
+        ).fetchall()
+
+        balsheet_rows_by_day: dict[str, list[dict]] = {}
+        issue_rows: list[dict] = []
+        open_balance_total = 0.0
+
+        for candidate in candidates:
+            candidate_day = normalize_mmddyyyy(candidate["batch_date"]) or str(candidate["batch_date"] or "")
+            if not candidate_day:
+                continue
+
+            balsheet_rows = balsheet_rows_by_day.get(candidate_day)
+            if balsheet_rows is None:
+                balsheet_rows = _load_balsheet_review_day_rows(conn, candidate_day)
+                balsheet_rows_by_day[candidate_day] = balsheet_rows
+
+            try:
+                keyproof_payload = json.loads(candidate["keyproof_payload_json"]) if candidate["keyproof_payload_json"] else None
+            except Exception:
+                keyproof_payload = None
+
+            keyproof_form = _normalize_review_keyproof_payload(keyproof_payload)
+            keyproof_total = _keyproof_total_from_payload(keyproof_payload)
+            eft_expected = _normalize_balsheet_amount(keyproof_form.get("eft"))
+            lockbox_expected = _normalize_balsheet_amount(keyproof_form.get("lockbox"))
+            spring_lane_expected_total = round(eft_expected + lockbox_expected, 2)
+
+            site_name = str(candidate["site"] or "")
+            keyproof_subtotal = round(
+                keyproof_total + spring_lane_expected_total if "spring lane" in site_name.lower() else keyproof_total,
+                2,
+            )
+            balsheet_total = _live_balsheet_total_for_site(balsheet_rows, site_name)
+            difference = round(keyproof_subtotal - balsheet_total, 2)
+            if _is_close_to_zero(difference):
+                continue
+
+            issue_rows.append(
+                {
+                    "attachmentId": candidate["id"],
+                    "filename": candidate["filename"],
+                    "site": candidate["site"],
+                    "batchDate": normalize_mmddyyyy(candidate["batch_date"]) or str(candidate["batch_date"] or ""),
+                    "reviewStatus": candidate["review_status"],
+                    "keyproofTotal": keyproof_subtotal,
+                    "balsheetActualTotal": round(balsheet_total, 2),
+                    "difference": difference,
+                }
+            )
+            open_balance_total += abs(difference)
+
+        return {
+            "openCount": len(issue_rows),
+            "postingDateCount": len({row["batchDate"] for row in issue_rows if row.get("batchDate")}),
+            "openBalanceTotal": round(open_balance_total, 2),
+            "rows": issue_rows,
+        }
+    finally:
+        conn.close()
+
+
 def _balsheet_note_row_to_payload(row):
     return {
         "rowid": row["rowid"],
@@ -6377,13 +6693,20 @@ def post_balsheet_bulk(payload: dict):
 
     entries = payload.get("entries", [])
     source_attachment_id = payload.get("source_attachment_id")
+    posting_date = normalize_mmddyyyy(payload.get("posting_date")) if payload.get("posting_date") else None
     if not isinstance(entries, list):
         raise HTTPException(status_code=400, detail="entries must be a list")
 
     inserted = 0
     try:
         for entry in entries:
-            _balsheet_insert_or_replace(conn, entry if isinstance(entry, dict) else {})
+            if isinstance(entry, dict):
+                next_entry = dict(entry)
+                if posting_date:
+                    next_entry["posting_date"] = posting_date
+                _balsheet_insert_or_replace(conn, next_entry)
+            else:
+                _balsheet_insert_or_replace(conn, {"posting_date": posting_date} if posting_date else {})
             inserted += 1
         conn.commit()
         return {

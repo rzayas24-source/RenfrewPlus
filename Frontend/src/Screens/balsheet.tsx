@@ -1,4 +1,4 @@
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+﻿import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
@@ -7,6 +7,7 @@ import {
   createBalsheetEntry,
   deleteBalsheetEntry,
   getBalsheet,
+  getBalsheetKeyproofReview,
   getBalsheetNotes,
   getMisc,
   getBalsheetWorkday,
@@ -15,9 +16,13 @@ import {
   updateBalsheetEntry,
   upsertBalsheetNoteText,
   upsertBalsheetNoteMessage,
+  getBalsheetKeyproofIssues,
+  type BalsheetKeyproofReviewResponse,
+  type BalsheetKeyproofIssueResponse,
   type BalsheetEntry,
   type MiscEntry,
 } from "../api/balsheet_api";
+import { lookupCalendarBankDay } from "../api/calendar_api";
 
 const weekendHeroMessage = "Weekend";
 
@@ -204,9 +209,34 @@ function columnIndexToLetters(index: number) {
   return letters;
 }
 
+function getPinnedGroupRank(groupKey: string) {
+  const normalized = groupKey.trim().toLowerCase();
+  if (normalized === "eft") return 0;
+  if (normalized === "lockbox") return 1;
+  if (normalized.includes("spring lane")) return 2;
+  return 3;
+}
+
+function compareGroupedKeys(leftKey: string, rightKey: string, sortField: "entry_id" | keyof BalsheetEntry, sortDirection: "asc" | "desc") {
+  const leftRank = getPinnedGroupRank(leftKey);
+  const rightRank = getPinnedGroupRank(rightKey);
+
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+
+  if (leftRank < 3) {
+    return leftKey.localeCompare(rightKey, undefined, { sensitivity: "base" });
+  }
+
+  const direction = sortField === "type" ? sortDirection : "asc";
+  const comparison = leftKey.localeCompare(rightKey, undefined, { sensitivity: "base" });
+  return direction === "asc" ? comparison : -comparison;
+}
+
 export default function Balsheet() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const day = searchParams.get("day");
   const [postingDate, setPostingDate] = useState(normalizeDisplayDate(day));
   const [currentBankDay, setCurrentBankDay] = useState("");
@@ -223,6 +253,13 @@ export default function Balsheet() {
   const [selectionDraft, setSelectionDraft] = useState("");
   const [miscTypeOptions, setMiscTypeOptions] = useState<string[]>([]);
   const [sheetLocked, setSheetLocked] = useState(true);
+  const [heroMenuOpen, setHeroMenuOpen] = useState(false);
+  const [keyproofWorksheetOpen, setKeyproofWorksheetOpen] = useState(false);
+  const [keyproofReviewOpen, setKeyproofReviewOpen] = useState(false);
+  const [keyproofReviewLoading, setKeyproofReviewLoading] = useState(false);
+  const [keyproofReviewError, setKeyproofReviewError] = useState<string | null>(null);
+  const [keyproofReview, setKeyproofReview] = useState<BalsheetKeyproofReviewResponse | null>(null);
+  const [keyproofReviewIssues, setKeyproofReviewIssues] = useState<BalsheetKeyproofIssueResponse | null>(null);
   const [heroNote, setHeroNote] = useState("");
   const [heroMessage, setHeroMessage] = useState("");
   const resizeStateRef = useRef<{
@@ -235,9 +272,24 @@ export default function Balsheet() {
   const selectionSelectRef = useRef<HTMLSelectElement | null>(null);
   const inlineCellInputRef = useRef<HTMLInputElement | null>(null);
   const inlineCellSelectRef = useRef<HTMLSelectElement | null>(null);
+  const heroMenuWrapRef = useRef<HTMLDivElement | null>(null);
   const cancelInlineEditRef = useRef(false);
+  const keyproofWorksheetPanelRef = useRef<HTMLDivElement | null>(null);
+  const keyproofReviewPanelRef = useRef<HTMLDivElement | null>(null);
+  const keyproofReviewRequestRef = useRef(0);
 
   const postingDateIso = displayDateToIso(postingDate);
+  useEffect(() => {
+    if (!postingDate) {
+      return;
+    }
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    if (nextSearchParams.get("day") !== postingDate) {
+      nextSearchParams.set("day", postingDate);
+      setSearchParams(nextSearchParams, { replace: true });
+    }
+  }, [postingDate, searchParams, setSearchParams]);
 
   const totals = useMemo(
     () =>
@@ -264,11 +316,9 @@ export default function Balsheet() {
       groupMap.set(groupKey, groupRows);
     }
 
-    const groupEntries = Array.from(groupMap.entries()).sort(([leftKey], [rightKey]) => {
-      const direction = sortField === "type" ? sortDirection : "asc";
-      const comparison = leftKey.localeCompare(rightKey, undefined, { sensitivity: "base" });
-      return direction === "asc" ? comparison : -comparison;
-    });
+    const groupEntries = Array.from(groupMap.entries()).sort(([leftKey], [rightKey]) =>
+      compareGroupedKeys(leftKey, rightKey, sortField, sortDirection)
+    );
 
     return groupEntries.map(([groupKey, groupRows]) => ({
       groupKey,
@@ -299,6 +349,22 @@ export default function Balsheet() {
   const visibleRows = useMemo(
     () => groupedRows.flatMap((group) => (collapsedGroups.has(group.groupKey) ? [] : group.rows)),
     [collapsedGroups, groupedRows]
+  );
+
+  const keyproofDifferenceTotal = useMemo(
+    () =>
+      keyproofReview?.rows.reduce((total, row) => {
+        const isSpringLaneSite = /spring lane/i.test(`${row.site || ""} ${row.filename || ""}`);
+        const keyproofSubtotal = isSpringLaneSite
+          ? row.keyproofTotal + row.eftExpectedTotal + row.lockboxExpectedTotal
+          : row.keyproofTotal;
+        const balsheetSubtotal = isSpringLaneSite
+          ? row.itemizationBalsheetTotal + row.eftBalsheetTotal + row.lockboxBalsheetTotal
+          : row.balsheetActualTotal;
+        const displayedDifference = keyproofSubtotal - balsheetSubtotal;
+        return total + displayedDifference;
+      }, 0) ?? 0,
+    [keyproofReview]
   );
 
   const selectedCell = useMemo(() => {
@@ -397,6 +463,10 @@ export default function Balsheet() {
     setRows((previousRows) =>
       previousRows.map((row) => (row.entry_id === selectedCell.rowId ? response.data : row))
     );
+    void loadKeyproofReview();
+    if (keyproofReviewOpen) {
+      void loadKeyproofReviewIssues();
+    }
   }
 
   function beginInlineCellEdit(rowIndex: number, columnIndex: number) {
@@ -505,6 +575,10 @@ export default function Balsheet() {
         setActiveCell(null);
         setSelectionDraft("");
         setIsEditingSelection(false);
+        void loadKeyproofReview();
+        if (keyproofReviewOpen) {
+          void loadKeyproofReviewIssues();
+        }
         setError(null);
         setMessage(`Deleted row ${rowId}.`);
       } catch (err) {
@@ -535,6 +609,69 @@ export default function Balsheet() {
     setMessage(null);
   }
 
+  async function loadKeyproofReview(targetPostingDate = postingDate) {
+    if (!targetPostingDate) {
+      setKeyproofReviewError("No posting day is selected.");
+      setKeyproofReview(null);
+      return;
+    }
+
+    const requestId = ++keyproofReviewRequestRef.current;
+    setKeyproofReviewLoading(true);
+    setKeyproofReviewError(null);
+
+    try {
+      const response = await getBalsheetKeyproofReview(targetPostingDate);
+      if (requestId !== keyproofReviewRequestRef.current) {
+        return;
+      }
+      setKeyproofReview(response.data);
+    } catch (error) {
+      if (requestId !== keyproofReviewRequestRef.current) {
+        return;
+      }
+      setKeyproofReview(null);
+      setKeyproofReviewError(error instanceof Error ? error.message : "Failed to load keyproof review.");
+    } finally {
+      if (requestId === keyproofReviewRequestRef.current) {
+        setKeyproofReviewLoading(false);
+      }
+    }
+  }
+
+  async function loadKeyproofReviewIssues() {
+    setKeyproofReviewLoading(true);
+    setKeyproofReviewError(null);
+
+    try {
+      const response = await getBalsheetKeyproofIssues();
+      setKeyproofReviewIssues(response.data);
+    } catch (error) {
+      setKeyproofReviewIssues(null);
+      setKeyproofReviewError(error instanceof Error ? error.message : "Failed to load keyproof review.");
+    } finally {
+      setKeyproofReviewLoading(false);
+    }
+  }
+
+  function openKeyproofReview() {
+    setKeyproofWorksheetOpen(false);
+    setKeyproofReviewOpen(true);
+  }
+
+  function closeKeyproofReview() {
+    setKeyproofReviewOpen(false);
+  }
+
+  function openKeyproofWorksheet() {
+    setKeyproofReviewOpen(false);
+    setKeyproofWorksheetOpen(true);
+  }
+
+  function closeKeyproofWorksheet() {
+    setKeyproofWorksheetOpen(false);
+  }
+
   async function movePostingDay(deltaDays: number) {
     const nextPostingDate = shiftPostingDate(postingDate || day || "", deltaDays);
     if (!nextPostingDate) {
@@ -555,11 +692,9 @@ export default function Balsheet() {
       groupMap.set(groupKey, groupRows);
     }
 
-    const groupEntries = Array.from(groupMap.entries()).sort(([leftKey], [rightKey]) => {
-      const direction = sortField === "type" ? sortDirection : "asc";
-      const comparison = leftKey.localeCompare(rightKey, undefined, { sensitivity: "base" });
-      return direction === "asc" ? comparison : -comparison;
-    });
+    const groupEntries = Array.from(groupMap.entries()).sort(([leftKey], [rightKey]) =>
+      compareGroupedKeys(leftKey, rightKey, sortField, sortDirection)
+    );
 
     return groupEntries.flatMap(([groupKey, groupRows]) =>
       collapsedGroups.has(groupKey) ? [] : [...groupRows].sort((left, right) => compareSheetRows(left, right, sortField, sortDirection))
@@ -711,10 +846,10 @@ export default function Balsheet() {
 
   function getSortIndicator(columnKey: "entry_id" | keyof BalsheetEntry) {
     if (sortField !== columnKey) {
-      return "↕";
+      return "\u2195";
     }
 
-    return sortDirection === "asc" ? "▲" : "▼";
+    return sortDirection === "asc" ? "\u25B2" : "\u25BC";
   }
 
   async function loadRows(date = postingDate) {
@@ -743,6 +878,10 @@ export default function Balsheet() {
       } else {
         setHeroMessage(savedMessage);
       }
+      void loadKeyproofReview(date);
+      if (keyproofReviewOpen) {
+        void loadKeyproofReviewIssues();
+      }
       setError(null);
     } catch (err) {
       setRows([]);
@@ -757,14 +896,30 @@ export default function Balsheet() {
   }
 
   async function importBankingRows() {
-    const targetBankDay = currentBankDay;
-    if (!targetBankDay) {
-      setError("No bank day is available for importing banking rows.");
-      return;
-    }
     const selectedPostingDay = postingDate || normalizeDisplayDate(day) || "";
     if (!selectedPostingDay) {
       setError("No posting day is available for importing banking rows.");
+      return;
+    }
+
+    let targetBankDay = currentBankDay;
+    try {
+      const bankDayResponse = await lookupCalendarBankDay(selectedPostingDay);
+      targetBankDay = bankDayResponse.data.bankDay || targetBankDay;
+      setCurrentBankDay(targetBankDay);
+    } catch {
+      // If the lookup fails, fall back to the current cached value.
+    }
+
+    if (!targetBankDay) {
+      setError(`No bank day is mapped to ${selectedPostingDay}.`);
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Import banking rows into ${selectedPostingDay} using bank day ${targetBankDay}? This will replace existing BANK-* rows for that day only.`
+    );
+    if (!confirmed) {
       return;
     }
 
@@ -821,7 +976,7 @@ export default function Balsheet() {
     setLoading(true);
     setMessage(null);
     try {
-      const response = await saveBalsheetEntries(rows);
+      const response = await saveBalsheetEntries(rows, selectedPostingDay);
       await loadRows(selectedPostingDay);
       setError(null);
       setMessage(
@@ -876,7 +1031,6 @@ export default function Balsheet() {
     getBalsheetWorkday()
       .then((response) => {
         const workday = response.data.current_work_day || response.data.posting_date;
-        setCurrentBankDay(response.data.current_bank_day || "");
         const currentDay = normalizeDisplayDate(day) || workday;
         setPostingDate(currentDay);
         return loadRows(currentDay);
@@ -889,6 +1043,129 @@ export default function Balsheet() {
       })
       .finally(() => setLoading(false));
   }, [day]);
+
+  useEffect(() => {
+    if (!postingDate) {
+      setCurrentBankDay("");
+      return;
+    }
+
+    let cancelled = false;
+
+    lookupCalendarBankDay(postingDate)
+      .then((response: { data: { bankDay: string | null } }) => {
+        if (!cancelled) {
+          setCurrentBankDay(response.data.bankDay || "");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCurrentBankDay("");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [postingDate]);
+
+  useEffect(() => {
+    void loadKeyproofReview(postingDate);
+  }, [postingDate]);
+
+  useEffect(() => {
+    if (!keyproofWorksheetOpen) {
+      return;
+    }
+
+    void loadKeyproofReview(postingDate);
+  }, [keyproofWorksheetOpen, postingDate]);
+
+  useEffect(() => {
+    if (!keyproofReviewOpen) {
+      return;
+    }
+
+    void loadKeyproofReviewIssues();
+  }, [keyproofReviewOpen]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!keyproofReviewOpen) {
+        return;
+      }
+
+      const target = event.target as Node | null;
+      if (keyproofReviewPanelRef.current && target && !keyproofReviewPanelRef.current.contains(target)) {
+        closeKeyproofReview();
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeKeyproofReview();
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [keyproofReviewOpen]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!keyproofWorksheetOpen) {
+        return;
+      }
+
+      const target = event.target as Node | null;
+      if (keyproofWorksheetPanelRef.current && target && !keyproofWorksheetPanelRef.current.contains(target)) {
+        closeKeyproofWorksheet();
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        closeKeyproofWorksheet();
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [keyproofWorksheetOpen]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!heroMenuOpen) {
+        return;
+      }
+
+      const target = event.target as Node | null;
+      if (heroMenuWrapRef.current && target && !heroMenuWrapRef.current.contains(target)) {
+        setHeroMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setHeroMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [heroMenuOpen]);
 
   return (
     <AdminShell
@@ -966,27 +1243,79 @@ export default function Balsheet() {
             <div style={styles.heroCopy}>
               <div style={styles.kicker}>Balance Sheet</div>
               <h1 style={styles.title}>Balsheet</h1>
-              <p style={styles.subtitle}>{heroMessage || "\u00A0"}</p>
+              <div style={styles.heroSubtitleRow}>
+                <p style={styles.subtitle}>{heroMessage || "\u00A0"}</p>
+                <button type="button" style={styles.heroMessageEditButton} onClick={() => editHeroMessage()}>
+                  Edit
+                </button>
+              </div>
               <div style={styles.heroActions}>
-                <button style={styles.primaryButton} type="button" onClick={() => void saveCurrentBalsheet()}>
-                  Save Balsheet
-                </button>
-                <button style={styles.secondaryButton} type="button" onClick={() => loadRows()}>
-                  Refresh
-                </button>
-                <button style={styles.secondaryButton} type="button" onClick={() => importBankingRows()}>
+                <div ref={heroMenuWrapRef} style={styles.heroMenuWrap}>
+                  <button
+                    type="button"
+                    style={styles.heroMenuButton}
+                    onClick={() => setHeroMenuOpen((current) => !current)}
+                    aria-label="More actions"
+                    aria-expanded={heroMenuOpen}
+                    title="More actions"
+                  >
+                    ...
+                  </button>
+                  {heroMenuOpen ? (
+                    <div style={styles.heroMenuPanel} role="menu" aria-label="Balsheet actions">
+                      <button
+                        type="button"
+                        style={styles.heroMenuItemButton}
+                        role="menuitem"
+                        onClick={() => {
+                          setHeroMenuOpen(false);
+                          void saveCurrentBalsheet();
+                        }}
+                      >
+                        Save Balsheet
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.heroMenuItemButton}
+                        role="menuitem"
+                        onClick={() => {
+                          setHeroMenuOpen(false);
+                          loadRows();
+                        }}
+                      >
+                        Refresh
+                      </button>
+                      <button
+                        type="button"
+                        style={styles.heroMenuItemButton}
+                        role="menuitem"
+                        onClick={() => {
+                          setHeroMenuOpen(false);
+                          clearCurrentBalsheet();
+                        }}
+                      >
+                        Clear Balsheet
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                <button style={styles.importBankingButton} type="button" onClick={() => importBankingRows()}>
                   Import Banking
                 </button>
-                <button style={styles.dangerButton} type="button" onClick={() => clearCurrentBalsheet()}>
-                  Clear Balsheet
+                <button style={styles.importBankingButton} type="button" onClick={openKeyproofWorksheet}>
+                  Worksheet
                 </button>
-                <button style={styles.secondaryButton} type="button" onClick={() => editHeroMessage()}>
-                  Edit Message
+                <button style={styles.importBankingButton} type="button" onClick={openKeyproofReview}>
+                  Keyproof Review
                 </button>
               </div>
             </div>
 
           <div style={styles.heroArt}>
+            <div style={styles.heroKeyproofCard}>
+              <div style={styles.heroKeyproofLabel}>Open Balance</div>
+              <div style={styles.heroKeyproofValue}>{formatCurrency(keyproofDifferenceTotal)}</div>
+            </div>
             <div style={styles.heroStatusCard}>
               <div style={styles.heroStatusTop}>
                 <span style={styles.statusPill}>Notes</span>
@@ -1012,7 +1341,245 @@ export default function Balsheet() {
           )}
         </div>
 
-        <div style={styles.selectionBar}>
+        {keyproofWorksheetOpen ? (
+          <div style={styles.keyproofReviewOverlay} aria-hidden="false">
+            <div
+              ref={keyproofWorksheetPanelRef}
+              style={styles.keyproofReviewPanel}
+              role="dialog"
+              aria-label="Keyproof worksheet"
+            >
+              <div style={styles.keyproofReviewHeader}>
+                <div style={styles.keyproofReviewHeaderCopy}>
+                  <div style={styles.keyproofReviewKicker}>Worksheet</div>
+                  <div style={styles.keyproofReviewTitle}>Compare keyproof summaries to live Balsheet totals</div>
+                  <div style={styles.keyproofReviewMeta}>
+                    Selected posting day: {keyproofReview?.postingDate || postingDate}
+                  </div>
+                </div>
+                <button type="button" style={styles.keyproofReviewCloseButton} onClick={closeKeyproofWorksheet}>
+                  Close
+                </button>
+              </div>
+
+              {keyproofReviewLoading ? (
+                <div style={styles.keyproofReviewLoading}>Loading worksheet...</div>
+              ) : keyproofReviewError ? (
+                <div style={styles.keyproofReviewError}>{keyproofReviewError}</div>
+              ) : !keyproofReview ? (
+                <div style={styles.keyproofReviewEmpty}>No worksheet data is available for this posting day.</div>
+              ) : (
+                <>
+                  <div style={styles.keyproofReviewSummaryGrid}>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Keyproofs</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{keyproofReview.keyproofCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Balsheet matched</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{keyproofReview.balsheetMatchedCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Spring Lane matched</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{keyproofReview.springLaneMatchedCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Total difference</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{formatCurrency(keyproofDifferenceTotal)}</div>
+                    </div>
+                  </div>
+
+                  <div style={styles.keyproofReviewTableWrap}>
+                    {keyproofReview.rows.length === 0 ? (
+                      <div style={styles.keyproofReviewEmpty}>No keyproof rows were found for this posting day.</div>
+                    ) : (
+                      keyproofReview.rows.map((row) => {
+                        const isSpringLaneSite = /spring lane/i.test(`${row.site || ""} ${row.filename || ""}`);
+                        const keyproofSubtotal = isSpringLaneSite
+                          ? row.keyproofTotal + row.eftExpectedTotal + row.lockboxExpectedTotal
+                          : row.keyproofTotal;
+                        const balsheetSubtotal = isSpringLaneSite
+                          ? row.itemizationBalsheetTotal + row.eftBalsheetTotal + row.lockboxBalsheetTotal
+                          : row.balsheetActualTotal;
+                        const difference = keyproofSubtotal - balsheetSubtotal;
+
+                        return (
+                          <div key={row.attachmentId} style={styles.keyproofReviewTableRow}>
+                            <div style={styles.keyproofReviewTableSummaryRow}>
+                              <div style={styles.keyproofReviewTableSiteCell}>
+                                <div style={styles.keyproofReviewTableSiteTitle}>{row.site}</div>
+                                <div style={styles.keyproofReviewTableSiteMeta}>
+                                  {row.filename}
+                                  <br />
+                                  {row.batchDate}
+                                </div>
+                              </div>
+                              <div style={styles.keyproofReviewTableCellRight}>{formatCurrency(keyproofSubtotal)}</div>
+                              <div style={styles.keyproofReviewTableCellRight}>{formatCurrency(balsheetSubtotal)}</div>
+                              <div
+                                style={{
+                                  ...styles.keyproofReviewTableCellRight,
+                                  ...(Math.abs(difference) < 0.005
+                                    ? styles.keyproofReviewTableDifferenceGood
+                                    : styles.keyproofReviewTableDifferenceWarn),
+                                }}
+                              >
+                                {formatCurrency(difference)}
+                              </div>
+                            </div>
+
+                            {isSpringLaneSite ? (
+                              <>
+                                <div style={styles.keyproofReviewTableAttachmentRow}>Spring Lane breakdown</div>
+                                <div style={styles.keyproofReviewTableDetailRow}>
+                                  <div style={styles.keyproofReviewTableDetailLabel}>Itemized</div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.itemizationBalsheetTotal)}
+                                  </div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.keyproofTotal)}
+                                  </div>
+                                  <div
+                                    style={{
+                                      ...styles.keyproofReviewTableDetailValue,
+                                      ...(Math.abs(row.itemizationDifference) < 0.005
+                                        ? styles.keyproofReviewTableDifferenceGood
+                                        : styles.keyproofReviewTableDifferenceWarn),
+                                    }}
+                                  >
+                                    {formatCurrency(row.itemizationDifference)}
+                                  </div>
+                                </div>
+                                <div style={styles.keyproofReviewTableDetailRow}>
+                                  <div style={styles.keyproofReviewTableDetailLabel}>EFT</div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.eftBalsheetTotal)}
+                                  </div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.eftExpectedTotal)}
+                                  </div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.eftExpectedTotal - row.eftBalsheetTotal)}
+                                  </div>
+                                </div>
+                                <div style={styles.keyproofReviewTableDetailRow}>
+                                  <div style={styles.keyproofReviewTableDetailLabel}>Lockbox</div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.lockboxBalsheetTotal)}
+                                  </div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.lockboxExpectedTotal)}
+                                  </div>
+                                  <div style={styles.keyproofReviewTableDetailValue}>
+                                    {formatCurrency(row.lockboxExpectedTotal - row.lockboxBalsheetTotal)}
+                                  </div>
+                                </div>
+                              </>
+                            ) : null}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {keyproofReviewOpen && (
+          <div style={styles.keyproofReviewOverlay} aria-hidden="false">
+            <div ref={keyproofReviewPanelRef} style={styles.keyproofReviewPanel} role="dialog" aria-label="Keyproof review">
+              <div style={styles.keyproofReviewHeader}>
+                  <div style={styles.keyproofReviewHeaderCopy}>
+                  <div style={styles.keyproofReviewKicker}>Keyproof Review</div>
+                  <div style={styles.keyproofReviewTitle}>Open keyproof balances</div>
+                  <div style={styles.keyproofReviewMeta}>
+                    Keyproofs with a balance across all posting days
+                  </div>
+                </div>
+                <button type="button" style={styles.keyproofReviewCloseButton} onClick={closeKeyproofReview}>
+                  Close
+                </button>
+              </div>
+
+              {keyproofReviewLoading ? (
+                <div style={styles.keyproofReviewLoading}>Loading keyproof review...</div>
+              ) : keyproofReviewError ? (
+                <div style={styles.keyproofReviewError}>{keyproofReviewError}</div>
+              ) : keyproofReviewIssues ? (
+                <>
+                  <div style={styles.keyproofReviewSummaryGrid}>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Open items</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{keyproofReviewIssues.openCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Days affected</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{keyproofReviewIssues.postingDateCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Open balance</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{formatCurrency(keyproofReviewIssues.openBalanceTotal)}</div>
+                    </div>
+                  </div>
+
+                  <div style={styles.keyproofReviewTableWrap}>
+                    {keyproofReviewIssues.rows.length === 0 ? (
+                      <div style={styles.keyproofReviewEmpty}>No open keyproof balances were found.</div>
+                    ) : (
+                      keyproofReviewIssues.rows.map((row) => (
+                        <button
+                          key={row.attachmentId}
+                          type="button"
+                          style={styles.keyproofIssueRowButton}
+                          onClick={() => {
+                            const nextPostingDate = normalizeDisplayDate(row.batchDate || "") || row.batchDate || "";
+                            if (!nextPostingDate) {
+                              return;
+                            }
+
+                            setKeyproofReviewOpen(false);
+                            setKeyproofReviewIssues(null);
+                            setPostingDate(nextPostingDate);
+                            void loadRows(nextPostingDate);
+                          }}
+                        >
+                          <div style={styles.keyproofIssueRowTop}>
+                            <div style={styles.keyproofIssueRowDate}>{row.batchDate}</div>
+                            <div
+                              style={{
+                                ...styles.keyproofIssueRowDifference,
+                                ...(Math.abs(row.difference) < 0.005
+                                  ? styles.keyproofReviewTableDifferenceGood
+                                  : styles.keyproofReviewTableDifferenceWarn),
+                              }}
+                            >
+                              {formatCurrency(row.difference)}
+                            </div>
+                          </div>
+                          <div style={styles.keyproofIssueRowSite}>{row.site}</div>
+                          <div style={styles.keyproofIssueRowMeta}>
+                            <span>Keyproof {formatCurrency(row.keyproofTotal)}</span>
+                            <span>Balsheet {formatCurrency(row.balsheetActualTotal)}</span>
+                          </div>
+                          <div style={styles.keyproofIssueRowHint}>Open day on Balsheet</div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            ...styles.selectionBar,
+            ...(sheetLocked ? styles.selectionBarLocked : styles.selectionBarUnlocked),
+          }}
+        >
           <div style={styles.selectionNavCluster}>
             <button
               type="button"
@@ -1054,7 +1621,7 @@ export default function Balsheet() {
             title={sheetLocked ? "Unlock Sheet" : "Lock Sheet"}
           >
             <span style={styles.selectionLockIcon} aria-hidden="true">
-              {sheetLocked ? "🔒" : "🔓"}
+              {sheetLocked ? "\uD83D\uDD12" : "\uD83D\uDD13"}
             </span>
             <span style={styles.selectionLockText}>Lock Sheet</span>
           </button>
@@ -1271,10 +1838,10 @@ export default function Balsheet() {
                       <tr key={`group-${group.groupKey}`} style={styles.groupHeaderRow}>
                         <td style={styles.groupHeaderCell} colSpan={sheetColumns.length}>
                       <button type="button" style={styles.groupHeaderButton} onClick={() => toggleGroup(group.groupKey)}>
-                            <span style={styles.groupHeaderGlyph}>{isCollapsed ? "▸" : "▾"}</span>
+                            <span style={styles.groupHeaderGlyph}>{isCollapsed ? "\u25B8" : "\u25BE"}</span>
                             <span style={styles.groupHeaderLabel}>{group.groupKey}</span>
                             <span style={styles.groupHeaderMeta}>
-                              {group.rows.length} row{group.rows.length === 1 ? "" : "s"} · {formatCurrency(group.totals.amount)} amount
+                              {group.rows.length} row{group.rows.length === 1 ? "" : "s"} \u00B7 {formatCurrency(group.totals.amount)} amount
                             </span>
                           </button>
                         </td>
@@ -1560,6 +2127,28 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.55,
     color: "#b23361",
   },
+  heroSubtitleRow: {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+  heroMessageEditButton: {
+    height: "28px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid rgba(158, 176, 204, 0.22)",
+    background: "rgba(255,255,255,0.95)",
+    color: "#3f4a57",
+    fontSize: "11px",
+    fontWeight: 800,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    cursor: "pointer",
+    boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
+    marginTop: "6px",
+  },
   heroActions: {
     position: "fixed",
     top: "18px",
@@ -1576,6 +2165,50 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(255,255,255,0.88)",
     backdropFilter: "blur(18px)",
     boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
+  },
+  heroMenuWrap: {
+    position: "relative",
+    flex: "0 0 auto",
+  },
+  heroMenuButton: {
+    height: "38px",
+    minWidth: "44px",
+    padding: "0 12px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    borderRadius: "12px",
+    background: "rgba(255,255,255,0.95)",
+    color: "#3f4a57",
+    fontSize: "18px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 12px 22px rgba(52, 84, 120, 0.08)",
+  },
+  heroMenuPanel: {
+    position: "absolute",
+    top: "46px",
+    left: 0,
+    zIndex: 25,
+    display: "grid",
+    gap: "6px",
+    minWidth: "180px",
+    padding: "8px",
+    borderRadius: "14px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.98)",
+    backdropFilter: "blur(16px)",
+    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.14)",
+  },
+  heroMenuItemButton: {
+    height: "36px",
+    padding: "0 12px",
+    borderRadius: "10px",
+    border: "1px solid rgba(188, 193, 203, 0.35)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#3f4a57",
+    fontSize: "12px",
+    fontWeight: 800,
+    textAlign: "left",
+    cursor: "pointer",
   },
   primaryButton: {
     height: "38px",
@@ -1607,6 +2240,298 @@ const styles: Record<string, CSSProperties> = {
     minWidth: 0,
     whiteSpace: "nowrap",
   },
+  importBankingButton: {
+    height: "32px",
+    padding: "0 10px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    borderRadius: "999px",
+    background: "rgba(255,255,255,0.95)",
+    color: "#3f4a57",
+    fontSize: "11px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
+    whiteSpace: "nowrap",
+  },
+  keyproofReviewOverlay: {
+    position: "fixed",
+    top: "18px",
+    right: "18px",
+    bottom: "18px",
+    left: "282px",
+    zIndex: 60,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    padding: "90px 18px 18px",
+    background: "rgba(20, 34, 52, 0.24)",
+    backdropFilter: "blur(6px)",
+    boxSizing: "border-box",
+  },
+  keyproofReviewPanel: {
+    width: "min(980px, 100%)",
+    maxHeight: "calc(100vh - 126px)",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
+    borderRadius: "28px",
+    padding: "18px",
+    background: "rgba(255,255,255,0.98)",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    boxShadow: "0 32px 68px rgba(15, 25, 38, 0.24)",
+  },
+  keyproofReviewHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  keyproofReviewHeaderCopy: {
+    display: "grid",
+    gap: "4px",
+    minWidth: 0,
+  },
+  keyproofReviewKicker: {
+    textTransform: "uppercase",
+    letterSpacing: "0.18em",
+    fontSize: "11px",
+    fontWeight: 800,
+    color: "#74879c",
+  },
+  keyproofReviewTitle: {
+    fontSize: "22px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofReviewMeta: {
+    fontSize: "13px",
+    lineHeight: 1.4,
+    color: "#587089",
+  },
+  keyproofReviewCloseButton: {
+    height: "36px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#3f4a57",
+    fontSize: "12px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
+  },
+  keyproofReviewLoading: {
+    minHeight: "120px",
+    display: "grid",
+    placeItems: "center",
+    borderRadius: "20px",
+    background: "rgba(246, 249, 252, 0.96)",
+    color: "#587089",
+    fontWeight: 700,
+  },
+  keyproofReviewError: {
+    padding: "14px 16px",
+    borderRadius: "16px",
+    background: "#fff2f2",
+    border: "1px solid #f0c3c3",
+    color: "#972d2d",
+    fontWeight: 700,
+  },
+  keyproofReviewSummaryGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+    gap: "10px",
+  },
+  keyproofReviewSummaryCard: {
+    padding: "12px 14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(176, 194, 218, 0.22)",
+    background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.92) 100%)",
+  },
+  keyproofReviewSummaryLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: "#6d7f93",
+    fontWeight: 800,
+    marginBottom: "6px",
+  },
+  keyproofReviewSummaryValue: {
+    fontSize: "20px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofReviewTableWrap: {
+    display: "grid",
+    gap: "10px",
+    overflowY: "auto",
+    paddingRight: "2px",
+    minHeight: 0,
+    flex: "1 1 auto",
+  },
+  keyproofReviewEmpty: {
+    padding: "18px",
+    borderRadius: "16px",
+    background: "rgba(246, 249, 252, 0.96)",
+    color: "#587089",
+    fontWeight: 700,
+  },
+  keyproofReviewTableHead: {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 2fr) repeat(4, minmax(120px, 1fr))",
+    gap: "12px",
+    padding: "0 16px 6px",
+  },
+  keyproofReviewTableHeadCell: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: "#6d7f93",
+    fontWeight: 800,
+  },
+  keyproofReviewTableHeadCellRight: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: "#6d7f93",
+    fontWeight: 800,
+    textAlign: "right",
+  },
+  keyproofReviewTableRow: {
+    display: "grid",
+    gap: "10px",
+    padding: "14px 16px",
+    borderRadius: "18px",
+    border: "1px solid rgba(176, 194, 218, 0.22)",
+    background: "rgba(255,255,255,0.96)",
+    boxShadow: "0 12px 20px rgba(52, 84, 120, 0.06)",
+  },
+  keyproofReviewTableSummaryRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 2fr) repeat(3, minmax(120px, 1fr))",
+    gap: "12px",
+    alignItems: "start",
+  },
+  keyproofReviewTableAttachmentRow: {
+    paddingLeft: "12px",
+    fontSize: "12px",
+    color: "#587089",
+    lineHeight: 1.4,
+  },
+  keyproofReviewTableDetailRow: {
+    display: "grid",
+    gridTemplateColumns: "minmax(220px, 2fr) repeat(3, minmax(120px, 1fr))",
+    gap: "12px",
+    alignItems: "start",
+    paddingLeft: "12px",
+  },
+  keyproofReviewTableDetailLabel: {
+    fontSize: "12px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofReviewTableDetailValue: {
+    textAlign: "right",
+    fontSize: "14px",
+    fontWeight: 800,
+    color: "#16304d",
+  },
+  keyproofReviewTableActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    paddingTop: "4px",
+  },
+  keyproofReviewTableSiteCell: {
+    display: "grid",
+    gap: "6px",
+    minWidth: 0,
+  },
+  keyproofReviewTableSiteTitle: {
+    fontSize: "15px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofReviewTableSiteMeta: {
+    fontSize: "12px",
+    lineHeight: 1.35,
+    color: "#587089",
+    wordBreak: "break-word",
+  },
+  keyproofReviewTableCellRight: {
+    textAlign: "right",
+    fontSize: "15px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofReviewTableDifferenceGood: {
+    color: "#1f6b2a",
+  },
+  keyproofReviewTableDifferenceWarn: {
+    color: "#a25b00",
+  },
+  keyproofReviewOpenButton: {
+    height: "32px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#3f4a57",
+    fontSize: "11px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
+  },
+  keyproofIssueRowButton: {
+    width: "100%",
+    display: "grid",
+    gap: "6px",
+    padding: "14px 16px",
+    borderRadius: "18px",
+    border: "1px solid rgba(176, 194, 218, 0.22)",
+    background: "rgba(255,255,255,0.96)",
+    boxShadow: "0 12px 20px rgba(52, 84, 120, 0.06)",
+    cursor: "pointer",
+    textAlign: "left",
+    color: "#16304d",
+  },
+  keyproofIssueRowTop: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+  },
+  keyproofIssueRowDate: {
+    fontSize: "14px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofIssueRowDifference: {
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+  keyproofIssueRowSite: {
+    fontSize: "16px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  keyproofIssueRowMeta: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: "12px",
+    fontSize: "12px",
+    color: "#587089",
+    fontWeight: 700,
+  },
+  keyproofIssueRowHint: {
+    fontSize: "12px",
+    color: "#74879c",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    fontWeight: 800,
+  },
   dangerButton: {
     height: "38px",
     padding: "0 12px",
@@ -1623,10 +2548,38 @@ const styles: Record<string, CSSProperties> = {
     whiteSpace: "nowrap",
   },
   heroArt: {
-    display: "grid",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "10px",
     alignContent: "center",
   },
+  heroKeyproofCard: {
+    minWidth: "104px",
+    padding: "10px 12px",
+    borderRadius: "18px",
+    background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.9) 100%)",
+    border: "1px solid rgba(175, 193, 218, 0.22)",
+    boxShadow: "0 12px 24px rgba(52, 84, 120, 0.06)",
+  },
+  heroKeyproofLabel: {
+    fontSize: "10px",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: "#6d7f93",
+    fontWeight: 800,
+    marginBottom: "4px",
+  },
+  heroKeyproofValue: {
+    fontSize: "18px",
+    lineHeight: 1.1,
+    fontWeight: 900,
+    color: "#16304d",
+    whiteSpace: "nowrap",
+  },
   heroStatusCard: {
+    width: "min(640px, 100%)",
+    flex: "1 1 auto",
     borderRadius: "24px",
     padding: "16px",
     background: "linear-gradient(135deg, rgba(243, 248, 255, 0.95) 0%, rgba(255, 239, 245, 0.92) 100%)",
@@ -1715,8 +2668,6 @@ const styles: Record<string, CSSProperties> = {
     gap: "10px",
     alignItems: "stretch",
     flexWrap: "nowrap",
-    position: "sticky",
-    top: "18px",
     zIndex: 5,
     padding: "10px",
     borderRadius: "18px",
@@ -1724,6 +2675,16 @@ const styles: Record<string, CSSProperties> = {
     backdropFilter: "blur(12px)",
     border: "1px solid rgba(140, 160, 184, 0.16)",
     boxShadow: "0 16px 30px rgba(52, 84, 120, 0.10)",
+  },
+  selectionBarLocked: {
+    position: "static",
+  },
+  selectionBarUnlocked: {
+    position: "fixed",
+    top: "96px",
+    left: "282px",
+    right: "16px",
+    zIndex: 20,
   },
   selectionNavCluster: {
     display: "grid",
