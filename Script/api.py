@@ -3,6 +3,7 @@ import shutil
 import sqlite3
 import re
 import json
+import html as html_lib
 import tempfile
 import zipfile
 import subprocess
@@ -11,11 +12,13 @@ import uuid
 import hashlib
 import hmac
 import secrets
+from functools import lru_cache
 from io import BytesIO, StringIO
 from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import quote
+from xml.etree import ElementTree as ET
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -164,7 +167,9 @@ def _ensure_source_table_columns_on_startup():
 
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 
@@ -1146,6 +1151,21 @@ BALSHEET_TABLE_COLUMNS = [
     ("To", "TEXT"),
 ]
 
+BALSHEET_TABLE_COLUMN_NAMES = [name for name, _ in BALSHEET_TABLE_COLUMNS]
+
+
+def _balsheet_row_value(row, field_name: str, index: int):
+    if isinstance(row, sqlite3.Row):
+        return row[field_name]
+
+    if isinstance(row, dict):
+        return row.get(field_name)
+
+    try:
+        return row[index]
+    except Exception:
+        return None
+
 
 def ensure_balsheet_table(conn=None):
     close_conn = False
@@ -1250,6 +1270,9 @@ IMAGING_DOCUMENT_INDEX_COLUMNS = [
     ("is_archived", "INTEGER NOT NULL DEFAULT 0"),
     ("source_folder", "TEXT NOT NULL DEFAULT ''"),
     ("size_bytes", "INTEGER NOT NULL DEFAULT 0"),
+    ("page_count", "INTEGER NOT NULL DEFAULT 0"),
+    ("text_content", "TEXT NOT NULL DEFAULT ''"),
+    ("outline_json", "TEXT NOT NULL DEFAULT '[]'"),
     ("scanned_at", "TEXT NOT NULL"),
     ("updated_at", "TEXT NOT NULL"),
 ]
@@ -1258,6 +1281,7 @@ IMAGING_BALSHEET_LINK_COLUMNS = [
     ("link_id", "TEXT PRIMARY KEY"),
     ("entry_id", "TEXT NOT NULL"),
     ("posting_date", "TEXT NOT NULL"),
+    ("lockbox_image_date", "TEXT NOT NULL DEFAULT ''"),
     ("amount", "REAL NOT NULL DEFAULT 0"),
     ("payer", "TEXT NOT NULL DEFAULT ''"),
     ("check_number", "TEXT NOT NULL DEFAULT ''"),
@@ -1265,10 +1289,333 @@ IMAGING_BALSHEET_LINK_COLUMNS = [
     ("file_name", "TEXT NOT NULL DEFAULT ''"),
     ("match_method", "TEXT NOT NULL DEFAULT 'manual'"),
     ("confidence", "REAL NOT NULL DEFAULT 0"),
+    ("bookmark_page", "INTEGER NOT NULL DEFAULT 0"),
+    ("bookmark_title", "TEXT NOT NULL DEFAULT ''"),
+    ("source_query", "TEXT NOT NULL DEFAULT ''"),
     ("confirmed", "INTEGER NOT NULL DEFAULT 1"),
     ("created_at", "TEXT NOT NULL"),
     ("updated_at", "TEXT NOT NULL"),
 ]
+
+IMAGING_PDF_TOOL_NAMES = {
+    "pdfinfo": "pdfinfo.exe",
+    "pdftotext": "pdftotext.exe",
+    "pdftohtml": "pdftohtml.exe",
+}
+
+
+def _poppler_tool_path(tool_name: str) -> str:
+    executable = IMAGING_PDF_TOOL_NAMES.get(tool_name, tool_name)
+    candidate = Path(WORKFLOW_ROOT) / "poppler" / "Library" / "bin" / executable
+    return str(candidate) if candidate.exists() else executable
+
+
+def _run_text_command(command: list[str], *, cwd: str | None = None) -> str:
+    try:
+        result = subprocess.run(
+            command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except Exception:
+        return ""
+
+    if result.returncode != 0:
+        return result.stdout or result.stderr or ""
+
+    return result.stdout
+
+
+def _normalize_search_text(value: str | None) -> str:
+    return " ".join(str(value or "").upper().split())
+
+
+def _date_prefix_from_mmddyyyy(value: str | None) -> str:
+    normalized = normalize_mmddyyyy(value)
+    if not normalized:
+        return ""
+
+    try:
+        parsed = datetime.strptime(normalized, "%m/%d/%Y")
+    except ValueError:
+        return ""
+
+    return parsed.strftime("%m.%d.%y")
+
+
+def _extract_pdf_outline(xml_text: str) -> list[dict]:
+    if not xml_text.strip():
+        return []
+
+    try:
+        root = ET.fromstring(xml_text)
+    except Exception:
+        return []
+
+    outline_root = root.find("outline")
+    if outline_root is None:
+        return []
+
+    items: list[dict] = []
+
+    def walk(node, depth: int = 0):
+        for child in list(node):
+            if child.tag != "item":
+                continue
+
+            title = html_lib.unescape("".join(child.itertext()).strip())
+            page_value = str(child.attrib.get("page") or "").strip()
+            try:
+                page_number = int(page_value)
+            except ValueError:
+                page_number = 0
+
+            if title:
+                items.append({"title": title, "page": page_number, "depth": depth})
+
+            nested_outline = child.find("outline")
+            if nested_outline is not None:
+                walk(nested_outline, depth + 1)
+
+    walk(outline_root, 0)
+    return items
+
+
+def _extract_html_text(file_path: Path) -> str:
+    try:
+        raw = file_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return ""
+
+    stripped = re.sub(r"<script[\s\S]*?</script>", " ", raw, flags=re.IGNORECASE)
+    stripped = re.sub(r"<style[\s\S]*?</style>", " ", stripped, flags=re.IGNORECASE)
+    stripped = re.sub(r"<[^>]+>", " ", stripped)
+    stripped = html_lib.unescape(stripped)
+    return " ".join(stripped.split())
+
+
+@lru_cache(maxsize=256)
+def _extract_pdf_search_bundle(file_path: str, modified_time: float) -> tuple[str, int, str]:
+    path = Path(file_path)
+    if not path.exists():
+        return "", 0, "[]"
+
+    pdfinfo_output = _run_text_command([_poppler_tool_path("pdfinfo"), str(path)])
+    page_count = 0
+    for line in pdfinfo_output.splitlines():
+        if line.startswith("Pages:"):
+            try:
+                page_count = int(line.split(":", 1)[1].strip())
+            except ValueError:
+                page_count = 0
+            break
+
+    text_content = _run_text_command([_poppler_tool_path("pdftotext"), "-layout", str(path), "-"])
+    outline_xml = _run_text_command([_poppler_tool_path("pdftohtml"), "-xml", "-stdout", str(path)])
+    outline_json = json.dumps(_extract_pdf_outline(outline_xml))
+    return text_content.strip(), page_count, outline_json
+
+
+def _build_document_search_payload(file_row: sqlite3.Row) -> dict:
+    file_path = str(file_row["file_path"] or "")
+    file_ext = str(file_row["file_ext"] or "").lower()
+    modified_time = 0.0
+    try:
+        modified_time = Path(file_path).stat().st_mtime
+    except Exception:
+        modified_time = 0.0
+
+    if file_ext == "pdf":
+        text_content, page_count, outline_json = _extract_pdf_search_bundle(file_path, modified_time)
+    else:
+        text_content = _extract_html_text(Path(file_path))
+        page_count = 1 if text_content else 0
+        outline_json = "[]"
+
+    return {
+        "filePath": file_path,
+        "fileName": str(file_row["file_name"] or ""),
+        "fileExt": file_ext,
+        "normalizedName": str(file_row["normalized_name"] or ""),
+        "checkNumbers": json.loads(file_row["check_numbers_json"] or "[]"),
+        "isArchived": bool(file_row["is_archived"]),
+        "sourceFolder": str(file_row["source_folder"] or ""),
+        "sizeBytes": int(file_row["size_bytes"] or 0),
+        "pageCount": page_count,
+        "textContent": text_content,
+        "outline": json.loads(outline_json or "[]"),
+        "scannedAt": str(file_row["scanned_at"] or ""),
+        "updatedAt": str(file_row["updated_at"] or ""),
+    }
+
+
+def _build_search_snippet(text: str, query: str, width: int = 80) -> str:
+    normalized_text = " ".join(str(text or "").split())
+    normalized_query = _normalize_search_text(query)
+    if not normalized_text:
+        return ""
+
+    if not normalized_query:
+        return normalized_text[:width]
+
+    haystack = normalized_text.upper()
+    needle_index = haystack.find(normalized_query)
+    if needle_index < 0:
+        return normalized_text[:width]
+
+    start = max(0, needle_index - width // 2)
+    end = min(len(normalized_text), needle_index + len(normalized_query) + width // 2)
+    snippet = normalized_text[start:end].strip()
+    if start > 0:
+        snippet = f"... {snippet}"
+    if end < len(normalized_text):
+        snippet = f"{snippet} ..."
+    return snippet
+
+
+def _search_lockbox_documents(posting_date: str, query: str) -> list[dict]:
+    root = _imaging_root_folder()
+    if not root.exists():
+        return []
+
+    date_prefix = _date_prefix_from_mmddyyyy(posting_date)
+    normalized_query = _normalize_search_text(query)
+    candidates: list[dict] = []
+
+    def _lockbox_filename_schema_score(file_name: str, normalized_date_prefix: str) -> tuple[float, str]:
+        normalized_file_name = _normalize_search_text(file_name)
+        score = 0.0
+        tags: list[str] = []
+
+        if normalized_date_prefix and normalized_date_prefix in normalized_file_name:
+            score += 0.25
+            tags.append("date")
+
+        if "WF" in normalized_file_name:
+            score += 0.20
+            tags.append("wf")
+
+        if "LOCKBOX" in normalized_file_name:
+            score += 0.20
+            tags.append("lockbox")
+
+        schema_count_match = re.search(r"(?:^|[^A-Z0-9])[-_ ](\d{1,3})(?:[^A-Z0-9]|$)", str(file_name).upper())
+        if schema_count_match:
+            count_value = int(schema_count_match.group(1))
+            if count_value > 0:
+                score += 0.05
+                tags.append("count")
+
+        if score >= 0.45:
+            tags.append("schema")
+
+        return min(score, 0.6), "+".join(tags)
+
+    for path in sorted(root.rglob("*.pdf")):
+        if not path.is_file():
+            continue
+
+        file_name_upper = path.name.upper()
+        if "WF" not in file_name_upper and "LOCKBOX" not in file_name_upper:
+            continue
+        if date_prefix and date_prefix.upper() not in file_name_upper:
+            continue
+
+        try:
+            file_stat = path.stat()
+        except Exception:
+            continue
+
+        text_content, page_count, outline_json = _extract_pdf_search_bundle(str(path), file_stat.st_mtime)
+        page_texts = [page.strip() for page in text_content.split("\f") if page.strip()]
+        outline = json.loads(outline_json or "[]")
+        normalized_file_name = _normalize_search_text(path.name)
+        normalized_text = _normalize_search_text(text_content)
+        score = 0.0
+        matched_page = 0
+        matched_bookmark = ""
+        matched_snippet = ""
+        match_method = "date-prefix"
+
+        schema_score, schema_tag = _lockbox_filename_schema_score(path.name, date_prefix.upper() if date_prefix else "")
+        if schema_score:
+            score += schema_score
+            match_method = "filename-schema"
+            if schema_tag:
+                match_method = f"{match_method}-{schema_tag}"
+        elif date_prefix:
+            score += 0.2
+
+        if normalized_query:
+            if normalized_query in normalized_file_name:
+                score += 0.2
+                match_method = "filename"
+                if schema_score:
+                    match_method = f"{match_method}-schema"
+
+            if normalized_query in normalized_text:
+                score += 0.25
+                match_method = "text"
+
+            for page_number, page_text in enumerate(page_texts, start=1):
+                if normalized_query not in _normalize_search_text(page_text):
+                    continue
+                matched_page = page_number
+                matched_snippet = _build_search_snippet(page_text, query)
+                score = max(score, 0.7)
+                match_method = "page-text"
+                if schema_score:
+                    match_method = f"{match_method}-schema"
+                break
+
+            for outline_item in outline:
+                title = str(outline_item.get("title") or "")
+                if normalized_query not in _normalize_search_text(title):
+                    continue
+                matched_bookmark = title
+                matched_page = int(outline_item.get("page") or matched_page or 0)
+                score = max(score, 0.9)
+                match_method = "bookmark"
+                if schema_score:
+                    match_method = f"{match_method}-schema"
+                break
+        else:
+            if outline:
+                first_outline = outline[0]
+                matched_page = int(first_outline.get("page") or 0)
+                matched_bookmark = str(first_outline.get("title") or "")
+                score += 0.1
+
+        if not normalized_query and not score:
+            score = 0.2
+
+        if normalized_query and score <= 0:
+            continue
+
+        if not matched_snippet and page_texts:
+            matched_snippet = _build_search_snippet(page_texts[0], query)
+
+        candidates.append(
+            {
+                "filePath": str(path),
+                "fileName": path.name,
+                "pageCount": page_count,
+                "confidence": round(min(score, 1.0), 2),
+                "matchMethod": match_method,
+                "bookmarkPage": matched_page,
+                "bookmarkTitle": matched_bookmark,
+                "snippet": matched_snippet,
+                "openUrl": f"/imaging/files/open?path={quote(str(path), safe='')}" + (f"#page={matched_page}" if matched_page > 0 else ""),
+                "sourceFolder": str(path.parent.relative_to(root)) if path.parent.is_relative_to(root) else str(path.parent),
+            }
+        )
+
+    candidates.sort(key=lambda item: (item["confidence"], item["pageCount"], item["fileName"]), reverse=True)
+    return candidates[:10]
 
 
 def _normalize_imaging_check_number(value):
@@ -1346,6 +1693,176 @@ def _imaging_filename_partial_check_score(file_name: str, check_number: str) -> 
         best_score = max(best_score, 0.55 + (0.35 * ratio))
 
     return min(best_score, 0.94)
+
+
+def _normalize_imaging_amount_token(value) -> str:
+    try:
+        amount = float(str(value or 0).replace(",", "").replace("$", "").strip())
+    except Exception:
+        return ""
+
+    if amount.is_integer():
+        return f"{int(amount):d}"
+
+    return f"{amount:.2f}".rstrip("0").rstrip(".")
+
+
+def _imaging_amount_tokens(value) -> list[str]:
+    normalized = _normalize_imaging_amount_token(value)
+    if not normalized:
+        return []
+
+    try:
+        amount = float(normalized)
+    except Exception:
+        amount = 0.0
+
+    tokens = {
+        normalized,
+        f"{amount:,.2f}",
+        f"{amount:.2f}",
+        f"${amount:,.2f}",
+    }
+    if amount.is_integer():
+        tokens.add(f"{int(amount):,d}")
+        tokens.add(f"{int(amount):d}.00")
+    return [token for token in tokens if token]
+
+
+def _build_lockbox_recommendation_snippet(page_texts: list[str], page_number: int, query: str) -> str:
+    if page_number > 0 and page_number <= len(page_texts):
+        snippet = _build_search_snippet(page_texts[page_number - 1], query)
+        if snippet:
+            return snippet
+    if page_texts:
+        return _build_search_snippet(page_texts[0], query)
+    return ""
+
+
+def _build_lockbox_row_recommendations(posting_date: str, row: dict, document_rows: list[sqlite3.Row]) -> list[dict]:
+    date_prefix = _date_prefix_from_mmddyyyy(posting_date)
+    normalized_date_prefix = date_prefix.upper() if date_prefix else ""
+    entry_check = _normalize_imaging_check_number(row.get("checkNumber") or row.get("check_number") or "")
+    payer = str(row.get("payer") or "").strip()
+    normalized_payer = _normalize_search_text(payer)
+    amount_tokens = _imaging_amount_tokens(row.get("amount") or 0)
+    amount_display = f"{float(row.get('amount') or 0):,.2f}"
+    recommendations: list[dict] = []
+
+    for document_row in document_rows:
+        score, match_method = _imaging_match_score(entry_check, posting_date, document_row)
+        file_path = str(document_row["file_path"] or "")
+        file_name = str(document_row["file_name"] or "")
+        normalized_file_name = _normalize_search_text(file_name)
+        normalized_name = str(document_row["normalized_name"] or "").upper()
+        text_content = str(document_row["text_content"] or "")
+        normalized_text = _normalize_search_text(text_content)
+        outline = []
+        try:
+            outline = json.loads(document_row["outline_json"] or "[]")
+        except Exception:
+            outline = []
+        page_texts = [page.strip() for page in text_content.split("\f") if page.strip()]
+        matched_page = 0
+        matched_title = ""
+        matched_check = ""
+        matched_amount = ""
+        notes: list[str] = []
+
+        if normalized_date_prefix and normalized_date_prefix not in normalized_file_name:
+            continue
+
+        if entry_check:
+            if _imaging_filename_has_exact_check(file_name, entry_check):
+                matched_check = entry_check
+                score = max(score, 0.82)
+                notes.append("check")
+            else:
+                for page_number, page_text in enumerate(page_texts, start=1):
+                    normalized_page = _normalize_search_text(page_text)
+                    if entry_check not in normalized_page:
+                        continue
+                    matched_page = page_number
+                    matched_check = entry_check
+                    score = max(score, 0.86)
+                    notes.append("check-page")
+                    break
+
+        for token in amount_tokens:
+            if token and (token in normalized_name or token in normalized_text):
+                matched_amount = token
+                score = max(score, 0.82 if token in normalized_name else 0.75)
+                notes.append("amount")
+                break
+
+            for page_number, page_text in enumerate(page_texts, start=1):
+                normalized_page = _normalize_search_text(page_text)
+                if token not in normalized_page:
+                    continue
+                matched_page = page_number if not matched_page else matched_page
+                matched_amount = token
+                score = max(score, 0.88)
+                notes.append("amount-page")
+                break
+            if matched_amount:
+                break
+
+        if normalized_payer and normalized_payer in normalized_text:
+            score = min(1.0, score + 0.08)
+            notes.append("payer")
+
+        if outline:
+            for outline_item in outline:
+                title = str(outline_item.get("title") or "")
+                normalized_title = _normalize_search_text(title)
+                if entry_check and entry_check not in normalized_title:
+                    continue
+                if amount_tokens and not any(token in normalized_title for token in amount_tokens):
+                    continue
+                matched_title = title
+                matched_page = int(outline_item.get("page") or matched_page or 0)
+                score = max(score, 0.9)
+                notes.append("bookmark")
+                break
+
+        if matched_page == 0 and outline:
+            first_outline = outline[0]
+            matched_page = int(first_outline.get("page") or 0)
+            if not matched_title:
+                matched_title = str(first_outline.get("title") or "")
+
+        if matched_page == 0 and page_texts:
+            for page_number, page_text in enumerate(page_texts, start=1):
+                normalized_page = _normalize_search_text(page_text)
+                if (entry_check and entry_check in normalized_page) or any(token in normalized_page for token in amount_tokens):
+                    matched_page = page_number
+                    break
+
+        if not matched_check and entry_check:
+            matched_check = entry_check
+        if not matched_amount and amount_tokens:
+            matched_amount = amount_tokens[0]
+        if score <= 0:
+            continue
+
+        matched_text = " ".join(notes) if notes else "search"
+        recommendations.append(
+            {
+                "filePath": file_path,
+                "fileName": file_name,
+                "confidence": round(min(score, 1.0), 2),
+                "matchMethod": f"{match_method}-{matched_text}" if matched_text else match_method,
+                "bookmarkPage": matched_page,
+                "bookmarkTitle": matched_title,
+                "snippet": _build_lockbox_recommendation_snippet(page_texts, matched_page, f"{entry_check} {amount_display} {payer}".strip()),
+                "sourceFolder": str(document_row["source_folder"] or ""),
+                "foundCheckNumber": matched_check,
+                "foundAmount": amount_display,
+            }
+        )
+
+    recommendations.sort(key=lambda item: (item["confidence"], item["bookmarkPage"], item["fileName"]), reverse=True)
+    return recommendations[:3]
 
 
 def _imaging_posting_date_tokens(posting_date: str) -> set[str]:
@@ -1465,6 +1982,13 @@ def rebuild_imaging_document_index(conn=None):
             except Exception:
                 source_folder = str(path.parent)
 
+            if suffix == ".pdf":
+                text_content, page_count, outline_json = _extract_pdf_search_bundle(resolved_path, stat.st_mtime)
+            else:
+                text_content = _extract_html_text(path)
+                page_count = 1 if text_content else 0
+                outline_json = "[]"
+
             rows.append(
                 (
                     resolved_path,
@@ -1475,6 +1999,9 @@ def rebuild_imaging_document_index(conn=None):
                     is_archived,
                     source_folder,
                     int(stat.st_size),
+                    int(page_count),
+                    text_content,
+                    outline_json,
                     scanned_at,
                     scanned_at,
                 )
@@ -1492,10 +2019,13 @@ def rebuild_imaging_document_index(conn=None):
                 {_quote_identifier("is_archived")},
                 {_quote_identifier("source_folder")},
                 {_quote_identifier("size_bytes")},
+                {_quote_identifier("page_count")},
+                {_quote_identifier("text_content")},
+                {_quote_identifier("outline_json")},
                 {_quote_identifier("scanned_at")},
                 {_quote_identifier("updated_at")}
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -1645,6 +2175,7 @@ def _build_imaging_association_payload(conn, posting_date: str):
             {
                 "entryId": entry_id,
                 "postingDate": balsheet_row.get("posting_date") or "",
+                "type": str(balsheet_row.get("type") or ""),
                 "amount": float(balsheet_row.get("amount") or 0),
                 "payer": str(balsheet_row.get("payer") or ""),
                 "checkNumber": str(balsheet_row.get("check_number") or ""),
@@ -1655,8 +2186,14 @@ def _build_imaging_association_payload(conn, posting_date: str):
                         "fileName": link_row["file_name"],
                         "matchMethod": link_row["match_method"],
                         "confidence": float(link_row["confidence"] or 0),
+                        "bookmarkPage": int(link_row["bookmark_page"] or 0),
+                        "bookmarkTitle": str(link_row["bookmark_title"] or ""),
+                        "sourceQuery": str(link_row["source_query"] or ""),
                         "confirmed": bool(link_row["confirmed"]),
-                        "openUrl": f"/imaging/balsheet-links/{link_row['link_id']}/open",
+                        "openUrl": (
+                            f"/imaging/balsheet-links/{link_row['link_id']}/open"
+                            + (f"#page={int(link_row['bookmark_page'] or 0)}" if int(link_row["bookmark_page"] or 0) > 0 else "")
+                        ),
                     }
                     for link_row in linked_rows
                 ],
@@ -1667,6 +2204,7 @@ def _build_imaging_association_payload(conn, posting_date: str):
                 }
                     for match in matches[:5]
                 ],
+                "recommendations": [],
             }
         )
 
@@ -1676,6 +2214,20 @@ def _build_imaging_association_payload(conn, posting_date: str):
         "indexCount": len(index_rows),
         "rows": rows,
     }
+
+
+def _build_imaging_lockbox_recommendations_payload(conn, posting_date: str):
+    payload = _build_imaging_association_payload(conn, posting_date)
+    index_rows = _load_imaging_document_index(conn)
+
+    for row in payload["rows"]:
+        if str(row.get("type") or "").strip().lower() != "lockbox":
+            row["recommendations"] = []
+            continue
+
+        row["recommendations"] = _build_lockbox_row_recommendations(posting_date, row, index_rows)
+
+    return payload
 
 
 def _safe_imaging_file_response(file_path: str):
@@ -2270,24 +2822,25 @@ def _generate_balsheet_entry_id() -> str:
 
 def _balsheet_row_to_payload(row):
     return {
-        "entry_id": row["EntryID"],
-        "posting_date": normalize_mmddyyyy(row["PostingDate"]) or str(row["PostingDate"] or ""),
-        "type": str(row["Type"] or ""),
-        "amount": row["Amount"],
-        "payer": str(row["Payer"] or ""),
-        "check_number": str(row["Check Number"] or ""),
-        "edi": str(row["EDI"] or ""),
-        "poster": str(row["Poster"] or ""),
-        "eob": str(row["EOB"] or ""),
-        "unposted": row["UnPosted"],
-        "misc": row["Misc"],
-        "misc_type": str(row["Misc-Type"] or ""),
-        "notes": str(row["Notes"] or ""),
-        "nick": row["Nick"],
-        "raul": row["Raul"],
-        "needs": str(row["Needs"] or ""),
-        "from_date": str(row["From"] or ""),
-        "to_date": str(row["To"] or ""),
+        "entry_id": _balsheet_row_value(row, "EntryID", 0),
+        "posting_date": normalize_mmddyyyy(_balsheet_row_value(row, "PostingDate", 1))
+        or str(_balsheet_row_value(row, "PostingDate", 1) or ""),
+        "type": str(_balsheet_row_value(row, "Type", 2) or ""),
+        "amount": _balsheet_row_value(row, "Amount", 3),
+        "payer": str(_balsheet_row_value(row, "Payer", 4) or ""),
+        "check_number": str(_balsheet_row_value(row, "Check Number", 5) or ""),
+        "edi": str(_balsheet_row_value(row, "EDI", 6) or ""),
+        "poster": str(_balsheet_row_value(row, "Poster", 7) or ""),
+        "eob": str(_balsheet_row_value(row, "EOB", 8) or ""),
+        "unposted": _balsheet_row_value(row, "UnPosted", 9),
+        "misc": _balsheet_row_value(row, "Misc", 10),
+        "misc_type": str(_balsheet_row_value(row, "Misc-Type", 11) or ""),
+        "notes": str(_balsheet_row_value(row, "Notes", 12) or ""),
+        "nick": _balsheet_row_value(row, "Nick", 13),
+        "raul": _balsheet_row_value(row, "Raul", 14),
+        "needs": str(_balsheet_row_value(row, "Needs", 15) or ""),
+        "from_date": str(_balsheet_row_value(row, "From", 16) or ""),
+        "to_date": str(_balsheet_row_value(row, "To", 17) or ""),
     }
 
 
@@ -5267,8 +5820,14 @@ async def post_eft_upload_stage(file: UploadFile = File(...)):
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Failed to read Excel file: {exc}")
 
-    expected_headers = [
+    required_headers = [
         "As-Of Date",
+        "Debit Amt",
+        "Credit Amt",
+        "Descriptive Text 1",
+    ]
+
+    optional_headers = [
         "As-Of-Time",
         "Bank ID",
         "Bank Name",
@@ -5280,8 +5839,6 @@ async def post_eft_upload_stage(file: UploadFile = File(...)):
         "IBAN",
         "BAI Type Code",
         "Tran Desc",
-        "Debit Amt",
-        "Credit Amt",
         "0 Day Flt Amt",
         "1 Day Flt Amt",
         "2+ Day Flt Amt",
@@ -5290,7 +5847,6 @@ async def post_eft_upload_stage(file: UploadFile = File(...)):
         "Location",
         "Bank Reference",
         "Tran Status",
-        "Descriptive Text 1",
         "Descriptive Text 2",
         "Descriptive Text 3",
         "Descriptive Text 4",
@@ -5320,11 +5876,11 @@ async def post_eft_upload_stage(file: UploadFile = File(...)):
         "Beneficiary Final Wire Received Status",
     ]
 
-    missing_headers = [header for header in expected_headers if header not in df.columns]
-    if missing_headers:
+    missing_required_headers = [header for header in required_headers if header not in df.columns]
+    if missing_required_headers:
         raise HTTPException(
             status_code=400,
-            detail=f"Missing column(s) in DEP_1101_TRAN file: {', '.join(missing_headers)}",
+            detail=f"Missing required column(s) in DEP_1101_TRAN file: {', '.join(missing_required_headers)}",
         )
 
     conn = get_conn()
@@ -5334,7 +5890,11 @@ async def post_eft_upload_stage(file: UploadFile = File(...)):
         conn.execute("BEGIN IMMEDIATE")
         cur.execute("DELETE FROM EFTLoad")
 
-        working_df = df[expected_headers].copy()
+        working_df = df.copy()
+        for header in required_headers + optional_headers:
+            if header not in working_df.columns:
+                working_df[header] = ""
+        working_df = working_df[required_headers + optional_headers].copy()
         working_df.insert(0, "batchnum", None)
         working_df.insert(1, "transnum", None)
         working_df.insert(2, "timestamp", None)
@@ -5345,7 +5905,8 @@ async def post_eft_upload_stage(file: UploadFile = File(...)):
             "transnum",
             "timestamp",
             "matchstatus",
-            *expected_headers,
+            *required_headers,
+            *optional_headers,
         ]
         quoted_columns = ", ".join(_quote_identifier(column) for column in eftload_columns)
         placeholders = ", ".join(["?"] * len(eftload_columns))
@@ -6808,6 +7369,53 @@ def refresh_imaging_balsheet_associations(payload: dict | None = None):
         conn.close()
 
 
+@app.get("/imaging/lockbox-associations")
+def get_imaging_lockbox_associations(posting_date: str, query: str = ""):
+    normalized_posting_date = normalize_mmddyyyy(posting_date)
+    if not normalized_posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_imaging_tables(conn)
+        root = _imaging_root_folder()
+        if not root.exists():
+            return {
+                "postingDate": normalized_posting_date,
+                "query": str(query or "").strip(),
+                "results": [],
+            }
+
+        query_value = str(query or "").strip()
+        search_results = _search_lockbox_documents(normalized_posting_date, query_value)
+        return {
+            "postingDate": normalized_posting_date,
+            "query": query_value,
+            "results": search_results,
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/imaging/lockbox-associations/find-matches")
+def find_imaging_lockbox_matches(payload: dict | None = None):
+    payload = payload or {}
+    normalized_posting_date = normalize_mmddyyyy(payload.get("posting_date"))
+    if not normalized_posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        rebuild_imaging_document_index(conn)
+        return _build_imaging_lockbox_recommendations_payload(conn, normalized_posting_date)
+    finally:
+        conn.close()
+
+
 @app.post("/imaging/balsheet-links/confirm")
 def confirm_imaging_balsheet_link(payload: dict | None = None):
     payload = payload or {}
@@ -6831,6 +7439,12 @@ def confirm_imaging_balsheet_link(payload: dict | None = None):
             check_number=str(payload.get("check_number") or ""),
             match_method=str(payload.get("match_method") or "manual").strip() or "manual",
             confidence=float(payload.get("confidence") or 1),
+            bookmark_page=int(payload.get("bookmark_page") or 0),
+            bookmark_title=str(payload.get("bookmark_title") or ""),
+            source_query=str(payload.get("source_query") or ""),
+            lockbox_image_date=normalize_mmddyyyy(payload.get("lockbox_image_date"))
+            or normalize_mmddyyyy(payload.get("posting_date"))
+            or "",
         )
         conn.commit()
         return {
@@ -6838,7 +7452,32 @@ def confirm_imaging_balsheet_link(payload: dict | None = None):
             "linkId": result["linkId"],
             "entryId": entry_id,
             "filePath": file_path,
+            "bookmarkPage": result.get("bookmarkPage", 0),
+            "bookmarkTitle": result.get("bookmarkTitle", ""),
+            "lockboxImageDate": result.get("lockboxImageDate", ""),
         }
+    finally:
+        conn.close()
+
+
+@app.delete("/imaging/balsheet-links/{link_id}")
+def delete_imaging_balsheet_link(link_id: str):
+    link_id = str(link_id or "").strip()
+    if not link_id:
+        raise HTTPException(status_code=400, detail="link_id is required")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_imaging_tables(conn)
+        cur = conn.execute(
+            f'DELETE FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")} WHERE {_quote_identifier("link_id")} = ?',
+            (link_id,),
+        )
+        if cur.rowcount <= 0:
+            raise HTTPException(status_code=404, detail="Link not found")
+        conn.commit()
+        return {"status": "ok", "linkId": link_id}
     finally:
         conn.close()
 
@@ -6852,6 +7491,10 @@ def _upsert_imaging_balsheet_link(
     check_number: str,
     match_method: str,
     confidence: float,
+    bookmark_page: int = 0,
+    bookmark_title: str = "",
+    source_query: str = "",
+    lockbox_image_date: str = "",
 ):
     balsheet_row = conn.execute(
         f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
@@ -6881,6 +7524,7 @@ def _upsert_imaging_balsheet_link(
             {_quote_identifier("link_id")},
             {_quote_identifier("entry_id")},
             {_quote_identifier("posting_date")},
+            {_quote_identifier("lockbox_image_date")},
             {_quote_identifier("amount")},
             {_quote_identifier("payer")},
             {_quote_identifier("check_number")},
@@ -6888,19 +7532,26 @@ def _upsert_imaging_balsheet_link(
             {_quote_identifier("file_name")},
             {_quote_identifier("match_method")},
             {_quote_identifier("confidence")},
+            {_quote_identifier("bookmark_page")},
+            {_quote_identifier("bookmark_title")},
+            {_quote_identifier("source_query")},
             {_quote_identifier("confirmed")},
             {_quote_identifier("created_at")},
             {_quote_identifier("updated_at")}
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
         ON CONFLICT({_quote_identifier("entry_id")}, {_quote_identifier("file_path")}) DO UPDATE SET
             {_quote_identifier("posting_date")} = excluded.{_quote_identifier("posting_date")},
+            {_quote_identifier("lockbox_image_date")} = excluded.{_quote_identifier("lockbox_image_date")},
             {_quote_identifier("amount")} = excluded.{_quote_identifier("amount")},
             {_quote_identifier("payer")} = excluded.{_quote_identifier("payer")},
             {_quote_identifier("check_number")} = excluded.{_quote_identifier("check_number")},
             {_quote_identifier("file_name")} = excluded.{_quote_identifier("file_name")},
             {_quote_identifier("match_method")} = excluded.{_quote_identifier("match_method")},
             {_quote_identifier("confidence")} = excluded.{_quote_identifier("confidence")},
+            {_quote_identifier("bookmark_page")} = excluded.{_quote_identifier("bookmark_page")},
+            {_quote_identifier("bookmark_title")} = excluded.{_quote_identifier("bookmark_title")},
+            {_quote_identifier("source_query")} = excluded.{_quote_identifier("source_query")},
             {_quote_identifier("confirmed")} = excluded.{_quote_identifier("confirmed")},
             {_quote_identifier("updated_at")} = excluded.{_quote_identifier("updated_at")}
         """,
@@ -6908,6 +7559,7 @@ def _upsert_imaging_balsheet_link(
             link_id,
             entry_id,
             normalized_posting_date,
+            str(lockbox_image_date or normalized_posting_date or ""),
             float(balsheet_row["Amount"] or 0),
             str(balsheet_row["Payer"] or ""),
             _normalize_imaging_check_number(check_number or balsheet_row["Check Number"] or ""),
@@ -6915,6 +7567,9 @@ def _upsert_imaging_balsheet_link(
             str(document_row["file_name"] or ""),
             match_method,
             confidence,
+            int(bookmark_page or 0),
+            str(bookmark_title or ""),
+            str(source_query or ""),
             now,
             now,
         ),
@@ -6925,6 +7580,9 @@ def _upsert_imaging_balsheet_link(
         "entryId": entry_id,
         "filePath": file_path,
         "documentFileName": str(document_row["file_name"] or ""),
+        "bookmarkPage": int(bookmark_page or 0),
+        "bookmarkTitle": str(bookmark_title or ""),
+        "lockboxImageDate": str(lockbox_image_date or normalized_posting_date or ""),
     }
 
 

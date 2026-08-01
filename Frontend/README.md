@@ -73,3 +73,11 @@ export default defineConfig([
 ])
 
 ```
+
+## Local Dev Settings
+
+Create a `.env` file from `.env.example` if you want to change the Vite dev host, port, or API proxy target.
+
+- `VITE_DEV_HOST` controls the bind address for `vite dev`
+- `VITE_DEV_PORT` controls the dev server port
+- `VITE_DEV_PROXY_TARGET` controls where `/api` requests are proxied during local development

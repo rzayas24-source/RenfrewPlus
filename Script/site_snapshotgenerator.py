@@ -60,8 +60,6 @@ def _poppler_path():
     bundled_candidates = [
         BASE_DIR / "poppler" / "Library" / "bin",
         WORKFLOW_ROOT / "poppler" / "Library" / "bin",
-        Path(r"C:\Tools\poppler\Library\bin"),
-        Path(r"C:\poppler\Library\bin"),
     ]
 
     for candidate in (*config_candidates, *bundled_candidates):
@@ -75,8 +73,6 @@ def _safe_font(size: int):
     candidates = [
         FONT_CONFIG.get("regular"),
         FONT_CONFIG.get("alternate"),
-        r"C:\Windows\Fonts\arial.ttf",
-        r"C:\Windows\Fonts\segoeui.ttf",
     ]
     for candidate in candidates:
         if os.path.exists(candidate):

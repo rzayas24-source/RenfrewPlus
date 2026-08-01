@@ -129,6 +129,8 @@ export interface ImagingDocumentSuggestion {
   confidence: number;
   matchMethod: string;
   openUrl: string;
+  bookmarkPage?: number;
+  bookmarkTitle?: string;
 }
 
 export interface ImagingDocumentLink {
@@ -137,6 +139,10 @@ export interface ImagingDocumentLink {
   fileName: string;
   matchMethod: string;
   confidence: number;
+  bookmarkPage?: number;
+  bookmarkTitle?: string;
+  sourceQuery?: string;
+  lockboxImageDate?: string;
   confirmed: boolean;
   openUrl: string;
 }
@@ -144,11 +150,13 @@ export interface ImagingDocumentLink {
 export interface ImagingBalsheetAssociationRow {
   entryId: string;
   postingDate: string;
+  type: string;
   amount: number;
   payer: string;
   checkNumber: string;
   linkedFiles: ImagingDocumentLink[];
   matches: ImagingDocumentSuggestion[];
+  recommendations: ImagingLockboxRecommendation[];
 }
 
 export interface ImagingBalsheetAssociationResponse {
@@ -165,9 +173,46 @@ export interface ImagingLinkConfirmPayload {
   checkNumber?: string;
   matchMethod?: string;
   confidence?: number;
+  bookmarkPage?: number;
+  bookmarkTitle?: string;
+  sourceQuery?: string;
   postingDate?: string;
   payer?: string;
   amount?: number;
+  lockboxImageDate?: string;
+}
+
+export interface ImagingLockboxSearchResult {
+  filePath: string;
+  fileName: string;
+  pageCount: number;
+  confidence: number;
+  matchMethod: string;
+  bookmarkPage: number;
+  bookmarkTitle: string;
+  snippet: string;
+  openUrl: string;
+  sourceFolder: string;
+}
+
+export interface ImagingLockboxSearchResponse {
+  postingDate: string;
+  query: string;
+  results: ImagingLockboxSearchResult[];
+}
+
+export interface ImagingLockboxRecommendation {
+  filePath: string;
+  fileName: string;
+  confidence: number;
+  matchMethod: string;
+  bookmarkPage: number;
+  bookmarkTitle: string;
+  snippet: string;
+  sourceFolder: string;
+  foundCheckNumber: string;
+  foundAmount: string;
+  openUrl?: string;
 }
 
 export interface ImagingBulkCommitExactResponse {
@@ -308,19 +353,44 @@ export function confirmImagingBalsheetLink(payload: ImagingLinkConfirmPayload) {
       check_number: payload.checkNumber,
       match_method: payload.matchMethod,
       confidence: payload.confidence,
+      bookmark_page: payload.bookmarkPage,
+      bookmark_title: payload.bookmarkTitle,
+      source_query: payload.sourceQuery,
       posting_date: payload.postingDate,
       payer: payload.payer,
       amount: payload.amount,
+      lockbox_image_date: payload.lockboxImageDate,
     }
   );
 }
 
-export function buildImagingFileOpenUrl(filePath: string) {
-  return `${API_BASE}/imaging/files/open?path=${encodeURIComponent(filePath)}`;
+export function deleteImagingBalsheetLink(linkId: string) {
+  return axios.delete<{ status: string; linkId: string }>(`${API_BASE}/imaging/balsheet-links/${encodeURIComponent(linkId)}`);
 }
 
-export function buildImagingLinkOpenUrl(linkId: string) {
-  return `${API_BASE}/imaging/balsheet-links/${encodeURIComponent(linkId)}/open`;
+export function buildImagingFileOpenUrl(filePath: string, page?: number) {
+  const pageFragment = page && page > 0 ? `#page=${page}` : "";
+  return `${API_BASE}/imaging/files/open?path=${encodeURIComponent(filePath)}${pageFragment}`;
+}
+
+export function buildImagingLinkOpenUrl(linkId: string, page?: number) {
+  const pageFragment = page && page > 0 ? `#page=${page}` : "";
+  return `${API_BASE}/imaging/balsheet-links/${encodeURIComponent(linkId)}/open${pageFragment}`;
+}
+
+export function getImagingLockboxAssociations(postingDate: string, query = "") {
+  return axios.get<ImagingLockboxSearchResponse>(`${API_BASE}/imaging/lockbox-associations`, {
+    params: {
+      posting_date: postingDate,
+      query,
+    },
+  });
+}
+
+export function findImagingLockboxMatches(postingDate: string) {
+  return axios.post<ImagingBalsheetAssociationResponse>(`${API_BASE}/imaging/lockbox-associations/find-matches`, {
+    posting_date: postingDate,
+  });
 }
 
 export function getMisc(postingDate?: string) {

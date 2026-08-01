@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
+import { useAppConfig } from "../config/appConfig";
 import { styles as adminStyles } from "./adminscreen";
 import { getDuplicateCheckSpreadsheet, type DuplicateCheckSpreadsheetResponse, type DuplicateCheckRow } from "../api/duplicatecheck_api";
 
@@ -20,11 +21,12 @@ function formatAmount(value: string) {
 
 export default function DuplicateCheckScreen() {
   const navigate = useNavigate();
+  const appConfig = useAppConfig();
   const [data, setData] = useState<DuplicateCheckSpreadsheetResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const duplicateSourcePath = "C:\\Renfrew\\Workflow\\3.HTML\\Renamed";
+  const duplicateSourcePath = appConfig?.ui?.sources?.duplicate_check ?? "3.HTML\\Renamed";
 
   useEffect(() => {
     let active = true;

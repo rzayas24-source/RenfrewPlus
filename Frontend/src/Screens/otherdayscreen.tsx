@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
+import { useAppConfig } from "../config/appConfig";
 import { styles as adminStyles } from "./adminscreen";
 import { getOtherDaySpreadsheet, type OtherDaySpreadsheetResponse, type OtherDayRow } from "../api/otherday_api";
 
@@ -20,6 +21,7 @@ function formatAmount(value: string) {
 
 export default function OtherDayScreen() {
   const navigate = useNavigate();
+  const appConfig = useAppConfig();
   const [data, setData] = useState<OtherDaySpreadsheetResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +80,8 @@ export default function OtherDayScreen() {
   const missingRows = useMemo(() => data?.missingRows ?? [], [data]);
 
   const todayFilenamesWithMissing = data?.filenamesWithMissing ?? 0;
+  const htmlSourcePath = appConfig?.ui?.sources?.other_day_html ?? "3.HTML\\Renamed";
+  const eraSourcePath = appConfig?.ui?.sources?.other_day_era ?? "2.ERA\\Renamed";
 
   return (
     <AdminShell
@@ -90,11 +94,11 @@ export default function OtherDayScreen() {
           <div style={{ display: "grid", gap: "10px", marginTop: "8px" }}>
             <div>
               <div style={{ ...otherDayStyles.sourceLabel, ...otherDayStyles.sourceLabelFirst }}>3.HTML\Renamed</div>
-              <div style={otherDayStyles.sourcePath}>C:\Renfrew\Workflow\3.HTML\Renamed</div>
+              <div style={otherDayStyles.sourcePath}>{htmlSourcePath}</div>
             </div>
             <div>
               <div style={otherDayStyles.sourceLabel}>2.ERA\Renamed</div>
-              <div style={otherDayStyles.sourcePath}>C:\Renfrew\Workflow\2.ERA\Renamed</div>
+              <div style={otherDayStyles.sourcePath}>{eraSourcePath}</div>
             </div>
           </div>
         </div>

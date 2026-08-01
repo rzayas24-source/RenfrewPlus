@@ -83,6 +83,11 @@
         "rejected": "The same layout stays in place while the rows are filtered by status.",
         "complete": "Rows stay grouped by batch so you can trace the full path of each file."
       }
+    },
+    "sources": {
+      "duplicate_check": "3.HTML\\Renamed",
+      "other_day_html": "3.HTML\\Renamed",
+      "other_day_era": "2.ERA\\Renamed"
     }
   }
 }

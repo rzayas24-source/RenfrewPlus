@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import json
 from copy import deepcopy
 from pathlib import Path
@@ -7,7 +8,21 @@ from threading import RLock
 from typing import Any
 
 BASE_DIR = Path(__file__).resolve().parent
-CONFIG_PATH = BASE_DIR / "config.json"
+
+
+def _config_path() -> Path:
+    raw = os.environ.get("WORKFLOW_CONFIG_PATH", "").strip()
+    if not raw:
+        return BASE_DIR / "config.json"
+
+    candidate = Path(raw).expanduser()
+    if candidate.is_absolute():
+        return candidate
+
+    return (BASE_DIR.parent / candidate).resolve()
+
+
+CONFIG_PATH = _config_path()
 _CONFIG_LOCK = RLock()
 _CONFIG_CACHE: dict[str, Any] | None = None
 _CONFIG_MTIME: float | None = None
@@ -104,6 +119,11 @@ def default_config() -> dict[str, Any]:
                     "rejected": "The same layout stays in place while the rows are filtered by status.",
                     "complete": "Rows stay grouped by batch so you can trace the full path of each file.",
                 },
+            },
+            "sources": {
+                "duplicate_check": "3.HTML\\Renamed",
+                "other_day_html": "3.HTML\\Renamed",
+                "other_day_era": "2.ERA\\Renamed",
             },
         },
     }

@@ -11,16 +11,10 @@ export default function CollectionsScreen() {
       sidebarCopy="A soft collections console for follow-up, recovery, and receivables work."
       onBack={() => navigate("/")}
       sidebarAction={
-        <button
-          type="button"
-          onClick={() => navigate("/view-images")}
-          style={collectionsStyles.sidebarImagingButton}
-        >
+        <button type="button" onClick={() => navigate("/view-images")} style={collectionsStyles.sidebarImagingButton}>
           <div style={collectionsStyles.sidebarImagingKicker}>Imaging</div>
           <div style={collectionsStyles.sidebarImagingTitle}>Open imaging</div>
-          <div style={collectionsStyles.sidebarImagingMeta}>
-            Jump straight into the image viewer from the left bar.
-          </div>
+          <div style={collectionsStyles.sidebarImagingMeta}>Jump straight into the image viewer from the left bar.</div>
         </button>
       }
     >

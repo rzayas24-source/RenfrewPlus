@@ -86,6 +86,11 @@ export type AppConfig = {
         complete?: string;
       };
     };
+    sources?: {
+      duplicate_check?: string;
+      other_day_html?: string;
+      other_day_era?: string;
+    };
   };
 };
 

@@ -119,7 +119,14 @@ export default function BankingScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedDayIso, setSelectedDayIso] = useState("");
+  const selectedDayStorageKey = "banking:lastSelectedDay";
+  const [selectedDayIso, setSelectedDayIso] = useState(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+
+    return window.localStorage.getItem(selectedDayStorageKey) ?? "";
+  });
   const [sortField, setSortField] = useState<BankingSortField>("date");
   const [sortDirection, setSortDirection] = useState<BankingSortDirection>("desc");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<"EFT" | "Lockbox", boolean>>({
@@ -157,6 +164,16 @@ export default function BankingScreen() {
     void loadSpreadsheet();
     void loadCalendarStatus();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (selectedDayIso) {
+      window.localStorage.setItem(selectedDayStorageKey, selectedDayIso);
+    }
+  }, [selectedDayIso]);
 
   const allRows = useMemo(() => (data?.groups ?? []).flatMap((group) => group.rows), [data]);
   const availableDays = useMemo(

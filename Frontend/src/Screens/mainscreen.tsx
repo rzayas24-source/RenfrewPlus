@@ -3,14 +3,23 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import { getBankingSpreadsheet, type BankingSpreadsheetResponse } from "../api/banking_api";
+import { getBalsheet, getBalsheetWorkday, type BalsheetEntry, type BalsheetWorkday } from "../api/balsheet_api";
+import { getCalendarRange, type CalendarRangeRow } from "../api/calendar_api";
 
-type MonthlyBankPoint = {
-  day: string;
-  iso: string;
-  amount: number;
-  count: number;
-  eftAmount: number;
-  lockboxAmount: number;
+type DayTotals = {
+  total: number;
+  eft: number;
+  lockbox: number;
+};
+
+type ProjectionSummary = {
+  totalReceived: number;
+  averagePerBankDay: number;
+  receivedDays: number;
+  projectedDays: number;
+  projectedEndTotal: number;
+  lastActualDay: string;
+  missingDays: string[];
 };
 
 const moneyFmt = new Intl.NumberFormat("en-US", {
@@ -18,108 +27,81 @@ const moneyFmt = new Intl.NumberFormat("en-US", {
   currency: "USD",
 });
 
+const shortDateFmt = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+});
+
 export default function MainScreen() {
   const navigate = useNavigate();
   const [bankingData, setBankingData] = useState<BankingSpreadsheetResponse | null>(null);
-  const [chartLoading, setChartLoading] = useState(true);
-  const [chartError, setChartError] = useState<string | null>(null);
+  const [calendarRows, setCalendarRows] = useState<CalendarRangeRow[]>([]);
+  const [balsheetRows, setBalsheetRows] = useState<BalsheetEntry[]>([]);
+  const [workday, setWorkday] = useState<BalsheetWorkday | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const currentMonth = useMemo(() => new Date(), []);
+  const monthRange = useMemo(() => getMonthRange(currentMonth), [currentMonth]);
 
   useEffect(() => {
     let active = true;
 
-    const loadBanking = async () => {
-      setChartLoading(true);
-      setChartError(null);
+    const load = async () => {
+      setLoading(true);
+      setError(null);
 
       try {
-        const response = await getBankingSpreadsheet();
-        if (active) {
-          setBankingData(response.data);
+        const [bankingResponse, calendarResponse, balsheetResponse, workdayResponse] = await Promise.all([
+          getBankingSpreadsheet(),
+          getCalendarRange(monthRange.start, monthRange.end),
+          getBalsheet(),
+          getBalsheetWorkday(),
+        ]);
+
+        if (!active) {
+          return;
         }
-      } catch {
+
+        setBankingData(bankingResponse.data);
+        setCalendarRows(calendarResponse.data.rows ?? []);
+        setBalsheetRows(balsheetResponse.data ?? []);
+        setWorkday(workdayResponse.data);
+      } catch (caught) {
         if (active) {
-          setBankingData(null);
-          setChartError("Banking chart unavailable right now.");
+          setError(caught instanceof Error ? caught.message : "Unable to load the main screen snapshot.");
         }
       } finally {
         if (active) {
-          setChartLoading(false);
+          setLoading(false);
         }
       }
     };
 
-    void loadBanking();
+    void load();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [monthRange.end, monthRange.start]);
 
-  const chartData = useMemo(() => {
-    const now = new Date();
-    const monthIndex = now.getMonth();
-    const year = now.getFullYear();
-    const points = new Map<string, MonthlyBankPoint>();
+  const projection = useMemo(() => {
+    return buildProjectionSummary(calendarRows, bankingData);
+  }, [bankingData, calendarRows]);
 
-    for (const group of bankingData?.groups ?? []) {
-      for (const row of group.rows) {
-        const parsed = parseBankDate(row.date);
-        if (!parsed) continue;
-        if (parsed.getMonth() !== monthIndex || parsed.getFullYear() !== year) continue;
+  const snapshot = useMemo(() => {
+    return buildSnapshotSummary(bankingData, balsheetRows, workday);
+  }, [bankingData, balsheetRows, workday]);
 
-        const iso = toIsoDate(parsed);
-        const existing = points.get(iso) ?? {
-          day: String(parsed.getDate()).padStart(2, "0"),
-          iso,
-          amount: 0,
-          count: 0,
-          eftAmount: 0,
-          lockboxAmount: 0,
-        };
-
-        const amount = parseMoney(row.amount);
-        existing.amount += amount;
-        existing.count += 1;
-        if (row.source === "EFT") {
-          existing.eftAmount += amount;
-        } else {
-          existing.lockboxAmount += amount;
-        }
-        points.set(iso, existing);
-      }
-    }
-
-    return Array.from(points.values()).sort((left, right) => left.iso.localeCompare(right.iso));
-  }, [bankingData]);
-
-  const chartMax = useMemo(() => {
-    const max = Math.max(0, ...chartData.map((point) => point.amount));
-    return max > 0 ? max : 1;
-  }, [chartData]);
-
-  const currentMonthLabel = new Intl.DateTimeFormat("en-US", {
-    month: "long",
-    year: "numeric",
-  }).format(new Date());
-
-  const chartTotals = useMemo(() => {
-    return chartData.reduce(
-      (acc, point) => {
-        acc.amount += point.amount;
-        acc.count += point.count;
-        return acc;
-      },
-      { amount: 0, count: 0 }
-    );
-  }, [chartData]);
-
-  const chartLayout = useMemo(() => {
-    const leftPad = 18;
-    const usableWidth = 940 - leftPad * 2;
-    const step = chartData.length > 0 ? usableWidth / chartData.length : usableWidth;
-    const barWidth = Math.max(12, Math.min(26, step * 0.7));
-    return { leftPad, step, barWidth };
-  }, [chartData.length]);
+  const currentMonthLabel = useMemo(
+    () =>
+      new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        year: "numeric",
+      }).format(currentMonth),
+    [currentMonth]
+  );
 
   return (
     <AdminShell
@@ -143,12 +125,15 @@ export default function MainScreen() {
             <p style={styles.subtitle}>
               A calm workspace for review, approvals, and balance-sheet work.
             </p>
-
           </div>
 
           <div style={styles.heroArt}>
             <div style={styles.heroLogoCard}>
-              <img src="/renfrew-womenline.png" alt="Renfrew girls holding hands mark" style={styles.heroLogoImage} />
+              <img
+                src="/renfrew-womenline.png"
+                alt="Renfrew girls holding hands mark"
+                style={styles.heroLogoImage}
+              />
             </div>
 
             <div style={styles.heroStatusCard}>
@@ -164,121 +149,192 @@ export default function MainScreen() {
           </div>
         </section>
 
-        <section style={styles.chartCard}>
-          <div style={styles.chartHeader}>
+        <section style={styles.financeSection}>
+          <div style={styles.financeHeader}>
             <div>
-              <div style={styles.chartKicker}>Current month</div>
-              <h2 style={styles.chartTitle}>{currentMonthLabel} banking trend</h2>
+              <div style={styles.sectionKicker}>Financial snapshot</div>
+              <h2 style={styles.sectionTitle}>{currentMonthLabel}</h2>
             </div>
-            <div style={styles.chartHeaderMeta}>
-              <div style={styles.chartHeaderValue}>{formatCurrency(chartTotals.amount)}</div>
-              <div style={styles.chartHeaderLabel}>{chartTotals.count} rows this month</div>
+            <div style={styles.sectionMeta}>
+              Current month projection and file snapshot, presented in the same footprint as the
+              previous finance widget.
             </div>
           </div>
 
-          <div style={styles.chartLegend}>
-            <span style={styles.legendItem}>
-              <span style={{ ...styles.legendSwatch, background: "linear-gradient(135deg, #8ec5ff 0%, #cfe7ff 100%)" }} />
-              EFT
-            </span>
-            <span style={styles.legendItem}>
-              <span style={{ ...styles.legendSwatch, background: "linear-gradient(135deg, #ffb4d2 0%, #ffe0ec 100%)" }} />
-              Lockbox
-            </span>
-            <span style={styles.legendItem}>
-              <span style={{ ...styles.legendSwatch, background: "linear-gradient(135deg, #d7dee8 0%, #eef2f7 100%)" }} />
-              Total
-            </span>
-          </div>
+          {loading ? (
+            <div style={styles.stateCard}>Loading banking, calendar, and balance-sheet data...</div>
+          ) : error ? (
+            <div style={styles.stateCard}>{error}</div>
+          ) : (
+            <div style={styles.financeGrid}>
+              <article style={styles.financeCard}>
+                <div style={styles.cardTopRow}>
+                  <span style={styles.cardBadge}>Projection</span>
+                  <span style={styles.cardSubtle}>{projection.receivedDays} bank day(s) received</span>
+                </div>
+                <div style={styles.cardTitle}>Average collected per bank day</div>
 
-          <div style={styles.chartFrame}>
-            {chartLoading ? (
-              <div style={styles.chartState}>Loading monthly banking data...</div>
-            ) : chartError ? (
-              <div style={styles.chartState}>{chartError}</div>
-            ) : chartData.length === 0 ? (
-              <div style={styles.chartState}>No banking rows were found for the current month.</div>
-            ) : (
-                <svg viewBox="0 0 940 270" preserveAspectRatio="none" style={styles.chartSvg} aria-label={`${currentMonthLabel} banking chart`}>
-                  <defs>
-                  <linearGradient id="banking-total-gradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#8ec5ff" />
-                    <stop offset="100%" stopColor="#d7ebff" />
-                  </linearGradient>
-                  <linearGradient id="banking-eft-gradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#69aef8" />
-                    <stop offset="100%" stopColor="#bfe0ff" />
-                  </linearGradient>
-                  <linearGradient id="banking-lockbox-gradient" x1="0" x2="0" y1="0" y2="1">
-                    <stop offset="0%" stopColor="#ff9ec5" />
-                    <stop offset="100%" stopColor="#ffd8e7" />
-                  </linearGradient>
-                </defs>
+                <div style={styles.metricHero}>
+                  <div style={styles.metricValue}>{formatCurrency(projection.averagePerBankDay)}</div>
+                  <div style={styles.metricLabel}>Average per bank day</div>
+                </div>
 
-                <line x1="0" y1="220" x2="940" y2="220" stroke="rgba(120, 140, 164, 0.18)" strokeWidth="2" />
+                <div style={styles.metricRow}>
+                  <Metric label="Received" value={formatCurrency(projection.totalReceived)} />
+                  <Metric label="Projected days" value={String(projection.projectedDays)} />
+                  <Metric label="End number" value={formatCurrency(projection.projectedEndTotal)} accent />
+                </div>
 
-                {chartData.map((point, index) => {
-                  const left = chartLayout.leftPad + index * chartLayout.step + (chartLayout.step - chartLayout.barWidth) / 2;
-                  const barHeight = Math.max(10, (point.amount / chartMax) * 156);
-                  const eftHeight = Math.max(4, (point.eftAmount / chartMax) * 156);
-                  const lockboxHeight = Math.max(4, (point.lockboxAmount / chartMax) * 156);
-                  const isCurrent = index === chartData.length - 1;
-                  const splitWidth = Math.max(4, (chartLayout.barWidth - 4) / 2);
+                <div style={styles.cardFoot}>
+                  <div>
+                    <span style={styles.footLabel}>Last actual bank day</span>
+                    <div style={styles.footValue}>{formatDate(projection.lastActualDay)}</div>
+                  </div>
+                  <div>
+                    <span style={styles.footLabel}>Projected bank days remaining</span>
+                    <div style={styles.footValue}>{projection.projectedDays}</div>
+                  </div>
+                </div>
+                <div style={styles.compactNote}>
+                  {projection.missingDays.length > 0
+                    ? `Missing days: ${projection.missingDays.slice(0, 4).map((day) => formatDate(day)).join(" · ")}`
+                    : "No missing bank days remain in the month."}
+                </div>
+              </article>
 
-                  return (
-                    <g key={point.iso}>
-                      <rect
-                        x={left}
-                        y={210 - barHeight}
-                        width={chartLayout.barWidth}
-                        height={barHeight}
-                        rx="12"
-                        fill="url(#banking-total-gradient)"
-                        opacity={isCurrent ? 1 : 0.72}
-                      />
-                      <rect
-                        x={left}
-                        y={210 - eftHeight}
-                        width={splitWidth}
-                        height={eftHeight}
-                        rx="10"
-                        fill="url(#banking-eft-gradient)"
-                        opacity={point.eftAmount > 0 ? 1 : 0.22}
-                      />
-                      <rect
-                        x={left + splitWidth + 4}
-                        y={210 - lockboxHeight}
-                        width={splitWidth}
-                        height={lockboxHeight}
-                        rx="10"
-                        fill="url(#banking-lockbox-gradient)"
-                        opacity={point.lockboxAmount > 0 ? 1 : 0.22}
-                      />
-                      <circle cx={left + chartLayout.barWidth / 2} cy={210 - barHeight - 10} r={4} fill="#7a93ad" opacity={0.45} />
-                      <text x={left + chartLayout.barWidth / 2} y="236" textAnchor="middle" style={styles.chartDayLabel}>
-                        {point.day}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
-            )}
-          </div>
+              <article style={styles.financeCard}>
+                <div style={styles.cardTopRow}>
+                  <span style={styles.cardBadge}>Snapshot</span>
+                  <span style={styles.cardSubtle}>Current file state</span>
+                </div>
+                <div style={styles.cardTitle}>Latest file dates</div>
 
-          <div style={styles.chartFootnote}>
-            <span>Month to date total</span>
-            <strong>{formatCurrency(chartTotals.amount)}</strong>
-            <span>{chartTotals.count} rows across EFT and Lockbox</span>
-          </div>
+                <div style={styles.snapshotList}>
+                  <SnapshotRow label="Latest balsheet" value={snapshot.latestBalsheetDate} />
+                  <SnapshotRow label="Latest EFT" value={snapshot.lastEftDate} />
+                  <SnapshotRow label="Latest Lockbox" value={snapshot.lastLockboxDate} />
+                  <SnapshotRow label="Latest EDI" value={snapshot.lastEdiDate} />
+                </div>
+
+                <div style={styles.snapshotFooter}>
+                  <span style={styles.emptyNote}>Snapshot only. It does not change any files.</span>
+                </div>
+              </article>
+            </div>
+          )}
         </section>
-
       </section>
     </AdminShell>
   );
 }
 
+function Metric({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div style={{ ...styles.metricBox, ...(accent ? styles.metricBoxAccent : undefined) }}>
+      <div style={styles.metricBoxLabel}>{label}</div>
+      <div style={styles.metricBoxValue}>{value}</div>
+    </div>
+  );
+}
+
+function SnapshotRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={styles.snapshotRow}>
+      <div style={styles.snapshotLabel}>{label}</div>
+      <div style={styles.snapshotValue}>{formatSnapshotValue(value)}</div>
+    </div>
+  );
+}
+
+function buildProjectionSummary(
+  calendarRows: CalendarRangeRow[],
+  bankingData: BankingSpreadsheetResponse | null
+): ProjectionSummary {
+  const actualByDay = new Map<string, DayTotals>();
+  const currentMonthDays = new Set(
+    calendarRows
+      .filter((row) => !row.isClosed && row.bankDay)
+      .map((row) => row.bankDay)
+  );
+
+  for (const group of bankingData?.groups ?? []) {
+    for (const row of group.rows) {
+      const day = normalizeBankDate(row.date);
+      if (!day || !currentMonthDays.has(day)) {
+        continue;
+      }
+
+      const amount = parseMoney(row.amount);
+      const existing = actualByDay.get(day) ?? { total: 0, eft: 0, lockbox: 0 };
+      existing.total += amount;
+      if (group.source === "EFT") {
+        existing.eft += amount;
+      } else {
+        existing.lockbox += amount;
+      }
+      actualByDay.set(day, existing);
+    }
+  }
+
+  const openDays = calendarRows
+    .filter((row) => !row.isClosed && row.bankDay)
+    .map((row) => row.bankDay)
+    .filter((day): day is string => Boolean(day))
+    .sort(compareMmddyyyy);
+
+  const receivedDays = openDays.filter((day) => (actualByDay.get(day)?.total ?? 0) > 0);
+  const totalReceived = receivedDays.reduce((total, day) => total + (actualByDay.get(day)?.total ?? 0), 0);
+  const averagePerBankDay = receivedDays.length > 0 ? totalReceived / receivedDays.length : 0;
+  const lastActualDay = receivedDays.at(-1) ?? "";
+  const missingDays =
+    lastActualDay === ""
+      ? []
+      : openDays.filter((day) => compareMmddyyyy(day, lastActualDay) > 0 && !actualByDay.has(day));
+  const projectedDays = missingDays.length;
+  const projectedEndTotal = totalReceived + averagePerBankDay * projectedDays;
+
+  return {
+    totalReceived,
+    averagePerBankDay,
+    receivedDays: receivedDays.length,
+    projectedDays,
+    projectedEndTotal,
+    lastActualDay,
+    missingDays,
+  };
+}
+
+function buildSnapshotSummary(
+  bankingData: BankingSpreadsheetResponse | null,
+  balsheetRows: BalsheetEntry[],
+  workday: BalsheetWorkday | null
+) {
+  const summary = new Map((bankingData?.summary ?? []).map((item) => [item.source, item]));
+  const latestBalsheetDate = balsheetRows.reduce((latest, row) => {
+    const current = normalizeBankDate(row.posting_date);
+    if (!current) {
+      return latest;
+    }
+    if (!latest) {
+      return current;
+    }
+    return compareMmddyyyy(current, latest) > 0 ? current : latest;
+  }, "");
+
+  return {
+    postingDate: workday?.posting_date || workday?.current_work_day || workday?.current_bank_day || "",
+    lastEftDate: summary.get("EFT")?.lastDate || "",
+    lastLockboxDate: summary.get("Lockbox")?.lastDate || "",
+    lastEdiDate: summary.get("EDI")?.lastDate || "",
+    latestBalsheetDate,
+  };
+}
+
 function parseMoney(value: string) {
-  if (value.trim() === "") return 0;
+  if (value.trim() === "") {
+    return 0;
+  }
+
   const parsed = Number(String(value).replace(/,/g, ""));
   return Number.isNaN(parsed) ? 0 : parsed;
 }
@@ -287,199 +343,81 @@ function formatCurrency(value: number) {
   return moneyFmt.format(value);
 }
 
-function parseBankDate(value: string) {
+function formatDate(value: string) {
+  const parsed = parseMmddyyyy(value);
+  return parsed ? shortDateFmt.format(parsed) : "No date";
+}
+
+function formatSnapshotValue(value: string) {
+  return value ? formatDate(value) : "No date on file";
+}
+
+function normalizeBankDate(value: string) {
+  return parseMmddyyyy(value) ? formatMmddyyyy(parseMmddyyyy(value) as Date) : "";
+}
+
+function parseMmddyyyy(value: string) {
   const trimmed = value.trim();
   const mmddyyyy = trimmed.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (mmddyyyy) {
     const [, month, day, year] = mmddyyyy;
-    return new Date(Number(year), Number(month) - 1, Number(day));
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   const iso = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) {
     const [, year, month, day] = iso;
-    return new Date(Number(year), Number(month) - 1, Number(day));
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
 
   const parsed = new Date(trimmed);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function toIsoDate(value: Date) {
-  const year = value.getFullYear();
+function formatMmddyyyy(value: Date) {
   const month = String(value.getMonth() + 1).padStart(2, "0");
   const day = String(value.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  const year = value.getFullYear();
+  return `${month}/${day}/${year}`;
+}
+
+function compareMmddyyyy(left: string, right: string) {
+  if (!left && !right) {
+    return 0;
+  }
+  if (!left) {
+    return -1;
+  }
+  if (!right) {
+    return 1;
+  }
+
+  const leftTime = parseMmddyyyy(left)?.getTime() ?? Number.NEGATIVE_INFINITY;
+  const rightTime = parseMmddyyyy(right)?.getTime() ?? Number.NEGATIVE_INFINITY;
+  return leftTime - rightTime;
+}
+
+function getMonthRange(date: Date) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1);
+  const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return {
+    start: formatMmddyyyy(start),
+    end: formatMmddyyyy(end),
+  };
 }
 
 export const styles: Record<string, CSSProperties> = {
-  shell: {
-    minHeight: "100vh",
-    padding: "18px",
-    display: "grid",
-    gridTemplateColumns: "250px minmax(0, 1fr)",
-    gap: "18px",
-    position: "relative",
-    overflow: "hidden",
-    color: "#16304d",
-  },
-  glowBlue: {
-    position: "absolute",
-    top: "-120px",
-    left: "-120px",
-    width: "360px",
-    height: "360px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(146, 198, 255, 0.45) 0%, rgba(146, 198, 255, 0) 70%)",
-    filter: "blur(10px)",
-    pointerEvents: "none",
-  },
-  glowPink: {
-    position: "absolute",
-    right: "-100px",
-    top: "110px",
-    width: "320px",
-    height: "320px",
-    borderRadius: "50%",
-    background: "radial-gradient(circle, rgba(255, 186, 213, 0.42) 0%, rgba(255, 186, 213, 0) 72%)",
-    filter: "blur(10px)",
-    pointerEvents: "none",
-  },
-  sidebar: {
-    position: "relative",
-    zIndex: 1,
-    padding: "18px 16px",
-    borderRadius: "28px",
-    border: "1px solid rgba(140, 160, 184, 0.22)",
-    background: "rgba(255, 255, 255, 0.72)",
-    backdropFilter: "blur(18px)",
-    boxShadow: "0 24px 60px rgba(52, 84, 120, 0.10)",
-  },
-  brandWrap: {
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    justifyContent: "flex-start",
-    paddingBottom: "14px",
-    marginBottom: "16px",
-    borderBottom: "1px solid rgba(140, 160, 184, 0.18)",
-  },
-  brandMark: {
-    width: "52px",
-    height: "52px",
-    borderRadius: "14px",
-    display: "grid",
-    placeItems: "center",
-    background: "rgba(255,255,255,0.76)",
-    border: "1px solid rgba(140, 160, 184, 0.14)",
-    boxShadow: "0 12px 22px rgba(95, 128, 172, 0.08)",
-    overflow: "hidden",
-    flexShrink: 0,
-  },
-  brandMarkImage: {
-    width: "88%",
-    height: "88%",
-    objectFit: "contain",
-    objectPosition: "center",
-  },
-  brandWomenMark: {
-    width: "116px",
-    height: "60px",
-    borderRadius: "14px",
-    display: "grid",
-    placeItems: "center",
-    background: "rgba(255,255,255,0.64)",
-    border: "1px solid rgba(140, 160, 184, 0.10)",
-    boxShadow: "0 10px 18px rgba(95, 128, 172, 0.06)",
-    overflow: "hidden",
-    padding: "4px",
-    flexShrink: 0,
-    position: "sticky",
-    top: "18px",
-    alignSelf: "flex-start",
-    zIndex: 2,
-  },
-  brandWomenImage: {
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    objectPosition: "center",
-  },
-  sidebarCopy: {
-    margin: "0 0 16px",
-    fontSize: "14px",
-    lineHeight: 1.6,
-    color: "#516579",
-  },
-  navStack: {
-    display: "grid",
-    gap: "10px",
-  },
-  navButton: {
-    height: "46px",
-    border: "1px solid rgba(140, 160, 184, 0.20)",
-    borderRadius: "16px",
-    background:
-      "linear-gradient(135deg, rgba(255,255,255,0.96) 0%, rgba(236,245,255,0.95) 54%, rgba(255,236,244,0.92) 100%)",
-    color: "#16304d",
-    textAlign: "left",
-    padding: "0 14px",
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 12px 26px rgba(52, 84, 120, 0.08)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    letterSpacing: "0.01em",
-  },
-  navButtonLabel: {
-    fontSize: "14px",
-    fontWeight: 800,
-  },
-  navButtonGlyph: {
-    width: "22px",
-    height: "22px",
-    display: "grid",
-    placeItems: "center",
-    borderRadius: "999px",
-    background: "rgba(255,255,255,0.76)",
-    color: "#8aa5c6",
-    fontSize: "12px",
-    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.7)",
-  },
-  sidebarCard: {
-    marginTop: "18px",
-    padding: "16px",
-    borderRadius: "20px",
-    background: "linear-gradient(135deg, rgba(235, 245, 255, 0.95) 0%, rgba(255, 234, 243, 0.90) 100%)",
-    border: "1px solid rgba(176, 194, 218, 0.22)",
-  },
-  sidebarCardLabel: {
-    fontSize: "12px",
-    textTransform: "uppercase",
-    letterSpacing: "0.12em",
-    color: "#6d7f93",
-    fontWeight: 800,
-    marginBottom: "8px",
-  },
-  sidebarCardValue: {
-    fontSize: "18px",
-    fontWeight: 800,
-    marginBottom: "8px",
-  },
-  sidebarCardMeta: {
-    fontSize: "13px",
-    lineHeight: 1.55,
-    color: "#5d7187",
-  },
   content: {
     position: "relative",
     zIndex: 1,
     minWidth: 0,
     display: "flex",
     flexDirection: "column",
-    gap: "12px",
-    minHeight: "calc(100vh - 32px)",
+    justifyContent: "flex-start",
+    gap: "8px",
+    height: "calc(100vh - 32px)",
   },
   heroShell: {
     position: "relative",
@@ -491,7 +429,8 @@ export const styles: Record<string, CSSProperties> = {
     padding: "16px",
     borderRadius: "32px",
     border: "1px solid rgba(140, 160, 184, 0.20)",
-    background: "linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(248,250,253,0.88) 50%, rgba(255,244,248,0.92) 100%)",
+    background:
+      "linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(248,250,253,0.88) 50%, rgba(255,244,248,0.92) 100%)",
     boxShadow: "0 24px 60px rgba(52, 84, 120, 0.08)",
   },
   heroCopy: {
@@ -590,51 +529,25 @@ export const styles: Record<string, CSSProperties> = {
     lineHeight: 1.45,
     color: "#5d7187",
   },
-  statsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "14px",
-  },
-  statCard: {
-    padding: "18px",
-    borderRadius: "24px",
-    background: "rgba(255,255,255,0.78)",
-    border: "1px solid rgba(140, 160, 184, 0.18)",
-    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.06)",
-    minHeight: "142px",
-  },
-  statLabel: {
-    textTransform: "uppercase",
-    letterSpacing: "0.16em",
-    fontSize: "11px",
-    color: "#74879c",
-    fontWeight: 800,
-    marginBottom: "10px",
-  },
-  statValue: {
-    fontSize: "20px",
-    fontWeight: 800,
-    color: "#10253d",
-    marginBottom: "8px",
-  },
-  statDetail: {
-    fontSize: "14px",
-    lineHeight: 1.6,
-    color: "#5d7187",
-  },
-  widgetSection: {
-    padding: "22px",
+  financeSection: {
+    padding: "8px",
     borderRadius: "30px",
     border: "1px solid rgba(140, 160, 184, 0.18)",
     background: "rgba(255,255,255,0.64)",
     boxShadow: "0 24px 60px rgba(52, 84, 120, 0.06)",
+    marginTop: 0,
+    display: "flex",
+    flexDirection: "column",
+    flex: 1,
+    minHeight: 0,
   },
-  sectionHeader: {
+  financeHeader: {
     display: "flex",
     justifyContent: "space-between",
     gap: "14px",
     alignItems: "end",
-    marginBottom: "16px",
+    marginBottom: "6px",
+    flexWrap: "wrap",
   },
   sectionKicker: {
     textTransform: "uppercase",
@@ -642,185 +555,188 @@ export const styles: Record<string, CSSProperties> = {
     fontSize: "11px",
     color: "#74879c",
     fontWeight: 800,
-    marginBottom: "8px",
+    marginBottom: "4px",
   },
   sectionTitle: {
     margin: 0,
-    fontSize: "28px",
+    fontSize: "18px",
     lineHeight: 1.08,
     letterSpacing: "-0.03em",
     color: "#10253d",
   },
   sectionMeta: {
     maxWidth: "460px",
-    fontSize: "14px",
-    lineHeight: 1.6,
+    fontSize: "11px",
+    lineHeight: 1.3,
     color: "#5d7187",
   },
-  widgetGrid: {
+  stateCard: {
+    padding: "10px",
+    borderRadius: "24px",
+    background: "linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(245,248,252,0.92) 100%)",
+    border: "1px solid rgba(140, 160, 184, 0.14)",
+    color: "#526579",
+    fontSize: "11px",
+  },
+  financeGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-    gap: "14px",
+    gap: "8px",
+    flex: 1,
+    minHeight: 0,
+    alignItems: "stretch",
   },
-  widgetCard: {
-    minHeight: "190px",
-    border: "0",
+  financeCard: {
+    minHeight: 0,
     borderRadius: "28px",
-    padding: "18px",
-    textAlign: "left",
-    cursor: "pointer",
+    padding: "10px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(135deg, rgba(255,255,255,0.93) 0%, rgba(247,250,254,0.92) 55%, rgba(255,242,247,0.90) 100%)",
     boxShadow: "0 22px 40px rgba(52, 84, 120, 0.08)",
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-between",
-    transition: "transform 160ms ease, box-shadow 160ms ease",
+    gap: "5px",
+    flex: 1,
   },
-  widgetTop: {
+  cardTopRow: {
     display: "flex",
     justifyContent: "space-between",
-    gap: "12px",
+    gap: "10px",
+    alignItems: "center",
+    flexWrap: "wrap",
   },
-  widgetBadge: {
+  cardBadge: {
     alignSelf: "start",
     borderRadius: "999px",
-    padding: "7px 12px",
-    fontSize: "11px",
+    padding: "5px 8px",
+    fontSize: "10px",
     fontWeight: 800,
     letterSpacing: "0.12em",
     textTransform: "uppercase",
-    background: "rgba(255,255,255,0.70)",
+    background: "rgba(255,255,255,0.78)",
     color: "#16304d",
   },
-  widgetBody: {
-    paddingTop: "18px",
+  cardSubtle: {
+    fontSize: "11px",
+    color: "#6a7e93",
+    fontWeight: 700,
   },
-  widgetTitle: {
-    fontSize: "24px",
+  cardTitle: {
+    fontSize: "16px",
     fontWeight: 800,
-    marginBottom: "8px",
-    color: "#10253d",
-  },
-  widgetMeta: {
-    fontSize: "15px",
-    lineHeight: 1.6,
-    color: "#526579",
-    maxWidth: "360px",
-  },
-  widgetAction: {
-    alignSelf: "start",
-    marginTop: "18px",
-    fontSize: "14px",
-    fontWeight: 800,
-    color: "#10253d",
-  },
-  chartCard: {
-    padding: "14px 16px 12px",
-    borderRadius: "28px",
-    border: "1px solid rgba(140, 160, 184, 0.18)",
-    background: "linear-gradient(135deg, rgba(255,255,255,0.90) 0%, rgba(247,250,254,0.92) 52%, rgba(255,242,247,0.92) 100%)",
-    boxShadow: "0 22px 44px rgba(52, 84, 120, 0.08)",
-    display: "grid",
-    gap: "10px",
-    width: "100%",
-    minWidth: 0,
-    marginTop: "auto",
-  },
-  chartHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "12px",
-    alignItems: "flex-end",
-    flexWrap: "wrap",
-  },
-  chartKicker: {
-    textTransform: "uppercase",
-    letterSpacing: "0.16em",
-    fontSize: "10px",
-    color: "#74879c",
-    fontWeight: 800,
-    marginBottom: "6px",
-  },
-  chartTitle: {
-    margin: 0,
-    fontSize: "19px",
-    lineHeight: 1.08,
+    lineHeight: 1.1,
     letterSpacing: "-0.03em",
     color: "#10253d",
   },
-  chartHeaderMeta: {
-    display: "grid",
-    justifyItems: "end",
-    gap: "2px",
+  cardLead: {
+    fontSize: "11px",
+    lineHeight: 1.2,
+    color: "#526579",
   },
-  chartHeaderValue: {
+  metricHero: {
+    padding: "8px",
+    borderRadius: "24px",
+    background: "linear-gradient(135deg, rgba(230, 244, 255, 0.94) 0%, rgba(255, 236, 245, 0.92) 100%)",
+    border: "1px solid rgba(140, 160, 184, 0.14)",
+  },
+  metricValue: {
     fontSize: "18px",
+    fontWeight: 900,
+    letterSpacing: "-0.04em",
+    color: "#10253d",
+    lineHeight: 1.05,
+  },
+  metricLabel: {
+    marginTop: "1px",
+    fontSize: "9px",
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "#6a7e93",
+    fontWeight: 800,
+  },
+  metricRow: {
+    display: "grid",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+    gap: "6px",
+  },
+  metricBox: {
+    padding: "8px",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.72)",
+    border: "1px solid rgba(140, 160, 184, 0.14)",
+  },
+  metricBoxAccent: {
+    background: "linear-gradient(135deg, rgba(237, 248, 255, 0.98) 0%, rgba(255, 239, 247, 0.96) 100%)",
+  },
+  metricBoxLabel: {
+    fontSize: "9px",
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "#6a7e93",
+    fontWeight: 800,
+    marginBottom: "3px",
+  },
+  metricBoxValue: {
+    fontSize: "11px",
+    lineHeight: 1.15,
+    color: "#10253d",
+    fontWeight: 800,
+    wordBreak: "break-word",
+  },
+  cardFoot: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "6px",
+  },
+  footLabel: {
+    display: "block",
+    fontSize: "9px",
+    textTransform: "uppercase",
+    letterSpacing: "0.14em",
+    color: "#6a7e93",
+    fontWeight: 800,
+    marginBottom: "2px",
+  },
+  footValue: {
+    fontSize: "11px",
     fontWeight: 800,
     color: "#10253d",
   },
-  chartHeaderLabel: {
-    fontSize: "11px",
-    color: "#5d7187",
-    fontWeight: 700,
+  compactNote: {
+    fontSize: "10px",
+    lineHeight: 1.2,
+    color: "#6a7e93",
+    fontStyle: "italic",
+    marginTop: "1px",
   },
-  chartLegend: {
+  snapshotList: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: "5px",
+  },
+  snapshotRow: {
     display: "flex",
-    flexWrap: "wrap",
-    gap: "8px 12px",
-    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    padding: "7px 8px",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.76)",
+    border: "1px solid rgba(140, 160, 184, 0.14)",
   },
-  legendItem: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
+  snapshotLabel: {
+    fontSize: "9px",
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+    color: "#6a7e93",
+    fontWeight: 800,
+  },
+  snapshotValue: {
     fontSize: "11px",
     fontWeight: 800,
-    color: "#4f647a",
+    color: "#10253d",
+    textAlign: "right",
   },
-  legendSwatch: {
-    width: "12px",
-    height: "12px",
-    borderRadius: "999px",
-    boxShadow: "0 0 0 4px rgba(255,255,255,0.7)",
-    flexShrink: 0,
-  },
-  chartFrame: {
-    width: "100%",
-    minWidth: 0,
-    height: "180px",
-    borderRadius: "24px",
-    border: "1px solid rgba(140, 160, 184, 0.12)",
-    background: "linear-gradient(180deg, rgba(255,255,255,0.88) 0%, rgba(245,248,252,0.86) 100%)",
-    overflow: "hidden",
-  },
-  chartSvg: {
-    width: "100%",
-    height: "100%",
-    display: "block",
-  },
-  chartDayLabel: {
-    fontSize: "10px",
-    fill: "#6b7f94",
-    fontWeight: 700,
-  },
-  chartState: {
-    height: "100%",
-    display: "grid",
-    placeItems: "center",
-    color: "#5d7187",
-    fontSize: "12px",
-    padding: "12px",
-    textAlign: "center",
-  },
-  chartFootnote: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "6px 10px",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingTop: "0",
-    fontSize: "11px",
-    color: "#5d7187",
+  snapshotFooter: {
+    marginTop: "2px",
   },
 };
-
-
