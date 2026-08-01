@@ -11,6 +11,7 @@ export default function CashScreen() {
       sidebarCopy=""
       onBack={() => navigate("/")}
       hideBackButton
+      useGlobalMenuFallback={false}
     >
       <section style={styles.heroShell}>
         <div style={styles.heroCopy}>
