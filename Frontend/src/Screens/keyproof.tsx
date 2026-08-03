@@ -98,14 +98,6 @@ function formatFlywireAmount(value: number | null | undefined) {
   return formatCurrency(value);
 }
 
-function keyproofStorageKey(id: string) {
-  return `keyproof:${id}`;
-}
-
-function itemizationStorageKey(id: string) {
-  return `itemization:${id}`;
-}
-
 function normalizeDateInput(value: string | null | undefined) {
   const text = String(value || "").trim();
   if (!text) {
@@ -172,6 +164,7 @@ export default function Keyproof() {
   const [paperworkTotalInput, setPaperworkTotalInput] = useState("");
   const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatusKind>("not_saved");
+  const [savedItemizationTotal, setSavedItemizationTotal] = useState(0);
   const [balsheetBalance, setBalsheetBalance] = useState<number | null>(null);
   const [balsheetBalanceCount, setBalsheetBalanceCount] = useState(0);
   const [balsheetBalanceLoading, setBalsheetBalanceLoading] = useState(false);
@@ -226,24 +219,46 @@ export default function Keyproof() {
   useEffect(() => {
     if (!attachmentId) return;
 
-    const saved = window.localStorage.getItem(keyproofStorageKey(attachmentId));
-    if (!saved) return;
+    let active = true;
 
-    try {
-      const parsed = JSON.parse(saved) as Partial<typeof emptyForm> & {
-        batchDate?: string;
-        paperworkTotal?: string;
-      };
-      setForm((current) => ({
-        ...current,
-        ...normalizeKeyproofForm(parsed),
-        site: parsed.site || siteFromParams || current.site,
-      }));
-      setBatchDate(normalizeDateInput(parsed.batchDate) || normalizeDateInput(day));
-      setPaperworkTotalInput(formatCurrencyInput(String(parsed.paperworkTotal ?? "")));
-    } catch {
-      window.localStorage.removeItem(keyproofStorageKey(attachmentId));
-    }
+    const loadSavedKeyproof = async () => {
+      try {
+        const response = await getKeyproof(Number(attachmentId));
+        if (!active) {
+          return;
+        }
+
+        const saved = response.data.payload;
+        const normalizedSaved = saved
+          ? {
+              ...saved,
+              form: normalizeKeyproofForm(saved.form),
+              paperworkTotal: formatCurrencyInput(String(saved.paperworkTotal ?? "")),
+            }
+          : null;
+        setSavedSnapshot(normalizedSaved ? JSON.stringify(normalizedSaved) : null);
+
+        if (normalizedSaved) {
+          setForm((current) => ({
+            ...current,
+            ...normalizedSaved.form,
+            site: normalizedSaved.form.site || siteFromParams || current.site,
+          }));
+          setBatchDate(normalizeDateInput(normalizedSaved.batchDate) || normalizeDateInput(day));
+          setPaperworkTotalInput(normalizedSaved.paperworkTotal);
+        }
+      } catch {
+        if (active) {
+          setSavedSnapshot(null);
+        }
+      }
+    };
+
+    void loadSavedKeyproof();
+
+    return () => {
+      active = false;
+    };
   }, [attachmentId, siteFromParams]);
 
   useEffect(() => {
@@ -271,17 +286,6 @@ export default function Keyproof() {
             }
           : null;
         setSavedSnapshot(normalizedSaved ? JSON.stringify(normalizedSaved) : null);
-
-        const hasLocalDraft = Boolean(window.localStorage.getItem(keyproofStorageKey(attachmentId)));
-        if (normalizedSaved && !hasLocalDraft) {
-          setForm((current) => ({
-            ...current,
-            ...normalizedSaved.form,
-            site: normalizedSaved.form.site || siteFromParams || current.site,
-          }));
-          setBatchDate(normalizeDateInput(normalizedSaved.batchDate) || normalizeDateInput(day));
-          setPaperworkTotalInput(normalizedSaved.paperworkTotal);
-        }
       } catch {
         if (active) {
           setSavedSnapshot(null);
@@ -295,6 +299,40 @@ export default function Keyproof() {
       active = false;
     };
   }, [attachmentId, day, siteFromParams]);
+
+  useEffect(() => {
+    if (!attachmentId) {
+      setSavedItemizationTotal(0);
+      return;
+    }
+
+    let active = true;
+
+    const loadItemizationTotal = async () => {
+      try {
+        const response = await getItemization(Number(attachmentId));
+        if (!active) {
+          return;
+        }
+
+        const payloadItems = response.data.payload?.items;
+        const total = Array.isArray(payloadItems)
+          ? payloadItems.reduce((runningTotal, item) => runningTotal + Number(item.amount || 0), 0)
+          : 0;
+        setSavedItemizationTotal(total);
+      } catch {
+        if (active) {
+          setSavedItemizationTotal(0);
+        }
+      }
+    };
+
+    void loadItemizationTotal();
+
+    return () => {
+      active = false;
+    };
+  }, [attachmentId]);
 
   useEffect(() => {
     setBatchDate((current) => current || normalizeDateInput(day));
@@ -414,7 +452,7 @@ export default function Keyproof() {
       itemizationRequiredFields.reduce((total, field) => total + parseAmount(form[field]), 0),
     [form]
   );
-  const itemizationTotal = useMemo(() => getSavedItemizationTotal(), [attachmentId]);
+  const itemizationTotal = savedItemizationTotal;
   const balsheetDifference = useMemo(
     () => (balsheetBalance ?? 0) - itemizationTotal,
     [balsheetBalance, itemizationTotal]
@@ -566,19 +604,11 @@ export default function Keyproof() {
     setSaveMessage(`Credit Card populated from Fly Wire total ${formatCurrency(flywireCreditCardTotal)}.`);
   }
 
-  function goToItemization() {
+  async function goToItemization() {
     const params = new URLSearchParams();
 
     if (attachmentId) {
       params.set("attachmentId", attachmentId);
-      window.localStorage.setItem(
-        keyproofStorageKey(attachmentId),
-        JSON.stringify({
-          ...normalizeKeyproofForm(form),
-          batchDate,
-          paperworkTotal: formatCurrencyInput(paperworkTotalInput),
-        })
-      );
     }
 
     if (day) {
@@ -590,6 +620,11 @@ export default function Keyproof() {
     }
 
     params.set("requiredTotal", itemizationRequiredTotal.toFixed(2));
+
+    const saved = await persistKeyproof();
+    if (!saved) {
+      return;
+    }
 
     navigate(`/itemization?${params.toString()}`);
   }
@@ -604,36 +639,9 @@ export default function Keyproof() {
     navigate(`/attachments${params.toString() ? `?${params.toString()}` : ""}`);
   }
 
-  function getSavedItemizationTotal() {
-    if (!attachmentId) return 0;
-
-    const saved = window.localStorage.getItem(itemizationStorageKey(attachmentId));
-    if (!saved) return 0;
-
-    try {
-      const items = JSON.parse(saved) as Array<{ amount?: number | string }>;
-      return items.reduce((total, item) => total + Number(item.amount || 0), 0);
-    } catch {
-      return 0;
-    }
-  }
-
   async function loadCurrentItemizationRows() {
     if (!attachmentId) {
       return [] as Array<Record<string, unknown>>;
-    }
-
-    const storageKey = itemizationStorageKey(attachmentId);
-    const saved = window.localStorage.getItem(storageKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as Array<Record<string, unknown>>;
-        if (Array.isArray(parsed)) {
-          return parsed;
-        }
-      } catch {
-        window.localStorage.removeItem(storageKey);
-      }
     }
 
     const response = await getItemization(Number(attachmentId));
@@ -654,7 +662,7 @@ export default function Keyproof() {
       }
 
       await updateItemization(attachmentNumber, { items });
-      window.localStorage.setItem(itemizationStorageKey(attachmentId), JSON.stringify(items));
+      setSavedItemizationTotal(items.reduce((total, item) => total + Number(item.amount || 0), 0));
       return true;
     } catch (error) {
       setMatchWarning(error instanceof Error ? error.message : "Failed to save Itemization.");
@@ -706,14 +714,6 @@ export default function Keyproof() {
     const attachmentNumber = Number(attachmentId);
 
     setSaveStatus("saving");
-    window.localStorage.setItem(
-      keyproofStorageKey(attachmentId),
-      JSON.stringify({
-        ...normalizedForm,
-        batchDate,
-        paperworkTotal: normalizedPaperworkTotal,
-      })
-    );
 
     try {
       await updateKeyproof(attachmentNumber, payload);
@@ -778,8 +778,6 @@ export default function Keyproof() {
     );
 
     await approveAttachment(attachmentNumber);
-    window.localStorage.removeItem(keyproofStorageKey(String(attachmentNumber)));
-    window.localStorage.removeItem(itemizationStorageKey(String(attachmentNumber)));
     navigate(`/attachments${redirectDay ? `?day=${encodeURIComponent(redirectDay)}` : ""}`);
   }
 

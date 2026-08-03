@@ -64,27 +64,7 @@ function formatCurrency(value: unknown) {
   });
 }
 
-function keyproofStorageKey(id: string) {
-  return `keyproof:${id}`;
-}
-
-function getRequiredTotal(attachmentId: string | null, fallback: string | null) {
-  if (attachmentId) {
-    const saved = window.localStorage.getItem(keyproofStorageKey(attachmentId));
-
-    if (saved) {
-      try {
-        const keyproof = JSON.parse(saved) as Record<string, string>;
-        return ["cash", "check", "creditCard", "foreignCheck", "wireTransfer", "misc"].reduce(
-          (total, field) => total + parseAmount(keyproof[field]),
-          0
-        );
-      } catch {
-        window.localStorage.removeItem(keyproofStorageKey(attachmentId));
-      }
-    }
-  }
-
+function getRequiredTotal(fallback: string | null) {
   return parseAmount(fallback);
 }
 
@@ -809,19 +789,8 @@ export default function Itemization() {
   const day = searchParams.get("day");
   const site = searchParams.get("site") || "";
   const importId = Number(attachmentId || 0);
-  const storageKey = attachmentId ? `itemization:${attachmentId}` : "";
 
-  const [items, setItems] = useState<ItemizationItem[]>(() => {
-    if (!storageKey) return [];
-    const saved = window.localStorage.getItem(storageKey);
-    if (!saved) return [];
-    try {
-      return normalizeItemizationItems(JSON.parse(saved) as ItemizationItem[]);
-    } catch {
-      window.localStorage.removeItem(storageKey);
-      return [];
-    }
-  });
+  const [items, setItems] = useState<ItemizationItem[]>([]);
 
   const [sortField, setSortField] = useState<ItemizationField>("poster");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -848,7 +817,7 @@ export default function Itemization() {
   const originalPdfDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const originalPdfWindowRef = useRef<HTMLDivElement | null>(null);
   const originalPdfScrollRef = useRef<HTMLDivElement | null>(null);
-  const requiredTotal = getRequiredTotal(attachmentId, searchParams.get("requiredTotal"));
+  const requiredTotal = getRequiredTotal(searchParams.get("requiredTotal"));
 
   useEffect(() => {
     let active = true;
@@ -949,6 +918,7 @@ export default function Itemization() {
     if (!attachmentId) {
       setSavedSnapshot(null);
       setSaveStatus("not_saved");
+      setItems([]);
       return;
     }
 
@@ -963,13 +933,8 @@ export default function Itemization() {
 
         const saved = response.data.payload as ItemizationSavedPayload | null;
         setSavedSnapshot(saved ? JSON.stringify(saved) : null);
-
-        const hasLocalDraft = Boolean(window.localStorage.getItem(storageKey));
-        if (saved && !hasLocalDraft) {
-          const nextItems = normalizeItemizationItems((saved.items || []) as ItemizationItem[]);
-          setItems(nextItems);
-          window.localStorage.setItem(storageKey, JSON.stringify(nextItems));
-        }
+        const nextItems = saved ? normalizeItemizationItems((saved.items || []) as ItemizationItem[]) : [];
+        setItems(nextItems);
       } catch {
         if (active) {
           setSavedSnapshot(null);
@@ -982,14 +947,11 @@ export default function Itemization() {
     return () => {
       active = false;
     };
-  }, [attachmentId, storageKey]);
+  }, [attachmentId]);
 
   const saveItems = (nextItems: ItemizationItem[]) => {
     const normalizedItems = normalizeItemizationItems(nextItems);
     setItems(normalizedItems);
-    if (storageKey) {
-      window.localStorage.setItem(storageKey, JSON.stringify(normalizedItems));
-    }
   };
 
   const refreshDerivedTotals = () => {
@@ -1015,9 +977,6 @@ export default function Itemization() {
     try {
       await updateItemization(attachmentNumber, payload);
       setSavedSnapshot(JSON.stringify(payload));
-      if (storageKey) {
-        window.localStorage.setItem(storageKey, JSON.stringify(items));
-      }
     } catch {
       setSaveStatus(savedSnapshot ? "dirty" : "not_saved");
       return;
@@ -1390,7 +1349,7 @@ export default function Itemization() {
     <AdminShell
       sidebarCopy=""
       onBack={() => {
-        navigate(keyproofReturnUrl);
+        void saveItemization().then(() => navigate(keyproofReturnUrl));
       }}
       hideSidebar
       backButtonFirst
@@ -1441,16 +1400,25 @@ export default function Itemization() {
               style={styles.heroBarAction}
               type="button"
               onClick={() => {
-                const params = new URLSearchParams();
-                if (day) {
-                  params.set("day", day);
-                }
-                navigate(`/balsheet/view${params.toString() ? `?${params.toString()}` : ""}`);
+                void saveItemization().then(() => {
+                  const params = new URLSearchParams();
+                  if (day) {
+                    params.set("day", day);
+                  }
+                  navigate(`/balsheet/view${params.toString() ? `?${params.toString()}` : ""}`);
+                });
               }}
             >
               Balsheet
             </button>
-            <button style={styles.heroBarAction} type="button" onClick={() => navigate(keyproofReturnUrl)} disabled={!attachmentId}>
+            <button
+              style={styles.heroBarAction}
+              type="button"
+              onClick={() => {
+                void saveItemization().then(() => navigate(keyproofReturnUrl));
+              }}
+              disabled={!attachmentId}
+            >
               Keyproof
             </button>
           </div>

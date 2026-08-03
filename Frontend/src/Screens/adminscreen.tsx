@@ -39,6 +39,30 @@ export default function AdminScreen() {
           <span style={styles.actionTitle}>Config</span>
           <span style={styles.actionMeta}>Edit live app config</span>
         </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/hipaa")}>
+          <span style={styles.actionTitle}>HIPAA</span>
+          <span style={styles.actionMeta}>Review readiness gaps and controls</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/security")}>
+          <span style={styles.actionTitle}>Security</span>
+          <span style={styles.actionMeta}>Document auth-side controls and steps</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/portability")}>
+          <span style={styles.actionTitle}>Portability</span>
+          <span style={styles.actionMeta}>Plan server migration readiness</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/dependencies")}>
+          <span style={styles.actionTitle}>Dependencies</span>
+          <span style={styles.actionMeta}>Review server prerequisites</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/schema")}>
+          <span style={styles.actionTitle}>Schema</span>
+          <span style={styles.actionMeta}>Review table structure</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/auditors")}>
+          <span style={styles.actionTitle}>Auditors</span>
+          <span style={styles.actionMeta}>Open technical data sheets</span>
+        </button>
         <button type="button" style={styles.actionButton} onClick={() => navigate("/worklist-editor")}>
           <span style={styles.actionTitle}>Daily Worklist</span>
           <span style={styles.actionMeta}>Manage the daily work queue</span>

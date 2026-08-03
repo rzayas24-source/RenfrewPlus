@@ -1,5 +1,6 @@
 // src/ScreenManager.tsx
 import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from "react-router-dom";
 
 import AttachmentReviewScreen from "./Screens/attachmentreview";
@@ -31,48 +32,49 @@ import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
 import AdminConfigScreen from "./Screens/adminconfigscreen";
+import HipaaScreen from "./Screens/hipaascreen";
+import DependenciesScreen from "./Screens/dependenciesscreen";
+import AuditorsScreen from "./Screens/auditorsscreen";
+import SchemaScreen from "./Screens/schemascreen";
+import SecurityScreen from "./Screens/securityscreen";
+import PortabilityScreen from "./Screens/portabilityscreen";
 import WorklistEditorScreen from "./Screens/worklisteditor";
 import MiscEditorScreen from "./Screens/miscbuilder";
 import SitesScreen from "./Screens/sitescreen";
 import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
 import ViewImagesScreen from "./Screens/viewimagesscreen";
+import { getItemization, getKeyproof } from "./api/keyproof_api";
 
 function parseAmount(value: unknown) {
   const parsed = Number.parseFloat(String(value || "").replace(/[$,]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function readKeyproofTotal(attachmentId: string | null) {
-  if (!attachmentId) return 0;
+function readKeyproofTotal(keyproof: unknown) {
+  const payload = keyproof as
+    | {
+        form?: Record<string, unknown>;
+      }
+    | null
+    | undefined;
 
-  const saved = window.localStorage.getItem(`keyproof:${attachmentId}`);
-  if (!saved) return 0;
-
-  try {
-    const keyproof = JSON.parse(saved) as Record<string, string>;
-    return ["cash", "check", "creditCard", "foreignCheck", "wireTransfer", "misc"].reduce(
-      (total, field) => total + parseAmount(keyproof[field]),
-      0
-    );
-  } catch {
-    window.localStorage.removeItem(`keyproof:${attachmentId}`);
-    return 0;
-  }
+  const form = payload?.form ?? {};
+  return ["cash", "check", "creditCard", "foreignCheck", "wireTransfer", "misc"].reduce(
+    (total, field) => total + parseAmount(form[field]),
+    0
+  );
 }
 
-function readItemizationTotal(attachmentId: string | null) {
-  if (!attachmentId) return 0;
+function readItemizationTotal(itemization: unknown) {
+  const payload = itemization as
+    | {
+        items?: Array<{ amount?: number | string }>;
+      }
+    | null
+    | undefined;
 
-  const saved = window.localStorage.getItem(`itemization:${attachmentId}`);
-  if (!saved) return 0;
-
-  try {
-    const items = JSON.parse(saved) as Array<{ amount?: number | string }>;
-    return items.reduce((total, item) => total + Number(item.amount || 0), 0);
-  } catch {
-    window.localStorage.removeItem(`itemization:${attachmentId}`);
-    return 0;
-  }
+  const items = Array.isArray(payload?.items) ? payload?.items : [];
+  return items.reduce((total, item) => total + Number(item.amount || 0), 0);
 }
 
 function buildReviewParams(attachmentId: string | null, day: string | null, site?: string | null) {
@@ -99,10 +101,47 @@ function BalanceCheckScreen() {
   const attachmentId = searchParams.get("attachmentId");
   const day = searchParams.get("day");
   const site = searchParams.get("site");
-  const keyproofTotal = readKeyproofTotal(attachmentId);
-  const itemizationTotal = readItemizationTotal(attachmentId);
+  const [keyproofTotal, setKeyproofTotal] = useState(0);
+  const [itemizationTotal, setItemizationTotal] = useState(0);
   const flowParams = buildReviewParams(attachmentId, day, site);
   const itemizationParams = buildReviewParams(attachmentId, day, site);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTotals = async () => {
+      if (!attachmentId) {
+        setKeyproofTotal(0);
+        setItemizationTotal(0);
+        return;
+      }
+
+      try {
+        const [keyproofResponse, itemizationResponse] = await Promise.all([
+          getKeyproof(Number(attachmentId)),
+          getItemization(Number(attachmentId)),
+        ]);
+
+        if (!active) {
+          return;
+        }
+
+        setKeyproofTotal(readKeyproofTotal(keyproofResponse.data.payload));
+        setItemizationTotal(readItemizationTotal(itemizationResponse.data.payload));
+      } catch {
+        if (active) {
+          setKeyproofTotal(0);
+          setItemizationTotal(0);
+        }
+      }
+    };
+
+    void loadTotals();
+
+    return () => {
+      active = false;
+    };
+  }, [attachmentId]);
 
   if (attachmentId) {
     itemizationParams.set("requiredTotal", keyproofTotal.toFixed(2));
@@ -131,6 +170,12 @@ export default function ScreenManager() {
         <Route path="/home" element={<MainScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
         <Route path="/admin/config" element={<AdminConfigScreen />} />
+        <Route path="/admin/hipaa" element={<HipaaScreen />} />
+        <Route path="/admin/security" element={<SecurityScreen />} />
+        <Route path="/admin/portability" element={<PortabilityScreen />} />
+        <Route path="/admin/dependencies" element={<DependenciesScreen />} />
+        <Route path="/admin/schema" element={<SchemaScreen />} />
+        <Route path="/admin/auditors" element={<AuditorsScreen />} />
         <Route path="/admin/menus" element={<AdminMenuScreen />} />
         <Route path="/admin/tables" element={<AdminTableScreen />} />
         <Route path="/admin/users" element={<AdminUserScreen />} />
