@@ -11,15 +11,7 @@ export default function FinanceScreen() {
       ribbonTitle="Finance"
       sidebarCopy="A finance workspace with a dedicated Misc feature on the left bar."
       onBack={() => navigate("/")}
-      sidebarAction={
-        <div style={financeStyles.sidebarActionStack}>
-          <button type="button" onClick={() => navigate("/misc")} style={financeStyles.sidebarNavButton}>
-            <div style={financeStyles.sidebarNavKicker}>Finance</div>
-            <div style={financeStyles.sidebarNavTitle}>Misc</div>
-            <div style={financeStyles.sidebarNavMeta}>Open the Misc workspace from the left menu.</div>
-          </button>
-        </div>
-      }
+      useGlobalMenuFallback={false}
     >
       <section style={financeStyles.content}>
         <section style={financeStyles.heroPane}>
@@ -39,6 +31,10 @@ export default function FinanceScreen() {
             </div>
           </div>
         </section>
+
+        <button type="button" onClick={() => navigate("/misc")} style={financeStyles.miscButton}>
+          Misc
+        </button>
       </section>
     </AdminShell>
   );
@@ -64,38 +60,19 @@ const financeStyles: Record<string, CSSProperties> = {
   heroCard: {
     ...cashStyles.heroStatusCard,
   },
-  sidebarActionStack: {
-    display: "grid",
-    gap: "10px",
-  },
-  sidebarNavButton: {
-    width: "100%",
+  miscButton: {
+    marginTop: "10px",
+    width: "fit-content",
+    minWidth: "150px",
     border: "1px solid rgba(140, 160, 184, 0.18)",
-    borderRadius: "20px",
-    padding: "16px",
-    textAlign: "left",
+    borderRadius: "18px",
+    padding: "12px 16px",
     cursor: "pointer",
     background: "linear-gradient(135deg, rgba(236, 245, 255, 0.98) 0%, rgba(255, 239, 246, 0.96) 100%)",
-    boxShadow: "0 14px 28px rgba(52, 84, 120, 0.08)",
-    display: "grid",
-    gap: "6px",
+    boxShadow: "0 10px 20px rgba(52, 84, 120, 0.07)",
     color: "#16304d",
-  },
-  sidebarNavKicker: {
-    fontSize: "11px",
-    textTransform: "uppercase",
-    letterSpacing: "0.14em",
-    color: "#6c7f95",
-    fontWeight: 800,
-  },
-  sidebarNavTitle: {
-    fontSize: "18px",
+    fontSize: "15px",
     fontWeight: 900,
-    lineHeight: 1.1,
-  },
-  sidebarNavMeta: {
-    fontSize: "12px",
-    lineHeight: 1.45,
-    color: "#5d7187",
+    textAlign: "center",
   },
 };

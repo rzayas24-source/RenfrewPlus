@@ -31,6 +31,14 @@ export default function BusinessScreen() {
             </div>
           </div>
         </section>
+
+        <button type="button" onClick={() => navigate("/discrepancy")} style={businessStyles.discrepancyButton}>
+          <div style={businessStyles.discrepancyButtonKicker}>Open feature</div>
+          <div style={businessStyles.discrepancyButtonTitle}>Discrepancy</div>
+          <div style={businessStyles.discrepancyButtonMeta}>
+            Jump directly into the discrepancy workspace from the business landing page.
+          </div>
+        </button>
       </section>
     </AdminShell>
   );
@@ -49,6 +57,38 @@ const businessStyles: Record<string, CSSProperties> = {
   },
   subtitle: {
     ...cashStyles.subtitle,
+  },
+  discrepancyButton: {
+    marginTop: "10px",
+    width: "fit-content",
+    minWidth: "220px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    borderRadius: "18px",
+    padding: "12px 14px",
+    textAlign: "left",
+    cursor: "pointer",
+    background: "linear-gradient(135deg, rgba(236, 245, 255, 0.98) 0%, rgba(255, 239, 246, 0.96) 100%)",
+    boxShadow: "0 10px 20px rgba(52, 84, 120, 0.07)",
+    display: "grid",
+    gap: "4px",
+    color: "#16304d",
+  },
+  discrepancyButtonKicker: {
+    fontSize: "10px",
+    textTransform: "uppercase",
+    letterSpacing: "0.12em",
+    color: "#6c7f95",
+    fontWeight: 800,
+  },
+  discrepancyButtonTitle: {
+    fontSize: "15px",
+    fontWeight: 900,
+    lineHeight: 1.1,
+  },
+  discrepancyButtonMeta: {
+    fontSize: "11px",
+    lineHeight: 1.35,
+    color: "#5d7187",
   },
   heroArt: {
     ...cashStyles.heroArt,

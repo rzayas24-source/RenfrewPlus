@@ -59,6 +59,19 @@ type FavoriteScreen = {
 
 const MAX_FAVORITES = 8;
 const LEGACY_GAZEBO_STORAGE_KEY = "gazebo:favorites";
+const menuSelectionCache = new Map<string, MenuSelectionEntry[]>();
+
+function cloneMenuSelection(selection: MenuSelectionEntry[]) {
+  return selection.map((item) => ({ ...item }));
+}
+
+function readMenuSelectionCache(menuId: string) {
+  return cloneMenuSelection(menuSelectionCache.get(menuId) ?? []);
+}
+
+function writeMenuSelectionCache(menuId: string, selection: MenuSelectionEntry[]) {
+  menuSelectionCache.set(menuId, cloneMenuSelection(selection));
+}
 
 const RIBBON_PASTELS: CSSProperties[] = [
   {
@@ -310,9 +323,9 @@ export function AdminShell({
   const currentScreen = useMemo(() => resolveScreen(location.pathname, appConfig ?? undefined), [location.pathname, appConfig]);
   const [isRibbonOpen, setIsRibbonOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
-  const [gazeboSelection, setGazeboSelection] = useState<MenuSelectionEntry[]>([]);
-  const [isGazeboLoaded, setIsGazeboLoaded] = useState(false);
-  const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>([]);
+  const [gazeboSelection, setGazeboSelection] = useState<MenuSelectionEntry[]>(() => readMenuSelectionCache(GAZEBO_MENU_ID));
+  const [isGazeboLoaded, setIsGazeboLoaded] = useState(() => menuSelectionCache.has(GAZEBO_MENU_ID));
+  const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>(() => readMenuSelectionCache(currentScreen.path));
   const isFavorite = gazeboSelection.some((item) => item.id === currentScreen.path);
   const globalMenuSelection = useMemo(
     () =>
@@ -392,6 +405,8 @@ export function AdminShell({
       }
 
       if (active) {
+        writeMenuSelectionCache(currentScreen.path, nextSelection);
+        writeMenuSelectionCache(GAZEBO_MENU_ID, resolvedGazeboSelection);
         setMenuSelection(nextSelection);
         setGazeboSelection(resolvedGazeboSelection);
         setIsGazeboLoaded(true);
@@ -433,12 +448,15 @@ export function AdminShell({
 
     setFavoriteNotice(null);
     setGazeboSelection(nextSelection);
+    writeMenuSelectionCache(GAZEBO_MENU_ID, nextSelection);
 
     try {
       const savedSelection = await saveMenuSelection(GAZEBO_MENU_ID, nextSelection);
+      writeMenuSelectionCache(GAZEBO_MENU_ID, savedSelection.slice(0, MAX_FAVORITES));
       setGazeboSelection(savedSelection.slice(0, MAX_FAVORITES));
     } catch {
       setGazeboSelection(previousSelection);
+      writeMenuSelectionCache(GAZEBO_MENU_ID, previousSelection);
       setFavoriteNotice("Could not save the gazebo menu.");
     }
   };

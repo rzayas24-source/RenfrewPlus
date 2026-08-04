@@ -11,6 +11,7 @@ export default function CollectionsScreen() {
       ribbonTitle="Collections Menu"
       sidebarCopy="A soft collections console for follow-up, recovery, and receivables work."
       onBack={() => navigate("/")}
+      useGlobalMenuFallback={false}
     >
       <section style={collectionsStyles.content}>
         <section style={collectionsStyles.heroPane}>
@@ -31,26 +32,22 @@ export default function CollectionsScreen() {
           </div>
         </section>
 
-        <section style={collectionsStyles.actionGrid}>
-          <button type="button" onClick={() => navigate("/view-images")} style={collectionsStyles.actionButton}>
-            <span style={collectionsStyles.actionButtonTitle}>Imaging</span>
-            <span style={collectionsStyles.actionButtonGlyph}>&gt;</span>
+        <section style={collectionsStyles.buttonGrid}>
+          <button type="button" onClick={() => navigate("/request")} style={collectionsStyles.menuButton}>
+            <span style={collectionsStyles.menuButtonTitle}>Request</span>
+            <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>
           </button>
-          <button type="button" onClick={() => navigate("/jane-doe")} style={collectionsStyles.actionButton}>
-            <span style={collectionsStyles.actionButtonTitle}>Jane Doe</span>
-            <span style={collectionsStyles.actionButtonGlyph}>&gt;</span>
+          <button type="button" onClick={() => navigate("/statements")} style={collectionsStyles.menuButton}>
+            <span style={collectionsStyles.menuButtonTitle}>Statements</span>
+            <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>
           </button>
-          <button type="button" onClick={() => navigate("/request")} style={collectionsStyles.actionButton}>
-            <span style={collectionsStyles.actionButtonTitle}>Request</span>
-            <span style={collectionsStyles.actionButtonGlyph}>&gt;</span>
+          <button type="button" onClick={() => navigate("/jane-doe")} style={collectionsStyles.menuButton}>
+            <span style={collectionsStyles.menuButtonTitle}>Jane Doe</span>
+            <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>
           </button>
-          <button type="button" onClick={() => navigate("/research")} style={collectionsStyles.actionButton}>
-            <span style={collectionsStyles.actionButtonTitle}>Research</span>
-            <span style={collectionsStyles.actionButtonGlyph}>&gt;</span>
-          </button>
-          <button type="button" onClick={() => navigate("/statements")} style={collectionsStyles.actionButton}>
-            <span style={collectionsStyles.actionButtonTitle}>Statement</span>
-            <span style={collectionsStyles.actionButtonGlyph}>&gt;</span>
+          <button type="button" onClick={() => navigate("/view-images")} style={collectionsStyles.menuButton}>
+            <span style={collectionsStyles.menuButtonTitle}>Imaging</span>
+            <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>
           </button>
         </section>
       </section>
@@ -78,13 +75,12 @@ const collectionsStyles: Record<string, CSSProperties> = {
   heroCard: {
     ...cashStyles.heroStatusCard,
   },
-  actionGrid: {
+  buttonGrid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
     gap: "12px",
   },
-  actionButton: {
-    width: "100%",
+  menuButton: {
     minHeight: "88px",
     padding: "14px 16px",
     borderRadius: "20px",
@@ -99,12 +95,12 @@ const collectionsStyles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     gap: "12px",
   },
-  actionButtonTitle: {
+  menuButtonTitle: {
     fontSize: "15px",
     fontWeight: 900,
     color: "#17324f",
   },
-  actionButtonGlyph: {
+  menuButtonGlyph: {
     width: "26px",
     height: "26px",
     display: "grid",
