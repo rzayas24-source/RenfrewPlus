@@ -35,14 +35,14 @@ def _workflow_root() -> Path:
 def default_config() -> dict[str, Any]:
     workflow_root = Path("..")
     return {
-        "workflow_root": str(workflow_root),
-        "db_path": str(workflow_root / "database.db"),
-        "emails_folder": str(workflow_root / "4.Emails"),
-        "snapshots_folder": str(workflow_root / "snapshots"),
-        "flywire_storage_root": str(workflow_root / "Import_Flywire"),
-        "trn_folder": str(workflow_root / "1.TRN"),
-        "era_folder": str(workflow_root / "2.ERA"),
-        "html_folder": str(workflow_root / "3.HTML"),
+        "workflow_root": workflow_root.as_posix(),
+        "db_path": f"{workflow_root.as_posix()}/database.db",
+        "emails_folder": f"{workflow_root.as_posix()}/4.Emails",
+        "snapshots_folder": f"{workflow_root.as_posix()}/snapshots",
+        "flywire_storage_root": f"{workflow_root.as_posix()}/Import_Flywire",
+        "trn_folder": f"{workflow_root.as_posix()}/1.TRN",
+        "era_folder": f"{workflow_root.as_posix()}/2.ERA",
+        "html_folder": f"{workflow_root.as_posix()}/3.HTML",
         "tooling": {
             "poppler_bins": [
                 "poppler/Library/bin",
@@ -121,9 +121,9 @@ def default_config() -> dict[str, Any]:
                 },
             },
             "sources": {
-                "duplicate_check": "3.HTML\\Renamed",
-                "other_day_html": "3.HTML\\Renamed",
-                "other_day_era": "2.ERA\\Renamed",
+                "duplicate_check": "3.HTML/Renamed",
+                "other_day_html": "3.HTML/Renamed",
+                "other_day_era": "2.ERA/Renamed",
             },
         },
     }

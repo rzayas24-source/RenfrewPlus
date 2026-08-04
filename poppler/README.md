@@ -9,7 +9,7 @@ tools\poppler\Library\bin\pdfinfo.exe
 tools\poppler\Library\bin\pdftoppm.exe
 ```
 
-When you run [`build.ps1`](/C:/Renfrew/Workflow/build.ps1), it will copy this folder to the runtime root as `poppler\`, which is what the snapshot generator now looks for first.
+When you run [`build.py`](../../build.py), it will copy this folder to the runtime root as `poppler\` when a valid bundled Poppler tree is present.
 
 If you already have Poppler packaged somewhere else, you can also use:
 

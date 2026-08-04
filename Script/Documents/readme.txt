@@ -8,7 +8,7 @@ The script is designed to be run manually whenever a new Lockbox file is availab
 Workflow Summary
 Find the Lockbox file
 
-Looks in: \\ren-fs01\users\rzayas\Downloads
+Looks in: the user's Downloads folder or another configured incoming folder
 
 Must start with: SearchResults
 
@@ -46,7 +46,7 @@ LockboxLoad is emptied after a successful load
 
 Archive the file
 
-File is moved to: C:\Renfrew\Workflow\Archive
+File is moved to the configured archive folder
 
 Diagnostics
 
@@ -60,13 +60,13 @@ Pauses so you can read the output
 
 File Locations
 Database:  
-C:\Renfrew\Workflow\database.db
+workflow database path from config
 
 Incoming files:  
-\\ren-fs01\users\rzayas\Downloads
+configured incoming folder
 
 Archive:  
-C:\Renfrew\Workflow\Archive
+configured archive folder
 
 What This Script Prevents
 Duplicate check numbers entering the system
@@ -89,7 +89,7 @@ Press ENTER to close the window
 Notes
 Only .xls files are supported
 
-The script uses absolute paths, so it works from any folder
+The script uses config-driven paths, so it can move with the workflow root
 
 If the staging table is empty, the load is cancelled
 
@@ -172,7 +172,7 @@ This ensures the operator can review diagnostics before the window closes.
 
 📂 Folder Structure
 Code
-C:\Renfrew\2.AVATAR\3_TRN_Bulk_Check\
+configured TRN input folder
     ├── *.txt                ← Incoming TRN files
     ├── Loaded\              ← Archive folder (only for accepted files)
 🗄 Database Structure
@@ -233,7 +233,7 @@ Code
 >>> DUPLICATES FOUND (these were skipped):
       - 826149000008673
       - 826149000082248
-Moved to archive: C:\Renfrew\...\Loaded\TRN_20260608.txt
+Moved to archive: loaded file path under the configured archive folder
 --------------------------------------------------
 Or for a rejected file:
 

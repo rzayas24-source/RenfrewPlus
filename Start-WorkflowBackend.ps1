@@ -10,13 +10,16 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 
+$launcher = Join-Path $root "Start-WorkflowBackend.py"
+$argsToPass = @(
+    $launcher,
+    "--host", $Host,
+    "--port", $Port,
+    "--app-dir", $AppDir
+)
+
 if ($ConfigPath.Trim()) {
-    if ([System.IO.Path]::IsPathRooted($ConfigPath)) {
-        $resolvedConfig = [System.IO.Path]::GetFullPath($ConfigPath)
-    } else {
-        $resolvedConfig = [System.IO.Path]::GetFullPath((Join-Path $root $ConfigPath))
-    }
-    $env:WORKFLOW_CONFIG_PATH = $resolvedConfig
+    $argsToPass += @("--config-path", $ConfigPath)
 }
 
-python -m uvicorn api:app --app-dir $AppDir --host $Host --port $Port
+python @argsToPass

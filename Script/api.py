@@ -1298,14 +1298,16 @@ IMAGING_BALSHEET_LINK_COLUMNS = [
 ]
 
 IMAGING_PDF_TOOL_NAMES = {
-    "pdfinfo": "pdfinfo.exe",
-    "pdftotext": "pdftotext.exe",
-    "pdftohtml": "pdftohtml.exe",
+    "pdfinfo": "pdfinfo",
+    "pdftotext": "pdftotext",
+    "pdftohtml": "pdftohtml",
 }
 
 
 def _poppler_tool_path(tool_name: str) -> str:
     executable = IMAGING_PDF_TOOL_NAMES.get(tool_name, tool_name)
+    if sys.platform.startswith("win") and not executable.lower().endswith(".exe"):
+        executable = f"{executable}.exe"
     candidate = Path(WORKFLOW_ROOT) / "poppler" / "Library" / "bin" / executable
     return str(candidate) if candidate.exists() else executable
 

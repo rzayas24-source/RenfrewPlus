@@ -19,6 +19,12 @@ Example local start command:
 python -m uvicorn api:app --app-dir Script --host 0.0.0.0 --port 8001
 ```
 
+Cross-platform launcher:
+
+```powershell
+python Start-WorkflowBackend.py
+```
+
 Or use the helper script:
 
 ```powershell
@@ -49,7 +55,25 @@ npm run dev
 
 Use `Frontend/.env.example` as a guide if you need a different dev host, port, or API proxy target.
 
+To build the frontend and package optional runtime assets:
+
+```powershell
+python build.py
+```
+
+If you prefer PowerShell on Windows, you can still run:
+
+```powershell
+.\build.ps1
+```
+
 ## Portable Paths
 
-The screens that show source folders now read from config instead of hardcoding `C:\Renfrew\Workflow\...`.
+The screens that show source folders now read from config instead of hardcoding machine-specific absolute paths.
 The snapshot helper also prefers configured or bundled tool paths before falling back to local defaults.
+The repo-level portability playbook lives in [PORTABILITY_PLAYBOOK.md](/C:/Renfrew/Workflow/PORTABILITY_PLAYBOOK.md).
+
+## Windows-Only Pieces
+
+- `Script/site_emaildownloader.py` uses Outlook COM automation, so that downloader only runs on Windows with Outlook installed.
+- The bundled Poppler tree is a Windows convenience copy for PDF rendering; on other systems, provide matching `pdftotext`/`pdftohtml`/`pdfinfo` binaries through config if you want PDF search and snapshots.

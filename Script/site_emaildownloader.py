@@ -21,7 +21,7 @@ WORKFLOW_ROOT = Path(resolve_path(CONFIG, "workflow_root", BASE_DIR.parent, rela
 DOWNLOAD_DIR = Path(resolve_path(CONFIG, "emails_folder", WORKFLOW_ROOT / "4.Emails", relative_to=WORKFLOW_ROOT))
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-OUTLOOK_AVAILABLE = win32com is not None
+OUTLOOK_AVAILABLE = sys.platform.startswith("win") and win32com is not None
 
 
 def normalize_outlook_datetime(dt):

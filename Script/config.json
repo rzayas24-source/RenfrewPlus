@@ -85,9 +85,9 @@
       }
     },
     "sources": {
-      "duplicate_check": "3.HTML\\Renamed",
-      "other_day_html": "3.HTML\\Renamed",
-      "other_day_era": "2.ERA\\Renamed"
+      "duplicate_check": "3.HTML/Renamed",
+      "other_day_html": "3.HTML/Renamed",
+      "other_day_era": "2.ERA/Renamed"
     }
   }
 }
