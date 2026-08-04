@@ -422,7 +422,7 @@ function formatDate(value: string | null) {
     return value;
   }
 
-  return parsed.toLocaleDateString(undefined, {
+  return parsed.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
@@ -430,7 +430,7 @@ function formatDate(value: string | null) {
 }
 
 function formatCurrency(value: number) {
-  return Number(value || 0).toLocaleString(undefined, {
+  return Number(value || 0).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
   });

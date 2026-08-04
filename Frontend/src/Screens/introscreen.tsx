@@ -25,7 +25,7 @@ function formatDay(day: string) {
     return day;
   }
 
-  return parsed.toLocaleDateString(undefined, {
+  return parsed.toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
     day: "numeric",

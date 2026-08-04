@@ -84,7 +84,7 @@ function shiftMmddyyyy(value: string, days: number) {
 }
 
 function formatMoney(value: number) {
-  return value.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return value.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
 function todayMmddyyyy() {

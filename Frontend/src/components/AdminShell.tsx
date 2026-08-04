@@ -42,6 +42,7 @@ type AdminShellProps = {
   hideBackButton?: boolean;
   backButtonFirst?: boolean;
   hideSidebar?: boolean;
+  hideSidebarNavButtons?: boolean;
   hideSidebarBackMenu?: boolean;
   hideSidebarBackStyles?: boolean;
   useGlobalMenuFallback?: boolean;
@@ -93,6 +94,7 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/calendar": { path: "/calendar", label: "Calendar", meta: "Posting day manager" },
   "/cash": { path: "/cash", label: "Cash", meta: "Cash workspace" },
   "/collections": { path: "/collections", label: "Collections", meta: "Collections workspace" },
+  "/jane-doe": { path: "/jane-doe", label: "Jane Doe", meta: "Jane Doe workspace" },
   "/era-convert": { path: "/era-convert", label: "ERA Convert", meta: "ERA workflow" },
   "/html-convert": { path: "/html-convert", label: "HTML Convert", meta: "HTML workflow" },
   "/otherday": { path: "/otherday", label: "Other Day Check", meta: "Missing rows" },
@@ -120,7 +122,9 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/request": { path: "/request", label: "Request", meta: "Request queue" },
   "/research": { path: "/research", label: "Research", meta: "Research tools" },
   "/finance": { path: "/finance", label: "Finance", meta: "Finance tools" },
+  "/misc": { path: "/misc", label: "Misc", meta: "Misc workspace" },
   "/business": { path: "/business", label: "Business", meta: "Business tools" },
+  "/discrepancy": { path: "/discrepancy", label: "Discrepancy", meta: "Discrepancy workspace" },
   "/sites": { path: "/sites", label: "Sites", meta: "Sites browser" },
   "/aux-posting": { path: "/aux-posting", label: "Aux Posting", meta: "Aux posting" },
   "/check-search": { path: "/check-search", label: "Check Search", meta: "Check search" },
@@ -290,6 +294,7 @@ export function AdminShell({
   hideBackButton,
   backButtonFirst,
   hideSidebar,
+  hideSidebarNavButtons,
   hideSidebarBackMenu,
   hideSidebarBackStyles,
   useGlobalMenuFallback = true,
@@ -469,7 +474,7 @@ export function AdminShell({
               </button>
             </div>
 
-            {backButtonFirst && (
+            {!hideSidebarNavButtons && backButtonFirst && (
               <nav style={styles.navStack} aria-label="Admin navigation">
                 {priorityNavItems.map((item) => (
                   <button
@@ -501,7 +506,7 @@ export function AdminShell({
 
             {sidebarTopCard && <div style={styles.sidebarTopCard}>{sidebarTopCard}</div>}
 
-            {!backButtonFirst && (
+            {!hideSidebarNavButtons && !backButtonFirst && (
               <nav style={styles.navStack} aria-label="Admin navigation">
                 {priorityNavItems.map((item) => (
                   <button
@@ -544,7 +549,7 @@ export function AdminShell({
               </div>
             )}
 
-            {remainingNavItems.length > 0 && (
+            {!hideSidebarNavButtons && remainingNavItems.length > 0 && (
               <nav style={styles.navStack} aria-label="Admin navigation more">
                 {remainingNavItems.map((item) => (
                   <button

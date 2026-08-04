@@ -56,7 +56,7 @@ function parseAmount(value: string) {
 }
 
 function formatCurrency(value: number) {
-  return value.toLocaleString(undefined, {
+  return value.toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
   });

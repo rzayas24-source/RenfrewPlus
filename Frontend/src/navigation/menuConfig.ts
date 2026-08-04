@@ -69,6 +69,7 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/calendar", label: "Calendar", meta: "Posting day manager.", kind: "screen", path: "/calendar" },
   { id: "/cash", label: "Cash", meta: "Cash workspace.", kind: "screen", path: "/cash" },
   { id: "/collections", label: "Collections", meta: "Collections workspace.", kind: "screen", path: "/collections" },
+  { id: "/jane-doe", label: "Jane Doe", meta: "Jane Doe workspace.", kind: "screen", path: "/jane-doe" },
   { id: "/era-convert", label: "ERA Convert", meta: "ERA workflow.", kind: "screen", path: "/era-convert" },
   { id: "/html-convert", label: "HTML Convert", meta: "HTML workflow.", kind: "screen", path: "/html-convert" },
   { id: "/otherday", label: "Other Day Check", meta: "Missing rows.", kind: "screen", path: "/otherday" },
@@ -95,7 +96,9 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/request", label: "Request", meta: "Request queue.", kind: "screen", path: "/request" },
   { id: "/research", label: "Research", meta: "Research tools.", kind: "screen", path: "/research" },
   { id: "/finance", label: "Finance", meta: "Finance tools.", kind: "screen", path: "/finance" },
+  { id: "/misc", label: "Misc", meta: "Misc workspace.", kind: "screen", path: "/misc" },
   { id: "/business", label: "Business", meta: "Business tools.", kind: "screen", path: "/business" },
+  { id: "/discrepancy", label: "Discrepancy", meta: "Discrepancy workspace.", kind: "screen", path: "/discrepancy" },
   { id: "/sites", label: "Sites", meta: "Sites browser.", kind: "screen", path: "/sites" },
 ];
 

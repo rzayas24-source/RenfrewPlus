@@ -16,7 +16,7 @@ function formatAmount(value: string) {
   if (!value) return "";
   const parsed = Number(String(value).replace(/,/g, ""));
   if (Number.isNaN(parsed)) return value;
-  return parsed.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return parsed.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
 export default function OtherDayScreen() {
@@ -80,8 +80,8 @@ export default function OtherDayScreen() {
   const missingRows = useMemo(() => data?.missingRows ?? [], [data]);
 
   const todayFilenamesWithMissing = data?.filenamesWithMissing ?? 0;
-  const htmlSourcePath = appConfig?.ui?.sources?.other_day_html ?? "3.HTML\\Renamed";
-  const eraSourcePath = appConfig?.ui?.sources?.other_day_era ?? "2.ERA\\Renamed";
+  const htmlSourcePath = appConfig?.ui?.sources?.other_day_html ?? "3.HTML/Renamed";
+  const eraSourcePath = appConfig?.ui?.sources?.other_day_era ?? "2.ERA/Renamed";
 
   return (
     <AdminShell
@@ -93,11 +93,11 @@ export default function OtherDayScreen() {
           <div style={{ ...adminStyles.sidebarCardLabel, textAlign: "center" }}>Sources</div>
           <div style={{ display: "grid", gap: "10px", marginTop: "8px" }}>
             <div>
-              <div style={{ ...otherDayStyles.sourceLabel, ...otherDayStyles.sourceLabelFirst }}>3.HTML\Renamed</div>
+              <div style={{ ...otherDayStyles.sourceLabel, ...otherDayStyles.sourceLabelFirst }}>3.HTML/Renamed</div>
               <div style={otherDayStyles.sourcePath}>{htmlSourcePath}</div>
             </div>
             <div>
-              <div style={otherDayStyles.sourceLabel}>2.ERA\Renamed</div>
+              <div style={otherDayStyles.sourceLabel}>2.ERA/Renamed</div>
               <div style={otherDayStyles.sourcePath}>{eraSourcePath}</div>
             </div>
           </div>

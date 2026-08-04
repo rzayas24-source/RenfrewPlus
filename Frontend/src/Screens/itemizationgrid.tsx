@@ -152,7 +152,7 @@ function parseAmount(value: unknown) {
 }
 
 function formatAmount(value: unknown) {
-  return parseAmount(value).toLocaleString(undefined, {
+  return parseAmount(value).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
   });

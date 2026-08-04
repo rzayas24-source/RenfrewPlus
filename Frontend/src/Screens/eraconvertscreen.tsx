@@ -67,7 +67,7 @@ function formatAmount(value: string) {
   if (!value) return "";
   const parsed = Number(String(value).replace(/,/g, ""));
   if (Number.isNaN(parsed)) return value;
-  return parsed.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return parsed.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
 function compareChecks(left: string, right: string) {

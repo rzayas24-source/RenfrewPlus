@@ -58,7 +58,7 @@ function parseAmount(value: unknown) {
 }
 
 function formatCurrency(value: unknown) {
-  return parseAmount(value).toLocaleString(undefined, {
+  return parseAmount(value).toLocaleString("en-US", {
     style: "currency",
     currency: "USD",
   });

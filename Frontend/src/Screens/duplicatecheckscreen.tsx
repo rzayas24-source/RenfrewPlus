@@ -16,7 +16,7 @@ function formatAmount(value: string) {
   if (!value) return "";
   const parsed = Number(String(value).replace(/,/g, ""));
   if (Number.isNaN(parsed)) return value;
-  return parsed.toLocaleString(undefined, { style: "currency", currency: "USD" });
+  return parsed.toLocaleString("en-US", { style: "currency", currency: "USD" });
 }
 
 export default function DuplicateCheckScreen() {
@@ -26,7 +26,7 @@ export default function DuplicateCheckScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState(false);
-  const duplicateSourcePath = appConfig?.ui?.sources?.duplicate_check ?? "3.HTML\\Renamed";
+  const duplicateSourcePath = appConfig?.ui?.sources?.duplicate_check ?? "3.HTML/Renamed";
 
   useEffect(() => {
     let active = true;

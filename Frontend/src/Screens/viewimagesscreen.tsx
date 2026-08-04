@@ -994,7 +994,7 @@ export default function ViewImagesScreen() {
 function formatCurrency(value: unknown) {
   const parsed = Number.parseFloat(String(value ?? 0));
   return Number.isFinite(parsed)
-    ? parsed.toLocaleString(undefined, { style: "currency", currency: "USD" })
+    ? parsed.toLocaleString("en-US", { style: "currency", currency: "USD" })
     : "$0.00";
 }
 

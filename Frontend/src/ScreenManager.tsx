@@ -11,7 +11,9 @@ import Itemization from "./Screens/itemization";
 import Keyproof from "./Screens/keyproof";
 import CalendarScreen from "./Screens/calendarscreen";
 import CashScreen from "./Screens/cashscreen";
+import FinanceScreen from "./Screens/financescreen";
 import CollectionsScreen from "./Screens/collectionsscreen";
+import JaneDoeScreen from "./Screens/janedoescreen";
 import ERAConvertScreen from "./Screens/eraconvertscreen";
 import HTMLConvertScreen from "./Screens/htmlconvertscreen";
 import ImportScreen from "./Screens/importscreen";
@@ -40,6 +42,9 @@ import SecurityScreen from "./Screens/securityscreen";
 import PortabilityScreen from "./Screens/portabilityscreen";
 import WorklistEditorScreen from "./Screens/worklisteditor";
 import MiscEditorScreen from "./Screens/miscbuilder";
+import MiscScreen from "./Screens/miscscreen";
+import BusinessScreen from "./Screens/businessscreen";
+import DiscrepancyScreen from "./Screens/discrepancyscreen";
 import SitesScreen from "./Screens/sitescreen";
 import SectionPlaceholderScreen from "./Screens/sectionplaceholderscreen";
 import ViewImagesScreen from "./Screens/viewimagesscreen";
@@ -181,8 +186,10 @@ export default function ScreenManager() {
         <Route path="/admin/users" element={<AdminUserScreen />} />
         <Route path="/calendar" element={<CalendarScreen />} />
         <Route path="/cash" element={<CashScreen />} />
+        <Route path="/finance" element={<FinanceScreen />} />
         <Route path="/aux-posting" element={<SectionPlaceholderScreen title="Aux Posting" description="Aux Posting tools will live here." />} />
         <Route path="/collections" element={<CollectionsScreen />} />
+        <Route path="/jane-doe" element={<JaneDoeScreen />} />
         <Route path="/check-search" element={<SectionPlaceholderScreen title="Check Search" description="Check Search tools will live here." />} />
         <Route path="/view-images" element={<ViewImagesScreen />} />
         <Route path="/era-convert" element={<ERAConvertScreen />} />
@@ -206,13 +213,14 @@ export default function ScreenManager() {
         <Route path="/balsheet/view" element={<Balsheet />} />
         <Route path="/keyproof" element={<Keyproof />} />
         <Route path="/itemization" element={<Itemization />} />
+        <Route path="/misc" element={<MiscScreen />} />
         <Route path="/misc-editor" element={<MiscEditorScreen />} />
         <Route path="/itemstoreview" element={<IntroScreen />} />
         <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
         <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />
         <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />
-        <Route path="/finance" element={<SectionPlaceholderScreen title="Finance" description="Finance tools will live here." />} />
-        <Route path="/business" element={<SectionPlaceholderScreen title="Business" description="Business tools will live here." />} />
+        <Route path="/business" element={<BusinessScreen />} />
+        <Route path="/discrepancy" element={<DiscrepancyScreen />} />
         <Route path="/sites" element={<SitesScreen />} />
       </Routes>
     </BrowserRouter>

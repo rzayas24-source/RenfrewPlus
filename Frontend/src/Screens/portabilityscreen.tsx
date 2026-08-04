@@ -13,6 +13,13 @@ type PortabilityItem = {
   nextStep: string;
 };
 
+type MigrationPhase = {
+  title: string;
+  objective: string;
+  items: string[];
+  doneWhen: string;
+};
+
 const portabilityItems: PortabilityItem[] = [
   {
     area: "Config-driven paths",
@@ -31,6 +38,12 @@ const portabilityItems: PortabilityItem[] = [
     whatItMeans: "The frontend builds cleanly and is separate from the backend runtime.",
     status: "Done",
     nextStep: "Keep the frontend build independent from the backend runtime.",
+  },
+  {
+    area: "Build and startup",
+    whatItMeans: "The build and backend startup paths now have portable Python entrypoints, with PowerShell and bash wrappers kept as convenience layers.",
+    status: "Done",
+    nextStep: "Keep the Python launchers as the canonical path and treat shell wrappers as optional helpers.",
   },
   {
     area: "Browser drafts",
@@ -64,11 +77,62 @@ const portabilityItems: PortabilityItem[] = [
   },
 ];
 
-const migrationPlan = [
-  "Keep config and environment values externalized.",
-  "Keep the backend and frontend separately deployable.",
-  "Reduce browser-held workflow state that should live server-side.",
-  "Define server storage targets for the database and file folders.",
+const migrationPhases: MigrationPhase[] = [
+  {
+    title: "Phase 1: Baseline the laptop",
+    objective: "Make the current work laptop reproducible before we move anything.",
+    items: [
+      "Capture the current config in `Script/config.json`.",
+      "Verify the canonical launch paths still work.",
+      "Record the current database and storage locations.",
+      "Confirm the laptop has a usable backup before changes.",
+    ],
+    doneWhen: "You can rebuild and relaunch without guessing at paths or state.",
+  },
+  {
+    title: "Phase 2: Make storage server-ready",
+    objective: "Move every machine-specific folder into config or environment.",
+    items: [
+      "Keep the database location fully configurable.",
+      "Keep emails, snapshots, imports, and EDI folders externally configurable.",
+      "Decide which folders become server-mounted shares versus local disk.",
+      "Verify paths resolve from config instead of code.",
+    ],
+    doneWhen: "The app can point at a new machine without code edits.",
+  },
+  {
+    title: "Phase 3: Harden auth and sessions",
+    objective: "Make login and access control survive a server move.",
+    items: [
+      "Review the login and role flow in the backend.",
+      "Define idle timeout and session behavior.",
+      "Confirm audit logging expectations for sign-in and role changes.",
+      "Keep the security boundary independent of the laptop trust model.",
+    ],
+    doneWhen: "Auth still behaves correctly after the app is hosted elsewhere.",
+  },
+  {
+    title: "Phase 4: Separate portable core from Windows-only pieces",
+    objective: "Keep the app usable even when Windows-only helpers are absent.",
+    items: [
+      "Keep Outlook COM automation explicitly marked as Windows-only.",
+      "Treat bundled Poppler as a convenience, not a hidden requirement.",
+      "Add capability checks for optional tooling.",
+      "Make the portable core work without the laptop-specific helpers.",
+    ],
+    doneWhen: "The portable path is clear and the exceptions are explicit.",
+  },
+  {
+    title: "Phase 5: Pilot and cut over",
+    objective: "Validate the server with real workflows before switching users.",
+    items: [
+      "Stand up a test server with the same config structure.",
+      "Point the app at server storage and the server database.",
+      "Run login, attachments, snapshots, worklists, and imports end to end.",
+      "Test backup and restore before cutover, then switch daily use.",
+    ],
+    doneWhen: "The server can run the app without depending on the laptop.",
+  },
 ];
 
 const impactItems = [
@@ -77,13 +141,35 @@ const impactItems = [
     detail: "Keyproof and itemization now rely on persisted backend state, which makes the app easier to move later.",
   },
   {
-    title: "Balance check is server-backed",
-    detail: "The review screen now loads saved totals from the backend, so it does not depend on workstation storage.",
+    title: "Build and startup are portable",
+    detail: "The backend and build now have Python entrypoints, so PowerShell and bash wrappers are convenience layers instead of required launch paths.",
   },
   {
-    title: "App score improved without IT changes",
-    detail: "This is an app-owned gain only. The remaining score lift still depends on infrastructure, backup, and storage work.",
+    title: "Windows-only pieces are explicit",
+    detail: "Outlook COM and bundled Windows Poppler are isolated and documented, so they do not hide the rest of the app's portable path.",
   },
+];
+
+const quickWins = [
+  "Keep all folder paths in `Script/config.json`.",
+  "Use `python build.py` and `python Start-WorkflowBackend.py` as the canonical entrypoints.",
+  "Keep PowerShell and bash wrappers as convenience layers only.",
+  "Use explicit `en-US` formatting when the UI expects US dates and currency.",
+  "Keep browser-held workflow state out of `localStorage` when it matters beyond one machine.",
+];
+
+const mediumFixes = [
+  "Push more storage targets into config, especially the database and file shares.",
+  "Keep the backend and frontend separately deployable.",
+  "Add capability checks for optional tooling like Poppler instead of assuming it is always present.",
+  "Keep auth, role checks, and audit logging server-side so they move with the app.",
+  "Add multi-OS build verification when practical.",
+];
+
+const windowsOnlyExceptions = [
+  "Outlook COM automation in `Script/site_emaildownloader.py`.",
+  "Bundled Windows Poppler for PDF rendering on Windows machines.",
+  "PowerShell helper scripts for Windows operators.",
 ];
 
 export default function PortabilityScreen() {
@@ -110,7 +196,7 @@ export default function PortabilityScreen() {
 
   return (
     <AdminShell
-      sidebarCopy="A dev-stage portability plan for keeping the app ready to move to a server later."
+      sidebarCopy="A phased laptop-to-server plan for keeping the app portable without breaking the current work machine."
       sidebarCardLabel="Portability"
       sidebarCardValue={`${score.percent}%`}
       sidebarCardMeta={`${score.done} done, ${score.partial} partial, ${score.need} remaining.`}
@@ -121,11 +207,12 @@ export default function PortabilityScreen() {
     >
       <section style={styles.page}>
         <section style={adminStyles.heroShell}>
-            <div style={adminStyles.heroCopy}>
-              <div style={adminStyles.kicker}>Portability plan</div>
-              <p style={adminStyles.subtitle}>
-              What is already portable, what still needs to be cleaned up in dev, and what to finish before a server move.
-              </p>
+          <div style={adminStyles.heroCopy}>
+            <div style={adminStyles.kicker}>Portability plan</div>
+            <p style={adminStyles.subtitle}>
+              What is already portable, what still needs to be cleaned up in dev, and how to move from the work laptop
+              to a server in phases.
+            </p>
             <div style={styles.heroActions}>
               <button type="button" style={adminStyles.primaryButton} onClick={() => navigate("/admin/security")}>
                 Open Security
@@ -146,7 +233,7 @@ export default function PortabilityScreen() {
               <div style={adminStyles.heroStatusText}>
                 {score.percent}% ready now. The app is portable in shape, and the biggest browser-state issue is now
                 handled in code. Storage, backup, and session hardening still need IT-side planning before a real
-                server cutover.
+                server cutover from the work laptop.
               </div>
             </div>
           </div>
@@ -224,16 +311,27 @@ export default function PortabilityScreen() {
           <div style={styles.cardHeader}>
             <div>
               <div style={adminStyles.sectionKicker}>Portability plan</div>
-              <h2 style={adminStyles.sectionTitle}>4 dev-stage steps to stay portable</h2>
+              <h2 style={adminStyles.sectionTitle}>Migration phases from laptop to server</h2>
             </div>
-            <div style={adminStyles.sectionMeta}>{migrationPlan.length} steps</div>
+            <div style={adminStyles.sectionMeta}>{migrationPhases.length} phases</div>
           </div>
 
-          <ol style={styles.planList}>
-            {migrationPlan.map((step) => (
-              <li key={step}>{step}</li>
+          <div style={styles.phaseGrid}>
+            {migrationPhases.map((phase) => (
+              <article key={phase.title} style={styles.phaseCard}>
+                <div style={styles.phaseTitle}>{phase.title}</div>
+                <div style={styles.phaseObjective}>{phase.objective}</div>
+                <ul style={styles.phaseList}>
+                  {phase.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+                <div style={styles.phaseDoneWhen}>
+                  <strong>Done when:</strong> {phase.doneWhen}
+                </div>
+              </article>
             ))}
-          </ol>
+          </div>
         </section>
 
         <section style={styles.card}>
@@ -256,14 +354,52 @@ export default function PortabilityScreen() {
         <section style={styles.card}>
           <div style={styles.cardHeader}>
             <div>
+              <div style={adminStyles.sectionKicker}>Portability playbook</div>
+              <h2 style={adminStyles.sectionTitle}>What to do next</h2>
+            </div>
+            <div style={adminStyles.sectionMeta}>Repo guidance</div>
+          </div>
+
+          <div style={styles.playbookGrid}>
+            <article style={styles.playbookCard}>
+              <div style={styles.playbookTitle}>Quick wins</div>
+              <ul style={styles.playbookList}>
+                {quickWins.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+            <article style={styles.playbookCard}>
+              <div style={styles.playbookTitle}>Medium fixes</div>
+              <ul style={styles.playbookList}>
+                {mediumFixes.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+            <article style={styles.playbookCard}>
+              <div style={styles.playbookTitle}>Windows-only exceptions</div>
+              <ul style={styles.playbookList}>
+                {windowsOnlyExceptions.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <div>
               <div style={adminStyles.sectionKicker}>Final score</div>
               <h2 style={adminStyles.sectionTitle}>Portability score</h2>
             </div>
           </div>
           <p style={styles.calloutText}>
-            {score.percent}% ready. The app is directionally portable already, but it still needs dev-stage cleanup
-            around server storage mapping, backup planning, and auth/session policy before it should be considered
-            ready for a real server move.
+            {score.percent}% ready. The app is directionally portable already, and the latest work made startup and
+            build paths more portable too. It still needs dev-stage cleanup around server storage mapping, backup
+            planning, and auth/session policy before it should be considered ready for a real server move off the
+            work laptop.
           </p>
         </section>
       </section>
@@ -334,6 +470,43 @@ const styles: Record<string, CSSProperties> = {
     display: "grid",
     gap: "12px",
   },
+  phaseGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+    gap: "12px",
+  },
+  phaseCard: {
+    padding: "14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(145deg, rgba(251,252,254,1) 0%, rgba(241,246,252,0.96) 100%)",
+    display: "grid",
+    gap: "10px",
+  },
+  phaseTitle: {
+    fontSize: "14px",
+    fontWeight: 900,
+    color: "#17324f",
+  },
+  phaseObjective: {
+    fontSize: "12px",
+    lineHeight: 1.5,
+    color: "#536579",
+  },
+  phaseList: {
+    margin: 0,
+    paddingLeft: "18px",
+    display: "grid",
+    gap: "8px",
+    color: "#4c6074",
+    lineHeight: 1.5,
+    fontSize: "13px",
+  },
+  phaseDoneWhen: {
+    fontSize: "12px",
+    lineHeight: 1.55,
+    color: "#405266",
+  },
   itemCard: {
     padding: "14px",
     borderRadius: "18px",
@@ -364,20 +537,37 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.55,
     color: "#405266",
   },
-  planList: {
-    margin: 0,
-    paddingLeft: "18px",
-    display: "grid",
-    gap: "10px",
-    color: "#405266",
-    lineHeight: 1.6,
-    fontSize: "13px",
-    fontWeight: 600,
-  },
   impactList: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
     gap: "12px",
+  },
+  playbookGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "12px",
+  },
+  playbookCard: {
+    padding: "14px",
+    borderRadius: "18px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "linear-gradient(145deg, rgba(251,252,254,1) 0%, rgba(241,246,252,0.96) 100%)",
+    display: "grid",
+    gap: "10px",
+  },
+  playbookTitle: {
+    fontSize: "14px",
+    fontWeight: 900,
+    color: "#17324f",
+  },
+  playbookList: {
+    margin: 0,
+    paddingLeft: "18px",
+    display: "grid",
+    gap: "8px",
+    color: "#4c6074",
+    lineHeight: 1.5,
+    fontSize: "13px",
   },
   impactCard: {
     padding: "14px",
