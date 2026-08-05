@@ -79,9 +79,13 @@ export default function AdminScreen() {
           <span style={styles.actionTitle}>Tables</span>
           <span style={styles.actionMeta}>Browse database tables</span>
         </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/roles")}>
+          <span style={styles.actionTitle}>Roles</span>
+          <span style={styles.actionMeta}>Define screen access</span>
+        </button>
         <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/users")}>
           <span style={styles.actionTitle}>Users</span>
-          <span style={styles.actionMeta}>Manage access control</span>
+          <span style={styles.actionMeta}>Manage signins and passwords</span>
         </button>
         <button type="button" style={styles.actionButton} onClick={() => navigate("/misc-editor")}>
           <span style={styles.actionTitle}>Misc Editor</span>

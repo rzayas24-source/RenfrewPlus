@@ -2346,24 +2346,19 @@ DEFAULT_AUTH_ROLES = [
         "name": "Admin",
         "description": "Full access across screens, settings, and permissions.",
         "permissions": ["*"],
+        "is_system": True,
     },
     {
         "name": "Manager",
-        "description": "Can manage day-to-day operations and shared menus.",
-        "permissions": [
-            "menu.view",
-            "menu.manage",
-            "feature.view",
-            "feature.manage",
-        ],
+        "description": "Can manage day-to-day operations and shared screens.",
+        "permissions": ["/admin", "/business"],
+        "is_system": False,
     },
     {
         "name": "User",
         "description": "Standard access for everyday work.",
-        "permissions": [
-            "menu.view",
-            "feature.view",
-        ],
+        "permissions": ["/cash"],
+        "is_system": False,
     },
 ]
 
@@ -2372,24 +2367,40 @@ def _utc_now_iso() -> str:
     return datetime.utcnow().isoformat(timespec="seconds")
 
 
-def _json_permissions(value) -> str:
+def _normalize_role_permissions(value) -> list[str]:
     if isinstance(value, str):
         text = value.strip()
         if not text:
-            return "[]"
-        try:
-            parsed = json.loads(text)
-        except Exception:
-            parsed = [item.strip() for item in text.split(",") if item.strip()]
-        return json.dumps(parsed)
+            raw_items = []
+        else:
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = [item.strip() for item in text.split(",") if item.strip()]
+            raw_items = parsed if isinstance(parsed, list) else []
+    elif isinstance(value, (list, tuple, set)):
+        raw_items = list(value)
+    elif value is None:
+        raw_items = []
+    else:
+        raw_items = [value]
 
-    if value is None:
-        return "[]"
+    normalized: list[str] = []
+    for item in raw_items:
+        if not isinstance(item, str):
+            continue
+        permission = item.strip()
+        if not permission:
+            continue
+        if permission != "*" and not permission.startswith("/"):
+            continue
+        if permission not in normalized:
+            normalized.append(permission)
+    return normalized
 
-    if isinstance(value, (list, tuple, set)):
-        return json.dumps([str(item).strip() for item in value if str(item).strip()])
 
-    return json.dumps([str(value).strip()])
+def _json_permissions(value) -> str:
+    return json.dumps(_normalize_role_permissions(value))
 
 
 def _hash_password(password: str) -> str:
@@ -2479,25 +2490,40 @@ def ensure_auth_tables(conn=None):
             f'ALTER TABLE {_quote_identifier("users")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
         )
 
-    for role_seed in DEFAULT_AUTH_ROLES:
-        permissions_json = _json_permissions(role_seed["permissions"])
-        existing_role = cur.execute(
-            f'SELECT id FROM {_quote_identifier("roles")} WHERE LOWER({_quote_identifier("name")}) = LOWER(?)',
-            (role_seed["name"],),
-        ).fetchone()
-        if existing_role:
-            continue
-
-        cur.execute(
-            f'INSERT INTO {_quote_identifier("roles")} ({_quote_identifier("name")}, {_quote_identifier("description")}, {_quote_identifier("permissions_json")}, {_quote_identifier("is_system")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, 1, 1, ?, ?)',
-            (
-                role_seed["name"],
-                role_seed["description"],
-                permissions_json,
-                _utc_now_iso(),
-                _utc_now_iso(),
-            ),
-        )
+    role_count = cur.execute(f'SELECT COUNT(*) AS count FROM {_quote_identifier("roles")}').fetchone()
+    if role_count and role_count["count"] == 0:
+        for role_seed in DEFAULT_AUTH_ROLES:
+            permissions_json = _json_permissions(role_seed["permissions"])
+            cur.execute(
+                f'INSERT INTO {_quote_identifier("roles")} ({_quote_identifier("name")}, {_quote_identifier("description")}, {_quote_identifier("permissions_json")}, {_quote_identifier("is_system")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, ?, 1, ?, ?)',
+                (
+                    role_seed["name"],
+                    role_seed["description"],
+                    permissions_json,
+                    1 if role_seed.get("is_system") else 0,
+                    _utc_now_iso(),
+                    _utc_now_iso(),
+                ),
+            )
+    else:
+        admin_seed = next((role_seed for role_seed in DEFAULT_AUTH_ROLES if role_seed["name"].lower() == "admin"), None)
+        if admin_seed is not None:
+            existing_admin = cur.execute(
+                f'SELECT id FROM {_quote_identifier("roles")} WHERE LOWER({_quote_identifier("name")}) = LOWER(?)',
+                (admin_seed["name"],),
+            ).fetchone()
+            if existing_admin is None:
+                cur.execute(
+                    f'INSERT INTO {_quote_identifier("roles")} ({_quote_identifier("name")}, {_quote_identifier("description")}, {_quote_identifier("permissions_json")}, {_quote_identifier("is_system")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, ?, 1, ?, ?)',
+                    (
+                        admin_seed["name"],
+                        admin_seed["description"],
+                        _json_permissions(admin_seed["permissions"]),
+                        1,
+                        _utc_now_iso(),
+                        _utc_now_iso(),
+                    ),
+                )
 
     conn.commit()
 
@@ -2623,11 +2649,7 @@ def _replace_menu_rows(conn, menu_key: str, selection):
 
 
 def _role_row_to_payload(row):
-    permissions = []
-    try:
-        permissions = json.loads(row["permissions_json"] or "[]")
-    except Exception:
-        permissions = []
+    permissions = _normalize_role_permissions(row["permissions_json"] or "[]")
 
     return {
         "id": row["id"],
@@ -8716,6 +8738,47 @@ def update_role(role_id: int, role: dict):
             (role_id,),
         ).fetchone()
         return _role_row_to_payload(updated)
+    finally:
+        conn.close()
+
+
+@app.delete("/auth/roles/{role_id}")
+def delete_role(role_id: int):
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        existing = _fetch_role_or_404(conn, role_id)
+
+        if existing["is_system"]:
+            raise HTTPException(status_code=409, detail="System roles cannot be deleted")
+
+        fallback_role = conn.execute(
+            f"""
+            SELECT *
+            FROM {_quote_identifier("roles")}
+            WHERE {_quote_identifier("id")} != ?
+              AND {_quote_identifier("active")} = 1
+            ORDER BY
+              CASE WHEN LOWER({_quote_identifier("name")}) = 'user' THEN 0 ELSE 1 END,
+              {_quote_identifier("name")} ASC
+            LIMIT 1
+            """,
+            (role_id,),
+        ).fetchone()
+        if fallback_role is None:
+            raise HTTPException(status_code=409, detail="No fallback role is available")
+
+        conn.execute(
+            f'UPDATE {_quote_identifier("users")} SET {_quote_identifier("role_id")} = ? WHERE {_quote_identifier("role_id")} = ?',
+            (fallback_role["id"], role_id),
+        )
+
+        conn.execute(
+            f'DELETE FROM {_quote_identifier("roles")} WHERE id = ?',
+            (role_id,),
+        )
+        conn.commit()
+        return {"ok": True, "reassigned_role_id": fallback_role["id"]}
     finally:
         conn.close()
 

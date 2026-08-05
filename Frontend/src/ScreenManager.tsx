@@ -29,7 +29,9 @@ import Match835Screen from "./Screens/835matchscreen";
 import SiteReviewScreen from "./Screens/sitereviewscreen";
 import SnapshotGeneratorScreen from "./Screens/snapshotgeneratorscreen";
 import MainScreen from "./Screens/mainscreen";
+import SignInScreen from "./Screens/signinscreen";
 import AdminScreen from "./Screens/adminscreen";
+import AdminRolesScreen from "./Screens/adminrolescreen";
 import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
@@ -173,6 +175,7 @@ export default function ScreenManager() {
       <Routes>
         <Route path="/" element={<MainScreen />} />
         <Route path="/home" element={<MainScreen />} />
+        <Route path="/signin" element={<SignInScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
         <Route path="/admin/config" element={<AdminConfigScreen />} />
         <Route path="/admin/hipaa" element={<HipaaScreen />} />
@@ -181,6 +184,7 @@ export default function ScreenManager() {
         <Route path="/admin/dependencies" element={<DependenciesScreen />} />
         <Route path="/admin/schema" element={<SchemaScreen />} />
         <Route path="/admin/auditors" element={<AuditorsScreen />} />
+        <Route path="/admin/roles" element={<AdminRolesScreen />} />
         <Route path="/admin/menus" element={<AdminMenuScreen />} />
         <Route path="/admin/tables" element={<AdminTableScreen />} />
         <Route path="/admin/users" element={<AdminUserScreen />} />

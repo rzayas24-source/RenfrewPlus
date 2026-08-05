@@ -47,6 +47,8 @@ export const createAdminRole = (payload: AdminRolePayload) => axios.post<AdminRo
 export const updateAdminRole = (roleId: number, payload: AdminRolePayload) =>
   axios.put<AdminRole>(`${API_BASE}/auth/roles/${roleId}`, payload);
 
+export const deleteAdminRole = (roleId: number) => axios.delete(`${API_BASE}/auth/roles/${roleId}`);
+
 export const getAdminUsers = () => axios.get<AdminUser[]>(`${API_BASE}/auth/users`);
 
 export const createAdminUser = (payload: AdminUserPayload) => axios.post<AdminUser>(`${API_BASE}/auth/users`, payload);

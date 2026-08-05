@@ -103,6 +103,7 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/admin/config": { path: "/admin/config", label: "Config", meta: "App config editor" },
   "/admin/tables": { path: "/admin/tables", label: "Tables", meta: "Database browser" },
   "/admin/users": { path: "/admin/users", label: "Users", meta: "Access control" },
+  "/admin/roles": { path: "/admin/roles", label: "Roles", meta: "Screen access control" },
   "/admin/menus": { path: "/admin/menus", label: "Menu Builder", meta: "Sidebar navigation" },
   "/calendar": { path: "/calendar", label: "Calendar", meta: "Posting day manager" },
   "/cash": { path: "/cash", label: "Cash", meta: "Cash workspace" },
@@ -310,7 +311,7 @@ export function AdminShell({
   hideSidebarNavButtons,
   hideSidebarBackMenu,
   hideSidebarBackStyles,
-  useGlobalMenuFallback = true,
+  useGlobalMenuFallback = false,
   onBack,
   ribbonTitle = "Favorites",
 }: AdminShellProps) {

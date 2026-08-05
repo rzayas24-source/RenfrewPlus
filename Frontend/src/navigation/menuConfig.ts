@@ -63,6 +63,7 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/admin/dependencies", label: "Dependencies", meta: "Server prerequisites.", kind: "screen", path: "/admin/dependencies" },
   { id: "/admin/schema", label: "Schema", meta: "Database structure map.", kind: "screen", path: "/admin/schema" },
   { id: "/admin/auditors", label: "Auditors", meta: "Technical data sheets.", kind: "screen", path: "/admin/auditors" },
+  { id: "/admin/roles", label: "Roles", meta: "Screen access control.", kind: "screen", path: "/admin/roles" },
   { id: "/admin/tables", label: "Tables", meta: "Database browser.", kind: "screen", path: "/admin/tables" },
   { id: "/admin/users", label: "Users", meta: "Access control.", kind: "screen", path: "/admin/users" },
   { id: "/admin/menus", label: "Menu Builder", meta: "Define sidebar navigation.", kind: "screen", path: "/admin/menus" },

@@ -1,24 +1,16 @@
-﻿import type { CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  createAdminRole,
   createAdminUser,
   getAdminRoles,
   getAdminUsers,
-  updateAdminRole,
   updateAdminUser,
+  type AdminRole,
+  type AdminUser,
 } from "../api/admin_access_api";
-import type { AdminRole, AdminUser } from "../api/admin_access_api";
 import { AdminShell } from "../components/AdminShell";
-import { styles as adminStyles } from './adminscreen';
-
-type RoleFormState = {
-  name: string;
-  description: string;
-  permissionsText: string;
-  active: boolean;
-};
+import { styles as adminStyles } from "./adminscreen";
 
 type UserFormState = {
   signin: string;
@@ -27,13 +19,6 @@ type UserFormState = {
   role_id: string;
   active: boolean;
 };
-
-const emptyRoleForm = (): RoleFormState => ({
-  name: "",
-  description: "",
-  permissionsText: "menu.view, feature.view",
-  active: true,
-});
 
 const emptyUserForm = (roleId = ""): UserFormState => ({
   signin: "",
@@ -47,60 +32,15 @@ export default function AdminUserScreen() {
   const navigate = useNavigate();
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [roleForm, setRoleForm] = useState<RoleFormState>(emptyRoleForm());
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm());
-  const [editingRoleId, setEditingRoleId] = useState<number | null>(null);
   const [editingUserId, setEditingUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    void loadData();
-  }, []);
-
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [rolesResponse, usersResponse] = await Promise.all([getAdminRoles(), getAdminUsers()]);
-      const nextRoles = rolesResponse.data;
-      const nextUsers = usersResponse.data;
-      setRoles(nextRoles);
-      setUsers(nextUsers);
-      setRoleForm((current) => (editingRoleId === null ? current : current));
-      setUserForm((current) =>
-        current.role_id || !nextRoles.length ? current : { ...current, role_id: String(nextRoles[0].id) }
-      );
-      if (!editingRoleId) {
-        setRoleForm(emptyRoleForm());
-      }
-      if (!editingUserId) {
-        setUserForm((current) =>
-          current.role_id ? current : emptyUserForm(nextRoles[0] ? String(nextRoles[0].id) : "")
-        );
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load users and roles");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!userForm.role_id && roles.length) {
-      setUserForm((current) => ({ ...current, role_id: String(roles[0].id) }));
-    }
-  }, [roles, userForm.role_id]);
-
-  const roleStats = useMemo(() => {
-    const active = roles.filter((role) => role.active).length;
-    const system = roles.filter((role) => role.is_system).length;
-    return {
-      total: roles.length,
-      active,
-      system,
-    };
+  const defaultRoleId = useMemo(() => {
+    const preferredRole = roles.find((role) => role.active) ?? roles[0];
+    return preferredRole ? String(preferredRole.id) : "";
   }, [roles]);
 
   const userStats = useMemo(() => {
@@ -112,15 +52,39 @@ export default function AdminUserScreen() {
     };
   }, [users]);
 
-  const startRoleEdit = (role: AdminRole) => {
-    setEditingRoleId(role.id);
-    setRoleForm({
-      name: role.name,
-      description: role.description || "",
-      permissionsText: role.permissions.join(", "),
-      active: role.active,
-    });
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [rolesResponse, usersResponse] = await Promise.all([getAdminRoles(), getAdminUsers()]);
+      const nextRoles = rolesResponse.data;
+      const nextUsers = usersResponse.data;
+      const nextDefaultRole = nextRoles.find((role) => role.active) ?? nextRoles[0] ?? null;
+      const nextDefaultRoleId = nextDefaultRole ? String(nextDefaultRole.id) : "";
+
+      setRoles(nextRoles);
+      setUsers(nextUsers);
+
+      if (editingUserId === null) {
+        setUserForm((current) => (current.role_id ? current : { ...current, role_id: nextDefaultRoleId }));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load users");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  useEffect(() => {
+    void loadData();
+  }, []);
+
+  useEffect(() => {
+    if (!userForm.role_id && defaultRoleId) {
+      setUserForm((current) => (current.role_id ? current : { ...current, role_id: defaultRoleId }));
+    }
+  }, [defaultRoleId, userForm.role_id]);
 
   const startUserEdit = (user: AdminUser) => {
     setEditingUserId(user.id);
@@ -133,50 +97,9 @@ export default function AdminUserScreen() {
     });
   };
 
-  const clearRoleForm = () => {
-    setEditingRoleId(null);
-    setRoleForm(emptyRoleForm());
-  };
-
   const clearUserForm = () => {
     setEditingUserId(null);
-    setUserForm(emptyUserForm(roles[0] ? String(roles[0].id) : ""));
-  };
-
-  const saveRole = async () => {
-    if (!roleForm.name.trim()) {
-      setError("Role name is required");
-      return;
-    }
-
-    setSaving(true);
-    setError(null);
-    try {
-      const permissions = roleForm.permissionsText
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
-
-      const payload = {
-        name: roleForm.name.trim(),
-        description: roleForm.description.trim(),
-        permissions,
-        active: roleForm.active,
-      };
-
-      if (editingRoleId === null) {
-        await createAdminRole(payload);
-      } else {
-        await updateAdminRole(editingRoleId, payload);
-      }
-
-      clearRoleForm();
-      await loadData();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save role");
-    } finally {
-      setSaving(false);
-    }
+    setUserForm(emptyUserForm(defaultRoleId));
   };
 
   const saveUser = async () => {
@@ -185,8 +108,9 @@ export default function AdminUserScreen() {
       return;
     }
 
-    if (!userForm.role_id) {
-      setError("Select a role first");
+    const roleId = userForm.role_id || defaultRoleId;
+    if (!roleId) {
+      setError("Create a role first so users have somewhere to land.");
       return;
     }
 
@@ -197,11 +121,12 @@ export default function AdminUserScreen() {
 
     setSaving(true);
     setError(null);
+
     try {
       const payload = {
         signin: userForm.signin.trim(),
         display_name: userForm.display_name.trim(),
-        role_id: Number(userForm.role_id),
+        role_id: Number(roleId),
         active: userForm.active,
         ...(userForm.password.trim() ? { password: userForm.password } : {}),
       };
@@ -223,23 +148,27 @@ export default function AdminUserScreen() {
 
   return (
     <AdminShell
-      sidebarCopy="Define the people who can sign in, and shape roles into permission groups for the rest of the app."
-      sidebarCardLabel="Roles"
-      sidebarCardValue={loading ? "Loading..." : String(roleStats.total)}
-      sidebarCardMeta={`${roleStats.active} active roles, ${userStats.total} users total.`}
+      sidebarCopy="Manage signins here. Role permissions now live on the Roles screen."
+      sidebarCardLabel="Users"
+      sidebarCardValue={loading ? "Loading..." : String(userStats.total)}
+      sidebarCardMeta={`${userStats.active} active users, ${userStats.inactive} inactive.`}
       onBack={() => navigate("/admin")}
       hideBackButton
-    >      <section style={adminStyles.content}>
+    >
+      <section style={adminStyles.content}>
         <section style={adminStyles.heroShell}>
           <div style={adminStyles.heroCopy}>
-            <div style={adminStyles.kicker}>Users and roles</div>
+            <div style={adminStyles.kicker}>Users</div>
             <p style={adminStyles.subtitle}>
-              Manage signins, passwords, and role-based permissions from the admin area.
+              Manage signins and passwords here. Role access is defined separately in Roles.
             </p>
 
             <div style={adminStyles.heroActions}>
               <button style={adminStyles.secondaryButton} type="button" onClick={() => void loadData()} disabled={saving}>
                 Refresh
+              </button>
+              <button style={adminStyles.primaryButton} type="button" onClick={() => navigate("/admin/roles")}>
+                Manage Roles
               </button>
             </div>
           </div>
@@ -247,12 +176,12 @@ export default function AdminUserScreen() {
           <div style={adminStyles.heroArt}>
             <div style={adminStyles.heroStatusCard}>
               <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>Security</span>
+                <span style={adminStyles.statusPill}>Access</span>
                 <span style={adminStyles.statusDot} />
               </div>
-              <div style={adminStyles.heroStatusTitle}>Access lives here</div>
+              <div style={adminStyles.heroStatusTitle}>Role access lives elsewhere</div>
               <div style={adminStyles.heroStatusText}>
-                Roles drive permissions, and users inherit those permissions from the role they belong to.
+                Users keep their account details here, while screen access is shaped on the Roles screen.
               </div>
             </div>
           </div>
@@ -260,90 +189,23 @@ export default function AdminUserScreen() {
 
         <section style={adminStyles.statsGrid}>
           <article style={adminStyles.statCard}>
-            <div style={adminStyles.statLabel}>Roles</div>
-            <div style={adminStyles.statValue}>{roleStats.total}</div>
-            <div style={adminStyles.statDetail}>{roleStats.active} active, {roleStats.system} system roles.</div>
-          </article>
-          <article style={adminStyles.statCard}>
             <div style={adminStyles.statLabel}>Users</div>
             <div style={adminStyles.statValue}>{userStats.total}</div>
-            <div style={adminStyles.statDetail}>{userStats.active} active, {userStats.inactive} inactive.</div>
+            <div style={adminStyles.statDetail}>All user accounts in the database.</div>
           </article>
           <article style={adminStyles.statCard}>
-            <div style={adminStyles.statLabel}>Menu link</div>
-            <div style={adminStyles.statValue}>Ready</div>
-            <div style={adminStyles.statDetail}>These permissions can later drive the gazebo and menu visibility.</div>
+            <div style={adminStyles.statLabel}>Active</div>
+            <div style={adminStyles.statValue}>{userStats.active}</div>
+            <div style={adminStyles.statDetail}>Currently enabled for sign in.</div>
+          </article>
+          <article style={adminStyles.statCard}>
+            <div style={adminStyles.statLabel}>Inactive</div>
+            <div style={adminStyles.statValue}>{userStats.inactive}</div>
+            <div style={adminStyles.statDetail}>Kept on file, but not available.</div>
           </article>
         </section>
 
-        {error && <div style={accessStyles.errorBanner}>{error}</div>}
-
-        <section style={adminStyles.widgetSection}>
-          <div style={adminStyles.sectionHeader}>
-            <div>
-              <div style={adminStyles.sectionKicker}>Roles</div>
-              <h2 style={adminStyles.sectionTitle}>{editingRoleId ? "Edit role" : "Create a role"}</h2>
-            </div>
-            <div style={adminStyles.sectionMeta}>
-              Use permission keys like `menu.view` or `feature.manage`. Separate them with commas.
-            </div>
-          </div>
-
-          <div style={accessStyles.formGrid}>
-            <label style={accessStyles.field}>
-              <span style={accessStyles.label}>Role name</span>
-              <input
-                type="text"
-                value={roleForm.name}
-                onChange={(event) => setRoleForm((current) => ({ ...current, name: event.target.value }))}
-                style={accessStyles.input}
-                placeholder="Admin"
-              />
-            </label>
-
-            <label style={accessStyles.field}>
-              <span style={accessStyles.label}>Description</span>
-              <input
-                type="text"
-                value={roleForm.description}
-                onChange={(event) => setRoleForm((current) => ({ ...current, description: event.target.value }))}
-                style={accessStyles.input}
-                placeholder="Full access across the app"
-              />
-            </label>
-
-            <label style={accessStyles.fieldFull}>
-              <span style={accessStyles.label}>Permissions</span>
-              <textarea
-                value={roleForm.permissionsText}
-                onChange={(event) => setRoleForm((current) => ({ ...current, permissionsText: event.target.value }))}
-                style={accessStyles.textarea}
-                rows={3}
-                placeholder="menu.view, menu.manage, feature.view"
-              />
-            </label>
-
-            <label style={accessStyles.toggleField}>
-              <input
-                type="checkbox"
-                checked={roleForm.active}
-                onChange={(event) => setRoleForm((current) => ({ ...current, active: event.target.checked }))}
-              />
-              <span>Active</span>
-            </label>
-
-            <div style={accessStyles.actionsRow}>
-              <button type="button" style={adminStyles.primaryButton} onClick={() => void saveRole()} disabled={saving}>
-                {editingRoleId ? "Save Role" : "Add Role"}
-              </button>
-              {editingRoleId !== null && (
-                <button type="button" style={adminStyles.secondaryButton} onClick={clearRoleForm}>
-                  Cancel
-                </button>
-              )}
-            </div>
-          </div>
-        </section>
+        {error && <div style={userStyles.errorBanner}>{error}</div>}
 
         <section style={adminStyles.widgetSection}>
           <div style={adminStyles.sectionHeader}>
@@ -352,61 +214,45 @@ export default function AdminUserScreen() {
               <h2 style={adminStyles.sectionTitle}>{editingUserId ? "Edit user" : "Create a user"}</h2>
             </div>
             <div style={adminStyles.sectionMeta}>
-              Signin and password belong to the user record. The role decides what they can access.
+              Role assignment is handled in Roles. New users will use the default active role until changed there.
             </div>
           </div>
 
-          <div style={accessStyles.formGrid}>
-            <label style={accessStyles.field}>
-              <span style={accessStyles.label}>Signin</span>
+          <div style={userStyles.formGrid}>
+            <label style={userStyles.field}>
+              <span style={userStyles.label}>Signin</span>
               <input
                 type="text"
                 value={userForm.signin}
                 onChange={(event) => setUserForm((current) => ({ ...current, signin: event.target.value }))}
-                style={accessStyles.input}
+                style={userStyles.input}
                 placeholder="jdoe"
               />
             </label>
 
-            <label style={accessStyles.field}>
-              <span style={accessStyles.label}>Display name</span>
+            <label style={userStyles.field}>
+              <span style={userStyles.label}>Display name</span>
               <input
                 type="text"
                 value={userForm.display_name}
                 onChange={(event) => setUserForm((current) => ({ ...current, display_name: event.target.value }))}
-                style={accessStyles.input}
+                style={userStyles.input}
                 placeholder="Jane Doe"
               />
             </label>
 
-            <label style={accessStyles.field}>
-              <span style={accessStyles.label}>Password {editingUserId ? "(optional)" : ""}</span>
+            <label style={userStyles.field}>
+              <span style={userStyles.label}>Password {editingUserId ? "(optional)" : ""}</span>
               <input
                 type="password"
                 value={userForm.password}
                 onChange={(event) => setUserForm((current) => ({ ...current, password: event.target.value }))}
-                style={accessStyles.input}
+                style={userStyles.input}
                 placeholder={editingUserId ? "Leave blank to keep current password" : "Create a password"}
               />
             </label>
 
-            <label style={accessStyles.field}>
-              <span style={accessStyles.label}>Role</span>
-              <select
-                value={userForm.role_id}
-                onChange={(event) => setUserForm((current) => ({ ...current, role_id: event.target.value }))}
-                style={accessStyles.input}
-              >
-                <option value="">Choose a role</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {role.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label style={accessStyles.toggleField}>
+            <label style={userStyles.toggleField}>
               <input
                 type="checkbox"
                 checked={userForm.active}
@@ -415,7 +261,7 @@ export default function AdminUserScreen() {
               <span>Active</span>
             </label>
 
-            <div style={accessStyles.actionsRow}>
+            <div style={userStyles.actionsRow}>
               <button type="button" style={adminStyles.primaryButton} onClick={() => void saveUser()} disabled={saving}>
                 {editingUserId ? "Save User" : "Add User"}
               </button>
@@ -431,89 +277,36 @@ export default function AdminUserScreen() {
         <section style={adminStyles.widgetSection}>
           <div style={adminStyles.sectionHeader}>
             <div>
-              <div style={adminStyles.sectionKicker}>Role list</div>
-              <h2 style={adminStyles.sectionTitle}>Defined roles</h2>
-            </div>
-            <div style={adminStyles.sectionMeta}>{roles.length} role(s) ready for use.</div>
-          </div>
-
-          <div style={accessStyles.tableWrap}>
-            <table style={accessStyles.table}>
-              <thead>
-                <tr>
-                  <th style={accessStyles.th}>Name</th>
-                  <th style={accessStyles.th}>Permissions</th>
-                  <th style={accessStyles.th}>Status</th>
-                  <th style={accessStyles.th}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {roles.map((role) => (
-                  <tr key={role.id} style={role.active ? accessStyles.activeRow : accessStyles.inactiveRow}>
-                    <td style={accessStyles.tdName}>{role.name}</td>
-                    <td style={accessStyles.td}>
-                      <div style={accessStyles.permissionWrap}>
-                        {role.permissions.length ? (
-                          role.permissions.map((permission) => (
-                            <span key={permission} style={accessStyles.permissionChip}>
-                              {permission}
-                            </span>
-                          ))
-                        ) : (
-                          <span style={accessStyles.mutedText}>No permissions defined</span>
-                        )}
-                      </div>
-                    </td>
-                    <td style={accessStyles.td}>
-                      <span style={role.active ? accessStyles.activeBadge : accessStyles.inactiveBadge}>
-                        {role.active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td style={accessStyles.tdActions}>
-                      <button type="button" style={accessStyles.actionButton} onClick={() => startRoleEdit(role)}>
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section style={adminStyles.widgetSection}>
-          <div style={adminStyles.sectionHeader}>
-            <div>
               <div style={adminStyles.sectionKicker}>User list</div>
               <h2 style={adminStyles.sectionTitle}>Defined users</h2>
             </div>
             <div style={adminStyles.sectionMeta}>{users.length} user(s) in the database.</div>
           </div>
 
-          <div style={accessStyles.tableWrap}>
-            <table style={accessStyles.table}>
+          <div style={userStyles.tableWrap}>
+            <table style={userStyles.table}>
               <thead>
                 <tr>
-                  <th style={accessStyles.th}>Signin</th>
-                  <th style={accessStyles.th}>Display name</th>
-                  <th style={accessStyles.th}>Role</th>
-                  <th style={accessStyles.th}>Status</th>
-                  <th style={accessStyles.th}>Actions</th>
+                  <th style={userStyles.th}>Signin</th>
+                  <th style={userStyles.th}>Display name</th>
+                  <th style={userStyles.th}>Role</th>
+                  <th style={userStyles.th}>Status</th>
+                  <th style={userStyles.th}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.id} style={user.active ? accessStyles.activeRow : accessStyles.inactiveRow}>
-                    <td style={accessStyles.tdName}>{user.signin}</td>
-                    <td style={accessStyles.td}>{user.display_name || "â€”"}</td>
-                    <td style={accessStyles.td}>{user.role_name || "Unassigned"}</td>
-                    <td style={accessStyles.td}>
-                      <span style={user.active ? accessStyles.activeBadge : accessStyles.inactiveBadge}>
+                  <tr key={user.id} style={user.active ? userStyles.activeRow : userStyles.inactiveRow}>
+                    <td style={userStyles.tdName}>{user.signin}</td>
+                    <td style={userStyles.td}>{user.display_name || "—"}</td>
+                    <td style={userStyles.td}>{user.role_name || "Unassigned"}</td>
+                    <td style={userStyles.td}>
+                      <span style={user.active ? userStyles.activeBadge : userStyles.inactiveBadge}>
                         {user.active ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td style={accessStyles.tdActions}>
-                      <button type="button" style={accessStyles.actionButton} onClick={() => startUserEdit(user)}>
+                    <td style={userStyles.tdActions}>
+                      <button type="button" style={userStyles.actionButton} onClick={() => startUserEdit(user)}>
                         Edit
                       </button>
                     </td>
@@ -528,7 +321,7 @@ export default function AdminUserScreen() {
   );
 }
 
-const accessStyles: Record<string, CSSProperties> = {
+const userStyles: Record<string, CSSProperties> = {
   errorBanner: {
     padding: "12px 14px",
     borderRadius: "16px",
@@ -547,12 +340,6 @@ const accessStyles: Record<string, CSSProperties> = {
     flexDirection: "column",
     gap: "8px",
   },
-  fieldFull: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    gridColumn: "1 / -1",
-  },
   label: {
     fontSize: "14px",
     fontWeight: 700,
@@ -567,17 +354,6 @@ const accessStyles: Record<string, CSSProperties> = {
     padding: "0 12px",
     fontSize: "15px",
     outline: "none",
-  },
-  textarea: {
-    minHeight: "92px",
-    borderRadius: "12px",
-    border: "1px solid rgba(140, 160, 184, 0.30)",
-    background: "#ffffff",
-    color: "#1f2933",
-    padding: "12px",
-    fontSize: "15px",
-    outline: "none",
-    resize: "vertical",
   },
   toggleField: {
     display: "flex",
@@ -603,7 +379,7 @@ const accessStyles: Record<string, CSSProperties> = {
   table: {
     width: "100%",
     borderCollapse: "collapse",
-    minWidth: "860px",
+    minWidth: "760px",
   },
   th: {
     textAlign: "left",
@@ -672,27 +448,4 @@ const accessStyles: Record<string, CSSProperties> = {
     fontWeight: 700,
     cursor: "pointer",
   },
-  permissionWrap: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "8px",
-  },
-  permissionChip: {
-    display: "inline-flex",
-    alignItems: "center",
-    minHeight: "28px",
-    padding: "0 10px",
-    borderRadius: "999px",
-    background: "rgba(236, 244, 252, 0.95)",
-    border: "1px solid rgba(169, 188, 210, 0.22)",
-    color: "#4c6076",
-    fontSize: "12px",
-    fontWeight: 700,
-  },
-  mutedText: {
-    fontSize: "13px",
-    color: "#65788d",
-  },
 };
-
-

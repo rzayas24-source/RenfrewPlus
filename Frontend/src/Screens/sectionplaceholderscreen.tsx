@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { styles as adminStyles } from "./adminscreen";
-import { WorklistBrandButton } from "../worklist/worklist";
+import { AdminShell, styles as adminStyles } from "../components/AdminShell";
 
 interface SectionPlaceholderScreenProps {
   title: string;
@@ -12,45 +11,18 @@ export default function SectionPlaceholderScreen({ title, description }: Section
   const navigate = useNavigate();
 
   return (
-    <main style={adminStyles.shell}>
-      <div style={adminStyles.glowBlue} />
-      <div style={adminStyles.glowPink} />
-
-      <aside style={adminStyles.sidebar}>
-        <div style={adminStyles.brandWrap}>
-          <WorklistBrandButton style={adminStyles.brandMark} ariaLabel="Open work list from the branding button">
-            <img src="/favicon.svg" alt="" style={adminStyles.brandMarkImage} />
-          </WorklistBrandButton>
-          <div style={adminStyles.brandWomenMark} aria-hidden="true">
-            <img src="/renfrew-gazebo.png" alt="" style={adminStyles.brandWomenImage} />
-          </div>
-        </div>
-
-        <p style={adminStyles.sidebarCopy}>
-          A placeholder workspace for {title.toLowerCase()} is ready to be filled in.
-        </p>
-
-        <nav style={adminStyles.navStack} aria-label={`${title} navigation`}>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/")}>
-            <span style={adminStyles.navButtonLabel}>Home</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-          <button className="sidebar-nav-button" style={adminStyles.navButton} type="button" onClick={() => navigate("/cash")}>
-            <span style={adminStyles.navButtonLabel}>Cash</span>
-            <span className="sidebar-nav-button__glyph" style={adminStyles.navButtonGlyph}>↗</span>
-          </button>
-        </nav>
-
-        <div style={adminStyles.sidebarCard}>
-          <div style={adminStyles.sidebarCardLabel}>Status</div>
-          <div style={adminStyles.sidebarCardValue}>{title}</div>
-          <div style={adminStyles.sidebarCardMeta}>{description}</div>
-        </div>
-      </aside>
-
-      <section style={adminStyles.content}>
-        <section style={adminStyles.heroShell}>
-          <div style={adminStyles.heroCopy}>
+    <AdminShell
+      ribbonTitle={title}
+      sidebarCopy={`A placeholder workspace for ${title.toLowerCase()} is ready to be filled in.`}
+      sidebarCardLabel="Status"
+      sidebarCardValue={title}
+      sidebarCardMeta={description}
+      onBack={() => navigate("/cash")}
+      hideSidebarNavButtons
+    >
+      <section style={placeholderStyles.content}>
+        <section style={placeholderStyles.heroShell}>
+          <div style={placeholderStyles.heroCopy}>
             <div style={adminStyles.kicker}>{title}</div>
             <p style={adminStyles.subtitle}>{description}</p>
             <div style={placeholderStyles.heroActions}>
@@ -74,26 +46,37 @@ export default function SectionPlaceholderScreen({ title, description }: Section
           </div>
         </section>
       </section>
-    </main>
+    </AdminShell>
   );
 }
 
 const placeholderStyles: Record<string, CSSProperties> = {
+  content: {
+    ...adminStyles.content,
+    paddingTop: "8px",
+  },
+  heroShell: {
+    ...adminStyles.heroShell,
+    position: "relative",
+    top: "auto",
+    zIndex: 1,
+    minHeight: "320px",
+    alignItems: "stretch",
+    padding: "28px",
+    gap: "24px",
+    background: "linear-gradient(135deg, rgba(247, 250, 255, 0.98) 0%, rgba(255, 244, 248, 0.94) 100%)",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    boxShadow: "0 26px 60px rgba(52, 84, 120, 0.10)",
+  },
+  heroCopy: {
+    ...adminStyles.heroCopy,
+    maxWidth: "640px",
+  },
   heroActions: {
-    position: "fixed",
-    top: "18px",
-    left: "282px",
-    right: "16px",
-    zIndex: 4,
+    marginTop: "18px",
     display: "flex",
     flexWrap: "wrap",
     gap: "12px",
     alignItems: "center",
-    padding: "10px 14px",
-    borderRadius: "18px",
-    border: "1px solid rgba(140, 160, 184, 0.18)",
-    background: "rgba(255,255,255,0.88)",
-    backdropFilter: "blur(18px)",
-    boxShadow: "0 18px 36px rgba(52, 84, 120, 0.08)",
   },
 };
