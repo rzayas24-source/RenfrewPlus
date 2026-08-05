@@ -1,6 +1,38 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, FormEvent } from "react";
+import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/auth";
 
 export default function SignInScreen() {
+  const navigate = useNavigate();
+  const { currentUser, signIn } = useAuth();
+  const [signin, setSignin] = useState("");
+  const [password, setPassword] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (currentUser) {
+    return <Navigate to="/" replace />;
+  }
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setSaving(true);
+    setError(null);
+
+    try {
+      await signIn({
+        signin,
+        password,
+      });
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <main style={signInStyles.page}>
       <div style={signInStyles.glowOne} />
@@ -8,23 +40,17 @@ export default function SignInScreen() {
 
       <section style={signInStyles.shell}>
         <header style={signInStyles.brandBlock}>
-          <img
-            src="/renfrewplus-banner-tight.png"
-            alt="RenfrewPlus wordmark"
-            style={signInStyles.wordmark}
-          />
-          <p style={signInStyles.tagline}>
-            Sign in to continue into the workflow admin shell.
-          </p>
+          <img src="/renfrewplus-banner-tight.png" alt="RenfrewPlus wordmark" style={signInStyles.wordmark} />
+          <p style={signInStyles.tagline}>Sign in to continue into the workflow admin shell.</p>
         </header>
 
         <section style={signInStyles.card} aria-label="Login credentials">
           <div style={signInStyles.cardHeader}>
             <div style={signInStyles.cardTitle}>Login credentials</div>
-            <div style={signInStyles.cardMeta}>Placeholder only for now.</div>
+            <div style={signInStyles.cardMeta}>Use your signin and password to enter the app.</div>
           </div>
 
-          <form style={signInStyles.form}>
+          <form style={signInStyles.form} onSubmit={(event) => void handleSubmit(event)}>
             <label style={signInStyles.field}>
               <span style={signInStyles.label}>Signin</span>
               <input
@@ -32,6 +58,8 @@ export default function SignInScreen() {
                 autoComplete="username"
                 placeholder="Enter your signin"
                 style={signInStyles.input}
+                value={signin}
+                onChange={(event) => setSignin(event.target.value)}
               />
             </label>
 
@@ -42,11 +70,15 @@ export default function SignInScreen() {
                 autoComplete="current-password"
                 placeholder="Enter your password"
                 style={signInStyles.input}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
               />
             </label>
 
-            <button type="button" style={signInStyles.button} disabled>
-              Sign In
+            {error && <div style={signInStyles.errorBanner}>{error}</div>}
+
+            <button type="submit" style={signInStyles.button} disabled={saving}>
+              {saving ? "Signing in..." : "Sign In"}
             </button>
           </form>
         </section>
@@ -158,6 +190,15 @@ const signInStyles: Record<string, CSSProperties> = {
     color: "#16304d",
     outline: "none",
   },
+  errorBanner: {
+    padding: "12px 14px",
+    borderRadius: "14px",
+    border: "1px solid rgba(224, 107, 107, 0.30)",
+    background: "rgba(255, 237, 237, 0.94)",
+    color: "#a32121",
+    fontSize: "13px",
+    fontWeight: 700,
+  },
   button: {
     marginTop: "6px",
     height: "48px",
@@ -166,7 +207,7 @@ const signInStyles: Record<string, CSSProperties> = {
     background: "linear-gradient(135deg, #dbeeff 0%, #c6ddfb 100%)",
     color: "#15304f",
     fontWeight: 900,
-    cursor: "not-allowed",
-    opacity: 0.8,
+    cursor: "pointer",
+    opacity: 0.98,
   },
 };

@@ -2321,6 +2321,7 @@ AUTH_USER_TABLE_COLUMNS = [
     ("id", "INTEGER PRIMARY KEY"),
     ("signin", "TEXT NOT NULL UNIQUE"),
     ("display_name", "TEXT NOT NULL DEFAULT ''"),
+    ("phone_number", "TEXT NOT NULL DEFAULT ''"),
     ("password_hash", "TEXT NOT NULL"),
     ("role_id", "INTEGER NOT NULL REFERENCES roles(id) ON UPDATE CASCADE ON DELETE RESTRICT"),
     ("active", "INTEGER NOT NULL DEFAULT 1"),
@@ -2668,6 +2669,7 @@ def _user_row_to_payload(row):
         "id": row["id"],
         "signin": row["signin"],
         "display_name": row["display_name"],
+        "phone_number": row["phone_number"],
         "role_id": row["role_id"],
         "role_name": row["role_name"],
         "active": bool(row["active"]),
@@ -2776,6 +2778,7 @@ def _create_user_record(conn, payload: dict):
     password = str(payload.get("password") or "")
     role_id = payload.get("role_id")
     display_name = str(payload.get("display_name") or "").strip()
+    phone_number = str(payload.get("phone_number") or "").strip()
 
     if not signin:
         raise HTTPException(status_code=400, detail="signin is required")
@@ -2793,8 +2796,8 @@ def _create_user_record(conn, payload: dict):
     now = _utc_now_iso()
     cur = conn.cursor()
     cur.execute(
-        f'INSERT INTO {_quote_identifier("users")} ({_quote_identifier("signin")}, {_quote_identifier("display_name")}, {_quote_identifier("password_hash")}, {_quote_identifier("role_id")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        (signin, display_name, password_hash, role_id, 1 if payload.get("active", True) else 0, now, now),
+        f'INSERT INTO {_quote_identifier("users")} ({_quote_identifier("signin")}, {_quote_identifier("display_name")}, {_quote_identifier("phone_number")}, {_quote_identifier("password_hash")}, {_quote_identifier("role_id")}, {_quote_identifier("active")}, {_quote_identifier("created_at")}, {_quote_identifier("updated_at")}) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        (signin, display_name, phone_number, password_hash, role_id, 1 if payload.get("active", True) else 0, now, now),
     )
     return cur.lastrowid
 
@@ -2806,6 +2809,7 @@ def _get_user_by_signin(conn, signin: str):
             u.id,
             u.signin,
             u.display_name,
+            u.phone_number,
             u.password_hash,
             u.role_id,
             u.active,
@@ -8794,6 +8798,7 @@ def list_users():
                 u.id,
                 u.signin,
                 u.display_name,
+                u.phone_number,
                 u.role_id,
                 u.active,
                 u.last_login_at,
@@ -8823,6 +8828,7 @@ def create_user(user: dict):
                 u.id,
                 u.signin,
                 u.display_name,
+                u.phone_number,
                 u.role_id,
                 u.active,
                 u.last_login_at,
@@ -8856,15 +8862,17 @@ def update_user(user_id: int, user: dict):
 
         signin = str(user.get("signin") or existing["signin"]).strip()
         display_name = str(user.get("display_name") or existing["display_name"]).strip()
+        phone_number = str(user.get("phone_number") or existing["phone_number"]).strip()
         role_id = int(user.get("role_id") or existing["role_id"])
         active = 1 if user.get("active", bool(existing["active"])) else 0
 
         _fetch_role_or_404(conn, role_id)
 
-        params = [signin, display_name, role_id, active, _utc_now_iso(), user_id]
+        params = [signin, display_name, phone_number, role_id, active, _utc_now_iso(), user_id]
         update_clause = [
             f'{_quote_identifier("signin")} = ?',
             f'{_quote_identifier("display_name")} = ?',
+            f'{_quote_identifier("phone_number")} = ?',
             f'{_quote_identifier("role_id")} = ?',
             f'{_quote_identifier("active")} = ?',
             f'{_quote_identifier("updated_at")} = ?',
@@ -8937,6 +8945,7 @@ def login(payload: dict):
             "id": user["id"],
             "signin": user["signin"],
             "display_name": user["display_name"],
+            "phone_number": user["phone_number"],
             "role": {
                 "id": user["role_id"],
                 "name": user["role_name"],
@@ -8991,6 +9000,7 @@ def bootstrap_admin(payload: dict):
                 u.id,
                 u.signin,
                 u.display_name,
+                u.phone_number,
                 u.role_id,
                 u.active,
                 u.last_login_at,

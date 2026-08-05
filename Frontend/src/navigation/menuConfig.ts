@@ -56,6 +56,7 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   GAZEBO_MENU_OPTION,
   { id: "/", label: "Main", meta: "Main workspace.", kind: "screen", path: "/" },
   { id: "/admin", label: "Admin", meta: "Admin console.", kind: "screen", path: "/admin" },
+  { id: "/profile", label: "Profile", meta: "User profile.", kind: "screen", path: "/profile" },
   { id: "/admin/config", label: "Config", meta: "App config editor.", kind: "screen", path: "/admin/config" },
   { id: "/admin/hipaa", label: "HIPAA", meta: "HIPAA readiness review.", kind: "screen", path: "/admin/hipaa" },
   { id: "/admin/security", label: "Security", meta: "Auth-side security notes.", kind: "screen", path: "/admin/security" },

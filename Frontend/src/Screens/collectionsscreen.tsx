@@ -37,6 +37,10 @@ export default function CollectionsScreen() {
             <span style={collectionsStyles.menuButtonTitle}>Request</span>
             <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>
           </button>
+          <button type="button" onClick={() => navigate("/research")} style={collectionsStyles.menuButton}>
+            <span style={collectionsStyles.menuButtonTitle}>Research</span>
+            <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>
+          </button>
           <button type="button" onClick={() => navigate("/statements")} style={collectionsStyles.menuButton}>
             <span style={collectionsStyles.menuButtonTitle}>Statements</span>
             <span style={collectionsStyles.menuButtonGlyph}>&gt;</span>

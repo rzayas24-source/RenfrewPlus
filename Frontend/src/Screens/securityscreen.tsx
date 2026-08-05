@@ -44,8 +44,13 @@ const authSteps: AuthStep[] = [
     status: "Done",
   },
   {
+    title: "Profile and password reset flow",
+    detail: "Signed-in users can update their own display name, phone number, and password, while admins can reset passwords from Users.",
+    status: "Done",
+  },
+  {
     title: "Auth boundary isolation",
-    detail: "The next step is to move auth into a dedicated service boundary if we want stronger separation.",
+    detail: "The next step is still to move auth into a dedicated service boundary if we want stronger separation.",
     status: "Partial",
   },
 ];
@@ -106,8 +111,8 @@ export default function SecurityScreen() {
           <div style={adminStyles.heroCopy}>
             <div style={adminStyles.kicker}>Security module</div>
             <p style={adminStyles.subtitle}>
-              Auth-side documentation for signin protocols, SQL safety, password handling, and the isolation path we can
-              own in the app.
+              Auth-side documentation for signin protocols, SQL safety, password handling, profile updates, and the
+              isolation path we can own in the app.
             </p>
             <div style={styles.heroActions}>
               <button type="button" style={adminStyles.primaryButton} onClick={() => navigate("/admin/hipaa")}>
@@ -127,8 +132,9 @@ export default function SecurityScreen() {
               </div>
               <div style={adminStyles.heroStatusTitle}>What we control</div>
               <div style={adminStyles.heroStatusText}>
-                The app team can harden sign-in, isolate the auth flow, parameterize database calls, and document the
-                steps taken. IT still owns the host, network, and identity infrastructure around it.
+                The app team can harden sign-in, isolate the auth flow, parameterize database calls, manage profile
+                updates, and document the steps taken. IT still owns the host, network, and identity infrastructure
+                around it.
               </div>
             </div>
           </div>
@@ -209,6 +215,7 @@ export default function SecurityScreen() {
             <li>Auth endpoints and what each one does.</li>
             <li>The password hashing scheme, salt format, and iteration count.</li>
             <li>SQL parameterization patterns used in auth queries.</li>
+            <li>The profile and password reset flow for signed-in users and admins.</li>
             <li>Lockout, throttling, and session timeout settings.</li>
             <li>Who reviewed and approved the auth boundary design.</li>
           </ul>

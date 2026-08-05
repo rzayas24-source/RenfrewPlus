@@ -1,8 +1,9 @@
 // src/ScreenManager.tsx
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate, useSearchParams } from "react-router-dom";
 
+import { useAuth } from "./auth/auth";
 import AttachmentReviewScreen from "./Screens/attachmentreview";
 import BalanceCheck from "./Screens/balancecheck";
 import Balsheet from "./Screens/balsheet";
@@ -36,6 +37,7 @@ import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
 import AdminConfigScreen from "./Screens/adminconfigscreen";
+import ProfileScreen from "./Screens/profilescreen";
 import HipaaScreen from "./Screens/hipaascreen";
 import DependenciesScreen from "./Screens/dependenciesscreen";
 import AuditorsScreen from "./Screens/auditorsscreen";
@@ -169,63 +171,89 @@ function BalanceCheckScreen() {
   );
 }
 
+function RequireAuth() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <Navigate to="/signin" replace />;
+  }
+
+  return <Outlet />;
+}
+
+function PublicOnly() {
+  const { currentUser } = useAuth();
+
+  if (currentUser) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Outlet />;
+}
+
 export default function ScreenManager() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MainScreen />} />
-        <Route path="/home" element={<MainScreen />} />
-        <Route path="/signin" element={<SignInScreen />} />
-        <Route path="/admin" element={<AdminScreen />} />
-        <Route path="/admin/config" element={<AdminConfigScreen />} />
-        <Route path="/admin/hipaa" element={<HipaaScreen />} />
-        <Route path="/admin/security" element={<SecurityScreen />} />
-        <Route path="/admin/portability" element={<PortabilityScreen />} />
-        <Route path="/admin/dependencies" element={<DependenciesScreen />} />
-        <Route path="/admin/schema" element={<SchemaScreen />} />
-        <Route path="/admin/auditors" element={<AuditorsScreen />} />
-        <Route path="/admin/roles" element={<AdminRolesScreen />} />
-        <Route path="/admin/menus" element={<AdminMenuScreen />} />
-        <Route path="/admin/tables" element={<AdminTableScreen />} />
-        <Route path="/admin/users" element={<AdminUserScreen />} />
-        <Route path="/calendar" element={<CalendarScreen />} />
-        <Route path="/cash" element={<CashScreen />} />
-        <Route path="/finance" element={<FinanceScreen />} />
-        <Route path="/aux-posting" element={<SectionPlaceholderScreen title="Aux Posting" description="Aux Posting tools will live here." />} />
-        <Route path="/collections" element={<CollectionsScreen />} />
-        <Route path="/jane-doe" element={<JaneDoeScreen />} />
-        <Route path="/check-search" element={<SectionPlaceholderScreen title="Check Search" description="Check Search tools will live here." />} />
-        <Route path="/view-images" element={<ViewImagesScreen />} />
-        <Route path="/era-convert" element={<ERAConvertScreen />} />
-        <Route path="/html-convert" element={<HTMLConvertScreen />} />
-        <Route path="/otherday" element={<OtherDayScreen />} />
-        <Route path="/duplicatecheck" element={<DuplicateCheckScreen />} />
-        <Route path="/tools" element={<ToolsScreen />} />
-        <Route path="/import" element={<ImportScreen />} />
-        <Route path="/eft-upload" element={<EFTUploadScreen />} />
-        <Route path="/835-upload" element={<Upload835Screen />} />
-        <Route path="/lockbox-import" element={<LockboxImportScreen />} />
-        <Route path="/banking" element={<BankingScreen />} />
-        <Route path="/835-match" element={<Match835Screen />} />
-        <Route path="/site-review" element={<SiteReviewScreen />} />
-        <Route path="/email-downloader" element={<EmailDownloaderScreen />} />
-        <Route path="/snapshot-generator" element={<SnapshotGeneratorScreen />} />
-        <Route path="/worklist-editor" element={<WorklistEditorScreen />} />
-        <Route path="/attachments" element={<AttachmentReviewScreen />} />
-        <Route path="/balancecheck" element={<BalanceCheckScreen />} />
-        <Route path="/balsheet" element={<Balsheet />} />
-        <Route path="/balsheet/view" element={<Balsheet />} />
-        <Route path="/keyproof" element={<Keyproof />} />
-        <Route path="/itemization" element={<Itemization />} />
-        <Route path="/misc" element={<MiscScreen />} />
-        <Route path="/misc-editor" element={<MiscEditorScreen />} />
-        <Route path="/itemstoreview" element={<IntroScreen />} />
-        <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
-        <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />
-        <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />
-        <Route path="/business" element={<BusinessScreen />} />
-        <Route path="/discrepancy" element={<DiscrepancyScreen />} />
-        <Route path="/sites" element={<SitesScreen />} />
+        <Route element={<PublicOnly />}>
+          <Route path="/signin" element={<SignInScreen />} />
+        </Route>
+
+        <Route element={<RequireAuth />}>
+          <Route path="/" element={<MainScreen />} />
+          <Route path="/home" element={<MainScreen />} />
+          <Route path="/admin" element={<AdminScreen />} />
+          <Route path="/admin/config" element={<AdminConfigScreen />} />
+          <Route path="/admin/hipaa" element={<HipaaScreen />} />
+          <Route path="/admin/security" element={<SecurityScreen />} />
+          <Route path="/admin/portability" element={<PortabilityScreen />} />
+          <Route path="/admin/dependencies" element={<DependenciesScreen />} />
+          <Route path="/admin/schema" element={<SchemaScreen />} />
+          <Route path="/admin/auditors" element={<AuditorsScreen />} />
+          <Route path="/admin/roles" element={<AdminRolesScreen />} />
+          <Route path="/admin/menus" element={<AdminMenuScreen />} />
+          <Route path="/admin/tables" element={<AdminTableScreen />} />
+          <Route path="/admin/users" element={<AdminUserScreen />} />
+          <Route path="/profile" element={<ProfileScreen />} />
+          <Route path="/calendar" element={<CalendarScreen />} />
+          <Route path="/cash" element={<CashScreen />} />
+          <Route path="/finance" element={<FinanceScreen />} />
+          <Route path="/aux-posting" element={<SectionPlaceholderScreen title="Aux Posting" description="Aux Posting tools will live here." />} />
+          <Route path="/collections" element={<CollectionsScreen />} />
+          <Route path="/jane-doe" element={<JaneDoeScreen />} />
+          <Route path="/check-search" element={<SectionPlaceholderScreen title="Check Search" description="Check Search tools will live here." />} />
+          <Route path="/view-images" element={<ViewImagesScreen />} />
+          <Route path="/era-convert" element={<ERAConvertScreen />} />
+          <Route path="/html-convert" element={<HTMLConvertScreen />} />
+          <Route path="/otherday" element={<OtherDayScreen />} />
+          <Route path="/duplicatecheck" element={<DuplicateCheckScreen />} />
+          <Route path="/tools" element={<ToolsScreen />} />
+          <Route path="/import" element={<ImportScreen />} />
+          <Route path="/eft-upload" element={<EFTUploadScreen />} />
+          <Route path="/835-upload" element={<Upload835Screen />} />
+          <Route path="/lockbox-import" element={<LockboxImportScreen />} />
+          <Route path="/banking" element={<BankingScreen />} />
+          <Route path="/835-match" element={<Match835Screen />} />
+          <Route path="/site-review" element={<SiteReviewScreen />} />
+          <Route path="/email-downloader" element={<EmailDownloaderScreen />} />
+          <Route path="/snapshot-generator" element={<SnapshotGeneratorScreen />} />
+          <Route path="/worklist-editor" element={<WorklistEditorScreen />} />
+          <Route path="/attachments" element={<AttachmentReviewScreen />} />
+          <Route path="/balancecheck" element={<BalanceCheckScreen />} />
+          <Route path="/balsheet" element={<Balsheet />} />
+          <Route path="/balsheet/view" element={<Balsheet />} />
+          <Route path="/keyproof" element={<Keyproof />} />
+          <Route path="/itemization" element={<Itemization />} />
+          <Route path="/misc" element={<MiscScreen />} />
+          <Route path="/misc-editor" element={<MiscEditorScreen />} />
+          <Route path="/itemstoreview" element={<IntroScreen />} />
+          <Route path="/statements" element={<SectionPlaceholderScreen title="Statements" description="Statements tools will live here." />} />
+          <Route path="/request" element={<SectionPlaceholderScreen title="Request" description="Request tools will live here." />} />
+          <Route path="/research" element={<SectionPlaceholderScreen title="Research" description="Research tools will live here." />} />
+          <Route path="/business" element={<BusinessScreen />} />
+          <Route path="/discrepancy" element={<DiscrepancyScreen />} />
+          <Route path="/sites" element={<SitesScreen />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );

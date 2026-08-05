@@ -65,9 +65,9 @@ const portabilityItems: PortabilityItem[] = [
   },
   {
     area: "Auth and roles",
-    whatItMeans: "Backend auth exists, but server rollout still needs session, access, and logging policies around it.",
+    whatItMeans: "Backend auth now includes profile updates, password resets, and sign-off, but server rollout still needs session, access, and logging policies around it.",
     status: "Partial",
-    nextStep: "Keep auth isolated enough that later hosting changes do not break login flows.",
+    nextStep: "Keep auth isolated enough that later hosting changes do not break login, profile, or sign-off flows.",
   },
   {
     area: "Monitoring and backup",
@@ -105,6 +105,7 @@ const migrationPhases: MigrationPhase[] = [
     objective: "Make login and access control survive a server move.",
     items: [
       "Review the login and role flow in the backend.",
+      "Keep the profile and password-reset flow aligned with the current auth record.",
       "Define idle timeout and session behavior.",
       "Confirm audit logging expectations for sign-in and role changes.",
       "Keep the security boundary independent of the laptop trust model.",
@@ -396,10 +397,10 @@ export default function PortabilityScreen() {
             </div>
           </div>
           <p style={styles.calloutText}>
-            {score.percent}% ready. The app is directionally portable already, and the latest work made startup and
-            build paths more portable too. It still needs dev-stage cleanup around server storage mapping, backup
-            planning, and auth/session policy before it should be considered ready for a real server move off the
-            work laptop.
+            {score.percent}% ready. The app is directionally portable already, and the latest work made startup,
+            profile, and sign-off paths more portable too. It still needs dev-stage cleanup around server storage
+            mapping, backup planning, and auth/session policy before it should be considered ready for a real server
+            move off the work laptop.
           </p>
         </section>
       </section>

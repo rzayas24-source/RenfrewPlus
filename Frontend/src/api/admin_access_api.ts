@@ -17,12 +17,34 @@ export interface AdminUser {
   id: number;
   signin: string;
   display_name: string;
+  phone_number: string;
   role_id: number;
   role_name: string | null;
   active: boolean;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AuthRole {
+  id: number;
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
+export interface AuthUser {
+  id: number;
+  signin: string;
+  display_name: string;
+  phone_number: string;
+  role: AuthRole;
+  permissions: string[];
+}
+
+export interface LoginPayload {
+  signin: string;
+  password: string;
 }
 
 export interface AdminRolePayload {
@@ -35,10 +57,19 @@ export interface AdminRolePayload {
 export interface AdminUserPayload {
   signin: string;
   display_name?: string;
+  phone_number?: string;
   password?: string;
   role_id: number;
   active?: boolean;
 }
+
+export interface UpdateProfilePayload {
+  display_name?: string;
+  phone_number?: string;
+  password?: string;
+}
+
+export const loginUser = (payload: LoginPayload) => axios.post<AuthUser>(`${API_BASE}/auth/login`, payload);
 
 export const getAdminRoles = () => axios.get<AdminRole[]>(`${API_BASE}/auth/roles`);
 

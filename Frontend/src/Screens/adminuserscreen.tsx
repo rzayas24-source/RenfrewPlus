@@ -15,6 +15,7 @@ import { styles as adminStyles } from "./adminscreen";
 type UserFormState = {
   signin: string;
   display_name: string;
+  phone_number: string;
   password: string;
   role_id: string;
   active: boolean;
@@ -23,6 +24,7 @@ type UserFormState = {
 const emptyUserForm = (roleId = ""): UserFormState => ({
   signin: "",
   display_name: "",
+  phone_number: "",
   password: "",
   role_id: roleId,
   active: true,
@@ -91,6 +93,7 @@ export default function AdminUserScreen() {
     setUserForm({
       signin: user.signin,
       display_name: user.display_name || "",
+      phone_number: user.phone_number || "",
       password: "",
       role_id: String(user.role_id),
       active: user.active,
@@ -126,6 +129,7 @@ export default function AdminUserScreen() {
       const payload = {
         signin: userForm.signin.trim(),
         display_name: userForm.display_name.trim(),
+        phone_number: userForm.phone_number.trim(),
         role_id: Number(roleId),
         active: userForm.active,
         ...(userForm.password.trim() ? { password: userForm.password } : {}),
@@ -242,14 +246,30 @@ export default function AdminUserScreen() {
             </label>
 
             <label style={userStyles.field}>
-              <span style={userStyles.label}>Password {editingUserId ? "(optional)" : ""}</span>
+              <span style={userStyles.label}>Phone number</span>
+              <input
+                type="tel"
+                value={userForm.phone_number}
+                onChange={(event) => setUserForm((current) => ({ ...current, phone_number: event.target.value }))}
+                style={userStyles.input}
+                placeholder="(555) 123-4567"
+              />
+            </label>
+
+            <label style={userStyles.field}>
+              <span style={userStyles.label}>{editingUserId ? "Reset password" : "Password"}</span>
               <input
                 type="password"
                 value={userForm.password}
                 onChange={(event) => setUserForm((current) => ({ ...current, password: event.target.value }))}
                 style={userStyles.input}
-                placeholder={editingUserId ? "Leave blank to keep current password" : "Create a password"}
+                placeholder={editingUserId ? "Enter a new password to reset it" : "Create a password"}
               />
+              {editingUserId && (
+                <div style={userStyles.helpText}>
+                  Leave blank to keep the current password on file.
+                </div>
+              )}
             </label>
 
             <label style={userStyles.toggleField}>
@@ -289,6 +309,7 @@ export default function AdminUserScreen() {
                 <tr>
                   <th style={userStyles.th}>Signin</th>
                   <th style={userStyles.th}>Display name</th>
+                  <th style={userStyles.th}>Phone</th>
                   <th style={userStyles.th}>Role</th>
                   <th style={userStyles.th}>Status</th>
                   <th style={userStyles.th}>Actions</th>
@@ -299,6 +320,7 @@ export default function AdminUserScreen() {
                   <tr key={user.id} style={user.active ? userStyles.activeRow : userStyles.inactiveRow}>
                     <td style={userStyles.tdName}>{user.signin}</td>
                     <td style={userStyles.td}>{user.display_name || "—"}</td>
+                    <td style={userStyles.td}>{user.phone_number || "—"}</td>
                     <td style={userStyles.td}>{user.role_name || "Unassigned"}</td>
                     <td style={userStyles.td}>
                       <span style={user.active ? userStyles.activeBadge : userStyles.inactiveBadge}>
@@ -344,6 +366,11 @@ const userStyles: Record<string, CSSProperties> = {
     fontSize: "14px",
     fontWeight: 700,
     color: "#27405e",
+  },
+  helpText: {
+    fontSize: "12px",
+    lineHeight: 1.45,
+    color: "#5d7186",
   },
   input: {
     height: "44px",

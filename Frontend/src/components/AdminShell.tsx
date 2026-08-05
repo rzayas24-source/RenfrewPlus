@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/auth";
 import { useAppConfig } from "../config/appConfig";
 import type { AppConfig } from "../config/appConfig";
 import { WorklistBrandButton } from "../worklist/worklist";
@@ -100,6 +101,7 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/": { path: "/", label: "Main", meta: "Main workspace" },
   "/home": { path: "/home", label: "Main", meta: "Main workspace" },
   "/admin": { path: "/admin", label: "Admin", meta: "Admin console" },
+  "/profile": { path: "/profile", label: "Profile", meta: "User profile" },
   "/admin/config": { path: "/admin/config", label: "Config", meta: "App config editor" },
   "/admin/tables": { path: "/admin/tables", label: "Tables", meta: "Database browser" },
   "/admin/users": { path: "/admin/users", label: "Users", meta: "Access control" },
@@ -315,18 +317,22 @@ export function AdminShell({
   onBack,
   ribbonTitle = "Favorites",
 }: AdminShellProps) {
+  void sidebarCopy;
   void backLabel;
   void onBack;
   void hideBackButton;
   const location = useLocation();
   const navigate = useNavigate();
   const appConfig = useAppConfig();
+  const { currentUser, signOut } = useAuth();
   const currentScreen = useMemo(() => resolveScreen(location.pathname, appConfig ?? undefined), [location.pathname, appConfig]);
   const [isRibbonOpen, setIsRibbonOpen] = useState(false);
+  const [isSidebarMenuOpen, setIsSidebarMenuOpen] = useState(false);
   const [favoriteNotice, setFavoriteNotice] = useState<string | null>(null);
   const [gazeboSelection, setGazeboSelection] = useState<MenuSelectionEntry[]>(() => readMenuSelectionCache(GAZEBO_MENU_ID));
   const [isGazeboLoaded, setIsGazeboLoaded] = useState(() => menuSelectionCache.has(GAZEBO_MENU_ID));
   const [menuSelection, setMenuSelection] = useState<MenuSelectionEntry[]>(() => readMenuSelectionCache(currentScreen.path));
+  const sidebarMenuRef = useRef<HTMLDivElement | null>(null);
   const isFavorite = gazeboSelection.some((item) => item.id === currentScreen.path);
   const globalMenuSelection = useMemo(
     () =>
@@ -429,6 +435,21 @@ export function AdminShell({
     return () => window.clearTimeout(timer);
   }, [favoriteNotice]);
 
+  useEffect(() => {
+    if (!isSidebarMenuOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (sidebarMenuRef.current && !sidebarMenuRef.current.contains(event.target as Node)) {
+        setIsSidebarMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    return () => window.removeEventListener("pointerdown", handlePointerDown);
+  }, [isSidebarMenuOpen]);
+
   const toggleFavorite = async () => {
     if (!isGazeboLoaded) {
       return;
@@ -462,7 +483,7 @@ export function AdminShell({
     }
   };
 
-  const normalizedSidebarCopy = sidebarCopy?.trim() ?? "";
+  const sidebarIdentity = currentUser?.signin?.trim() ?? "";
 
   return (
     <main
@@ -477,20 +498,63 @@ export function AdminShell({
       {!hideSidebar && (
         <>
           <aside style={styles.sidebar}>
-            <div style={styles.brandWrap}>
-              <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
-                <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
-              </WorklistBrandButton>
-              <button
-                type="button"
-                onClick={() => setIsRibbonOpen((current) => !current)}
-                style={styles.brandWomenMark}
-                aria-label={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
-                aria-expanded={isRibbonOpen}
-                title={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
-              >
-                <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
-              </button>
+            <div style={styles.sidebarHeader}>
+              <div style={styles.brandWrap}>
+                <WorklistBrandButton style={styles.brandMark} ariaLabel="Open work list from the branding button">
+                  <img src="/favicon.svg" alt="" style={styles.brandMarkImage} />
+                </WorklistBrandButton>
+                <button
+                  type="button"
+                  onClick={() => setIsRibbonOpen((current) => !current)}
+                  style={styles.brandWomenMark}
+                  aria-label={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
+                  aria-expanded={isRibbonOpen}
+                  title={isRibbonOpen ? "Close gazebo menu" : "Open gazebo menu"}
+                >
+                  <img src="/renfrew-gazebo.png" alt="" style={styles.brandWomenImage} />
+                </button>
+              </div>
+
+              <div ref={sidebarMenuRef} style={styles.sidebarMenuWrap}>
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarMenuOpen((current) => !current)}
+                  style={styles.sidebarMenuButton}
+                  aria-label="Open profile menu"
+                  aria-expanded={isSidebarMenuOpen}
+                  title="Open profile menu"
+                >
+                  ...
+                </button>
+
+                {isSidebarMenuOpen && (
+                  <div style={styles.sidebarMenuDropdown} role="menu" aria-label="Profile menu">
+                    <button
+                      type="button"
+                      style={styles.sidebarMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setIsSidebarMenuOpen(false);
+                        navigate("/profile");
+                      }}
+                    >
+                      Profile
+                    </button>
+                    <button
+                      type="button"
+                      style={styles.sidebarMenuItem}
+                      role="menuitem"
+                      onClick={() => {
+                        setIsSidebarMenuOpen(false);
+                        signOut();
+                        navigate("/signin");
+                      }}
+                    >
+                      Sign off
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {!hideSidebarNavButtons && backButtonFirst && (
@@ -521,7 +585,7 @@ export function AdminShell({
               </nav>
             )}
 
-            {normalizedSidebarCopy && <p style={styles.sidebarCopy}>{normalizedSidebarCopy}</p>}
+            {sidebarIdentity && <p style={styles.sidebarCopy}>{sidebarIdentity}</p>}
 
             {sidebarTopCard && <div style={styles.sidebarTopCard}>{sidebarTopCard}</div>}
 
@@ -727,13 +791,67 @@ export const styles: Record<string, CSSProperties> = {
     display: "flex",
     flexDirection: "column",
   },
+  sidebarHeader: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "10px",
+    marginBottom: "12px",
+  },
   brandWrap: {
     display: "flex",
     alignItems: "center",
     gap: "10px",
     justifyContent: "flex-start",
+    minWidth: 0,
+    flex: 1,
+  },
+  sidebarMenuWrap: {
+    position: "relative",
+    flexShrink: 0,
+  },
+  sidebarMenuButton: {
+    width: "28px",
+    height: "28px",
+    borderRadius: "999px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.84)",
+    color: "#35506d",
+    fontSize: "16px",
+    fontWeight: 900,
+    lineHeight: 1,
+    cursor: "pointer",
+    boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
+  },
+  sidebarMenuDropdown: {
+    position: "absolute",
+    top: "34px",
+    right: 0,
+    minWidth: "132px",
+    padding: "6px",
+    borderRadius: "16px",
+    border: "1px solid rgba(140, 160, 184, 0.18)",
+    background: "rgba(255,255,255,0.96)",
+    boxShadow: "0 22px 48px rgba(52, 84, 120, 0.14)",
+    display: "grid",
+    gap: "6px",
+    zIndex: 5,
+  },
+  sidebarMenuItem: {
+    height: "38px",
+    border: "0",
+    borderRadius: "12px",
+    background: "rgba(243, 248, 255, 0.96)",
+    color: "#17324f",
+    fontSize: "13px",
+    fontWeight: 800,
+    textAlign: "left",
+    padding: "0 12px",
+    cursor: "pointer",
+  },
+  brandWrapSpacer: {
+    height: "0",
     paddingBottom: "12px",
-    marginBottom: "14px",
     borderBottom: "1px solid rgba(140, 160, 184, 0.18)",
   },
   brandMark: {
@@ -775,10 +893,13 @@ export const styles: Record<string, CSSProperties> = {
     objectPosition: "center",
   },
   sidebarCopy: {
-    margin: "0 0 14px",
-    fontSize: "12px",
-    lineHeight: 1.55,
-    color: "#516579",
+    margin: "0 0 14px 4px",
+    fontFamily: '"Aptos", "Segoe UI", Arial, sans-serif',
+    fontSize: "13px",
+    lineHeight: 1.45,
+    fontWeight: 700,
+    letterSpacing: "0.01em",
+    color: "#35506d",
   },
   sidebarTopCard: {
     marginBottom: "12px",

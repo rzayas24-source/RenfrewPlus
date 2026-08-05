@@ -57,7 +57,8 @@ const sections: Section[] = [
         area: "User accounts",
         requirement: "Every user must have a unique account and password.",
         appStatus: "Done",
-        action: "Backend auth tables and login flow are already in place. Document the authentication path and ensure shared accounts are never used.",
+        action:
+          "Backend auth tables, login flow, profile updates, and password reset paths are already in place. Document the authentication path and ensure shared accounts are never used.",
       },
       {
         area: "Role-based access",
@@ -75,7 +76,7 @@ const sections: Section[] = [
         area: "Session timeout",
         requirement: "Idle sessions should lock out after a defined period.",
         appStatus: "Need to do",
-        action: "Add idle timeout, absolute timeout, and re-authentication for high-risk actions.",
+        action: "Add idle timeout, absolute timeout, and re-authentication for high-risk actions. The new profile screen does not replace session controls.",
       },
     ],
   },
@@ -180,7 +181,7 @@ const mileMarkers: Milestone[] = [
   },
   {
     title: "Backend auth endpoint",
-    detail: "The app already has a server-side login flow that validates signins and passwords.",
+    detail: "The app already has a server-side login flow that validates signins and passwords, plus self-service profile updates and admin password resets.",
     owner: "App team",
     status: "Done",
   },
@@ -210,7 +211,7 @@ const mileMarkers: Milestone[] = [
   },
   {
     title: "Session timeout and re-authentication",
-    detail: "Idle sessions should lock and sensitive actions should require fresh authentication.",
+    detail: "Idle sessions should lock and sensitive actions should require fresh authentication. Profile editing still needs the session controls to be defined separately.",
     owner: "App team",
     status: "Need to do",
   },
