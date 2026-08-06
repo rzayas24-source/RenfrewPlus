@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/auth";
 import { useAppConfig } from "../config/appConfig";
 import { AdminShell } from "../components/AdminShell";
 import {
@@ -39,6 +40,7 @@ function createSelectionEntry(optionId: string, current?: MenuSelectionEntry) {
 
 export default function AdminMenuScreen() {
   const navigate = useNavigate();
+  const { requireFreshAuth } = useAuth();
   const appConfig = useAppConfig();
   const [menuId, setMenuId] = useState<string>("/admin");
   const [selectedEntries, setSelectedEntries] = useState<MenuSelectionEntry[]>([]);
@@ -171,6 +173,11 @@ export default function AdminMenuScreen() {
   };
 
   const clearEverything = async () => {
+    const allowed = await requireFreshAuth();
+    if (!allowed) {
+      return;
+    }
+
     await clearAllMenuSelections();
     setMenuSelections({});
     setSelectedEntries([]);
@@ -178,6 +185,11 @@ export default function AdminMenuScreen() {
   };
 
   const applyChanges = async () => {
+    const allowed = await requireFreshAuth();
+    if (!allowed) {
+      return;
+    }
+
     const savedSelection = await saveMenuSelection(menuId, selectedEntries);
     setMenuSelections((current) => ({ ...current, [menuId]: savedSelection }));
     setSelectedEntries(savedSelection);
@@ -195,10 +207,24 @@ export default function AdminMenuScreen() {
           <button type="button" style={adminStyles.primaryButton} onClick={applyChanges} disabled={!isDirty}>
             {loadingMenus ? "Loading..." : isDirty ? "Apply changes" : "Saved"}
           </button>
-          <button type="button" style={adminStyles.secondaryButton} onClick={clearMenu}>
+          <button
+            type="button"
+            style={adminStyles.secondaryButton}
+            onClick={async () => {
+              const allowed = await requireFreshAuth();
+              if (!allowed) {
+                return;
+              }
+              clearMenu();
+            }}
+          >
             Clear menu
           </button>
-          <button type="button" style={adminStyles.secondaryButton} onClick={clearEverything}>
+          <button
+            type="button"
+            style={adminStyles.secondaryButton}
+            onClick={() => void clearEverything()}
+          >
             Clear all menus
           </button>
         </section>

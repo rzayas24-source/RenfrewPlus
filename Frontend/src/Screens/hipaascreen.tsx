@@ -10,7 +10,9 @@ type CheckItem = {
   area: string;
   requirement: string;
   appStatus: CheckState;
-  action: string;
+  satisfied: string;
+  remaining: string;
+  remainingOwner: "Dev side" | "Server side" | "Shared";
 };
 
 type Section = {
@@ -57,26 +59,33 @@ const sections: Section[] = [
         area: "User accounts",
         requirement: "Every user must have a unique account and password.",
         appStatus: "Done",
-        action:
-          "Backend auth tables, login flow, profile updates, and password reset paths are already in place. Document the authentication path and ensure shared accounts are never used.",
+        satisfied: "Backend auth tables, login flow, profile updates, and password reset paths are already in place.",
+        remaining: "Document the authentication path and keep shared accounts out of use.",
+        remainingOwner: "Shared",
       },
       {
         area: "Role-based access",
         requirement: "Limit users to the minimum necessary access for their job.",
         appStatus: "Partial",
-        action: "Roles exist, but every PHI and financial route still needs server-side permission checks.",
+        satisfied: "Roles exist and are available for access decisions.",
+        remaining: "Every PHI and financial route still needs server-side permission checks.",
+        remainingOwner: "Server side",
       },
       {
         area: "MFA",
         requirement: "Admins and sensitive users should have multi-factor authentication.",
         appStatus: "Need to do",
-        action: "Add MFA for privileged access, especially for any account that can view exports or admin data.",
+        satisfied: "None yet.",
+        remaining: "Add MFA for privileged access, especially for any account that can view exports or admin data.",
+        remainingOwner: "Server side",
       },
       {
         area: "Session timeout",
         requirement: "Idle sessions should lock out after a defined period.",
-        appStatus: "Need to do",
-        action: "Add idle timeout, absolute timeout, and re-authentication for high-risk actions. The new profile screen does not replace session controls.",
+        appStatus: "Partial",
+        satisfied: "Idle timeout and fresh authentication now exist for sensitive admin actions in both the app and backend.",
+        remaining: "Profile editing still needs its own session policy and we still need a longer server-side rollout plan for session governance.",
+        remainingOwner: "Shared",
       },
     ],
   },
@@ -88,25 +97,33 @@ const sections: Section[] = [
         area: "Browser storage",
         requirement: "Sensitive PHI or financial data should not live in localStorage.",
         appStatus: "Done",
-        action: "Sensitive workflow drafts now persist through the backend, which keeps them out of browser storage.",
+        satisfied: "Sensitive workflow drafts now persist through the backend, which keeps them out of browser storage.",
+        remaining: "Keep future drafts and caches server-backed instead of reintroducing localStorage use.",
+        remainingOwner: "Dev side",
       },
       {
         area: "Minimum necessary",
         requirement: "Only show the smallest amount of data needed to do the task.",
         appStatus: "Partial",
-        action: "Split views so users see masked or truncated values unless their role requires full detail.",
+        satisfied: "Some views already hide detail and use role-aware layouts.",
+        remaining: "Split all sensitive views so users only see masked or truncated values unless their role requires full detail.",
+        remainingOwner: "Dev side",
       },
       {
         area: "Encryption at rest",
         requirement: "Databases, exports, and backups should be encrypted.",
         appStatus: "Need to do",
-        action: "Turn on encryption for the database, file shares, backup volume, and any attachment storage.",
+        satisfied: "The app already knows the storage locations and can point at them through config.",
+        remaining: "Turn on encryption for the database, file shares, backup volume, and any attachment storage.",
+        remainingOwner: "Server side",
       },
       {
         area: "Transmission security",
         requirement: "PHI and financial data should only move over secure channels.",
         appStatus: "Need to do",
-        action: "Force HTTPS or private-network TLS for the frontend, backend, and any service calls.",
+        satisfied: "The app can already talk through the backend API and shared shell.",
+        remaining: "Force HTTPS or private-network TLS for the frontend, backend, and any service calls.",
+        remainingOwner: "Server side",
       },
     ],
   },
@@ -118,25 +135,33 @@ const sections: Section[] = [
         area: "Audit logs",
         requirement: "Record logins, reads, edits, exports, deletes, and admin changes.",
         appStatus: "Need to do",
-        action: "Add immutable audit logs with user, action, record, time, and result.",
+        satisfied: "The code now has clear auth and admin boundaries to hook into.",
+        remaining: "Add immutable audit logs with user, action, record, time, and result.",
+        remainingOwner: "Server side",
       },
       {
         area: "Alerting",
         requirement: "Detect repeated failures, unusual exports, and privilege changes.",
         appStatus: "Need to do",
-        action: "Add alerts for suspicious access patterns and admin events.",
+        satisfied: "The app can surface the events once alerting exists.",
+        remaining: "Add alerts for suspicious access patterns and admin events.",
+        remainingOwner: "Server side",
       },
       {
         area: "Review process",
         requirement: "Someone should review logs and exceptions on a schedule.",
         appStatus: "Need to do",
-        action: "Assign a weekly or monthly review and keep evidence of that review.",
+        satisfied: "Nothing formal yet.",
+        remaining: "Assign a weekly or monthly review and keep evidence of that review.",
+        remainingOwner: "Shared",
       },
       {
         area: "Backup recovery",
         requirement: "You must be able to restore the system and data after loss.",
         appStatus: "Partial",
-        action: "Backups exist in practice, but recovery testing and written retention rules still need to be formalized.",
+        satisfied: "Backups exist in practice.",
+        remaining: "Recovery testing and written retention rules still need to be formalized.",
+        remainingOwner: "Server side",
       },
     ],
   },
@@ -148,25 +173,33 @@ const sections: Section[] = [
         area: "Risk analysis",
         requirement: "Perform and document a HIPAA security risk analysis.",
         appStatus: "Need to do",
-        action: "Inventory data flows, threats, and controls, then track remediation items to closure.",
+        satisfied: "The checklist now documents the current controls and gaps.",
+        remaining: "Inventory data flows, threats, and controls, then track remediation items to closure.",
+        remainingOwner: "Shared",
       },
       {
         area: "Workforce training",
         requirement: "Train staff on HIPAA, phishing, and data handling rules.",
         appStatus: "Need to do",
-        action: "Set up onboarding and annual refreshers with proof of completion.",
+        satisfied: "Nothing formal yet.",
+        remaining: "Set up onboarding and annual refreshers with proof of completion.",
+        remainingOwner: "Shared",
       },
       {
         area: "Vendor review",
         requirement: "Make sure any third party touching PHI or financial data is covered by the right agreement.",
         appStatus: "Need to do",
-        action: "Confirm BAAs for PHI and security obligations for any financial-data service providers.",
+        satisfied: "The code now makes it clearer which systems and services touch sensitive data.",
+        remaining: "Confirm BAAs for PHI and security obligations for any financial-data service providers.",
+        remainingOwner: "Shared",
       },
       {
         area: "Retention and disposal",
         requirement: "Keep data only as long as needed and dispose of it securely.",
         appStatus: "Partial",
-        action: "Define retention windows for uploads, drafts, exports, backups, and logs, then automate cleanup.",
+        satisfied: "The app stores key workflow state server-side instead of leaving it in the browser.",
+        remaining: "Define retention windows for uploads, drafts, exports, backups, and logs, then automate cleanup.",
+        remainingOwner: "Server side",
       },
     ],
   },
@@ -211,9 +244,9 @@ const mileMarkers: Milestone[] = [
   },
   {
     title: "Session timeout and re-authentication",
-    detail: "Idle sessions should lock and sensitive actions should require fresh authentication. Profile editing still needs the session controls to be defined separately.",
+    detail: "Idle sessions now lock and sensitive admin actions require fresh authentication in the app and backend. Profile editing still uses its own session policy, and the remaining hardening is split between dev-side UI coverage and server-side policy enforcement.",
     owner: "App team",
-    status: "Need to do",
+    status: "Partial",
   },
   {
     title: "Minimum-necessary views",
@@ -335,7 +368,7 @@ export default function HipaaScreen() {
           </div>
         </section>
 
-        {sections.map((section) => (
+            {sections.map((section) => (
           <section key={section.title} style={styles.sectionCard}>
             <div style={styles.sectionHeader}>
               <div>
@@ -353,9 +386,21 @@ export default function HipaaScreen() {
                       <div style={styles.checkArea}>{item.area}</div>
                       <div style={styles.checkRequirement}>{item.requirement}</div>
                     </div>
-                    <span style={{ ...styles.badge, ...badgeStyles[item.appStatus] }}>{item.appStatus}</span>
+                    <div style={styles.checkMetaWrap}>
+                      <span style={styles.ownerPill}>{item.remainingOwner}</span>
+                      <span style={{ ...styles.badge, ...badgeStyles[item.appStatus] }}>{item.appStatus}</span>
+                    </div>
                   </div>
-                  <div style={styles.checkAction}>{item.action}</div>
+                  <div style={styles.checkActionBlock}>
+                    <div style={styles.checkActionRow}>
+                      <span style={styles.checkActionLabel}>Satisfied</span>
+                      <span style={styles.checkActionText}>{item.satisfied}</span>
+                    </div>
+                    <div style={styles.checkActionRow}>
+                      <span style={styles.checkActionLabel}>Remaining</span>
+                      <span style={styles.checkActionText}>{item.remaining}</span>
+                    </div>
+                  </div>
                 </article>
               ))}
             </div>
@@ -373,7 +418,7 @@ export default function HipaaScreen() {
             <li>Put route-level authorization on every screen that can read or change PHI or financial data.</li>
             <li>Remove sensitive draft data from browser storage and move it to controlled server-side storage.</li>
             <li>Add audit logging for access, edits, exports, deletes, and admin changes.</li>
-            <li>Turn on MFA, session timeout, encryption, and backup recovery testing.</li>
+            <li>Finish server-side session policy, MFA, encryption, and backup recovery testing.</li>
             <li>Finish the written HIPAA risk analysis, retention policy, training, and vendor review.</li>
           </ol>
         </section>
@@ -390,6 +435,8 @@ export default function HipaaScreen() {
             Backend auth is already in place, so the plan is now about documenting it, hardening the surrounding
             controls, and deciding whether we want to split it into a separate boundary later. That lowers the work a
             bit, but it does not replace parameterized SQL, session controls, or audit logging.
+            The app-side lock and re-auth checks now line up with the backend session policy for shared admin
+            actions, while profile editing still keeps a separate session policy.
           </p>
           <ul style={styles.planList}>
             {authImpactSteps.map((item) => (
@@ -523,7 +570,29 @@ const styles: Record<string, CSSProperties> = {
     lineHeight: 1.5,
     color: "#536579",
   },
-  checkAction: {
+  checkMetaWrap: {
+    display: "flex",
+    gap: "8px",
+    alignItems: "flex-start",
+    flexWrap: "wrap",
+    justifyContent: "flex-end",
+  },
+  checkActionBlock: {
+    display: "grid",
+    gap: "10px",
+  },
+  checkActionRow: {
+    display: "grid",
+    gap: "4px",
+  },
+  checkActionLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    fontWeight: 900,
+    color: "#6d7f93",
+  },
+  checkActionText: {
     fontSize: "12px",
     lineHeight: 1.55,
     color: "#405266",

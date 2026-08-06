@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BASE } from "../config/apiBase";
 import type { AppConfig } from "../config/appConfig";
+import "./session_auth";
 
 export async function getAppConfig() {
   const response = await axios.get<AppConfig>(`${API_BASE}/config`);

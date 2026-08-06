@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { API_BASE } from "../config/apiBase";
+import "./session_auth";
 
 export interface AdminRole {
   id: number;
@@ -42,8 +43,19 @@ export interface AuthUser {
   permissions: string[];
 }
 
+export interface AuthLoginResponse extends AuthUser {
+  session_token: string;
+  session_last_activity_at: string;
+  session_last_fresh_auth_at: string;
+  session_expires_at: string;
+}
+
 export interface LoginPayload {
   signin: string;
+  password: string;
+}
+
+export interface ReauthenticatePayload {
   password: string;
 }
 
@@ -69,7 +81,22 @@ export interface UpdateProfilePayload {
   password?: string;
 }
 
-export const loginUser = (payload: LoginPayload) => axios.post<AuthUser>(`${API_BASE}/auth/login`, payload);
+export interface UpdateProfileResponse {
+  id: number;
+  signin: string;
+  display_name: string;
+  phone_number: string;
+  role: AuthRole;
+  permissions: string[];
+}
+
+export const loginUser = (payload: LoginPayload) => axios.post<AuthLoginResponse>(`${API_BASE}/auth/login`, payload);
+
+export const reauthenticateSession = (payload: ReauthenticatePayload) =>
+  axios.post<{ ok: true; session_token: string; session_last_activity_at: string; session_last_fresh_auth_at: string; session_expires_at: string }>(
+    `${API_BASE}/auth/reauthenticate`,
+    payload
+  );
 
 export const getAdminRoles = () => axios.get<AdminRole[]>(`${API_BASE}/auth/roles`);
 
@@ -86,4 +113,7 @@ export const createAdminUser = (payload: AdminUserPayload) => axios.post<AdminUs
 
 export const updateAdminUser = (userId: number, payload: AdminUserPayload) =>
   axios.put<AdminUser>(`${API_BASE}/auth/users/${userId}`, payload);
+
+export const updateCurrentProfile = (payload: UpdateProfilePayload) =>
+  axios.put<UpdateProfileResponse>(`${API_BASE}/auth/profile`, payload);
 

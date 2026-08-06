@@ -59,6 +59,7 @@ type FavoriteScreen = {
 };
 
 const MAX_FAVORITES = 8;
+const SIDEBAR_GAP = "12px";
 const LEGACY_GAZEBO_STORAGE_KEY = "gazebo:favorites";
 const menuSelectionCache = new Map<string, MenuSelectionEntry[]>();
 
@@ -384,8 +385,6 @@ export function AdminShell({
     },
     [appConfig, effectiveMenuSelection, hiddenNavItemSet, hideSidebarBackMenu, hideSidebarBackStyles, navigate, priorityNavItemIds]
   );
-  const priorityNavItems = navItems.slice(0, 2);
-  const remainingNavItems = navItems.slice(2);
   useEffect(() => {
     let active = true;
 
@@ -559,7 +558,7 @@ export function AdminShell({
 
             {!hideSidebarNavButtons && backButtonFirst && (
               <nav style={styles.navStack} aria-label="Admin navigation">
-                {priorityNavItems.map((item) => (
+                {navItems.map((item) => (
                   <button
                     key={item.label}
                     className="sidebar-nav-button"
@@ -591,7 +590,7 @@ export function AdminShell({
 
             {!hideSidebarNavButtons && !backButtonFirst && (
               <nav style={styles.navStack} aria-label="Admin navigation">
-                {priorityNavItems.map((item) => (
+                {navItems.map((item) => (
                   <button
                     key={item.label}
                     className="sidebar-nav-button"
@@ -630,34 +629,6 @@ export function AdminShell({
                   </button>
                 ))}
               </div>
-            )}
-
-            {!hideSidebarNavButtons && remainingNavItems.length > 0 && (
-              <nav style={styles.navStack} aria-label="Admin navigation more">
-                {remainingNavItems.map((item) => (
-                  <button
-                    key={item.label}
-                    className="sidebar-nav-button"
-                    style={{
-                      ...styles.navButton,
-                      ...(item.isBackStyle ? styles.navButtonBack : null),
-                    }}
-                    type="button"
-                    onClick={item.onClick}
-                  >
-                    <span style={styles.navButtonLabel}>{item.label}</span>
-                    <span
-                      className="sidebar-nav-button__glyph"
-                      style={{
-                        ...styles.navButtonGlyph,
-                        ...(item.isBackStyle ? styles.navButtonBackGlyph : null),
-                      }}
-                    >
-                      {item.glyph ?? ">"}
-                    </span>
-                  </button>
-                ))}
-              </nav>
             )}
 
             {(sidebarCardLabel || sidebarCardValue || sidebarCardMeta) && (
@@ -893,7 +864,7 @@ export const styles: Record<string, CSSProperties> = {
     objectPosition: "center",
   },
   sidebarCopy: {
-    margin: "0 0 14px 4px",
+    margin: `0 0 ${SIDEBAR_GAP} 4px`,
     fontFamily: '"Aptos", "Segoe UI", Arial, sans-serif',
     fontSize: "13px",
     lineHeight: 1.45,
@@ -902,7 +873,7 @@ export const styles: Record<string, CSSProperties> = {
     color: "#35506d",
   },
   sidebarTopCard: {
-    marginBottom: "12px",
+    marginBottom: SIDEBAR_GAP,
     marginTop: "0",
     padding: "16px",
     borderRadius: "20px",
@@ -910,12 +881,12 @@ export const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(176, 194, 218, 0.22)",
   },
   sidebarAction: {
-    marginBottom: "12px",
+    marginBottom: SIDEBAR_GAP,
   },
   sidebarRibbon: {
     display: "grid",
-    gap: "10px",
-    marginBottom: "12px",
+    gap: SIDEBAR_GAP,
+    marginBottom: SIDEBAR_GAP,
   },
   sidebarRibbonButton: {
     width: "100%",
@@ -942,8 +913,8 @@ export const styles: Record<string, CSSProperties> = {
   sidebarFooter: {
     marginTop: "auto",
     display: "grid",
-    gap: "8px",
-    paddingTop: "12px",
+    gap: SIDEBAR_GAP,
+    paddingTop: SIDEBAR_GAP,
   },
   favoriteToggle: {
     width: "40px",
@@ -984,7 +955,7 @@ export const styles: Record<string, CSSProperties> = {
   },
   navStack: {
     display: "grid",
-    gap: "10px",
+    gap: SIDEBAR_GAP,
   },
   navButton: {
     height: "46px",

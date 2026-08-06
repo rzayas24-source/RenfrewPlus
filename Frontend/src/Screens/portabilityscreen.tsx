@@ -65,9 +65,11 @@ const portabilityItems: PortabilityItem[] = [
   },
   {
     area: "Auth and roles",
-    whatItMeans: "Backend auth now includes profile updates, password resets, and sign-off, but server rollout still needs session, access, and logging policies around it.",
+    whatItMeans:
+      "Backend auth now includes profile updates, password resets, sign-off, idle lockout, and fresh-auth checks for sensitive admin writes, with server-side session validation now in place for the shared admin shell.",
     status: "Partial",
-    nextStep: "Keep auth isolated enough that later hosting changes do not break login, profile, or sign-off flows.",
+    nextStep:
+      "Keep auth isolated enough that later hosting changes do not break login, profile, sign-off, or the session control flows.",
   },
   {
     area: "Monitoring and backup",
@@ -106,7 +108,7 @@ const migrationPhases: MigrationPhase[] = [
     items: [
       "Review the login and role flow in the backend.",
       "Keep the profile and password-reset flow aligned with the current auth record.",
-      "Define idle timeout and session behavior.",
+      "Validate idle timeout and sensitive-action reauthentication.",
       "Confirm audit logging expectations for sign-in and role changes.",
       "Keep the security boundary independent of the laptop trust model.",
     ],
@@ -173,8 +175,18 @@ const windowsOnlyExceptions = [
   "PowerShell helper scripts for Windows operators.",
 ];
 
+const vpnReadinessPlan = [
+  "Confirm whether Codex is running locally on the laptop, on a remote host, or through a remote connection before debugging VPN issues.",
+  "Separate `localhost` checks from external-network checks. A passing local test does not prove the VPN path is healthy.",
+  "After connecting the VPN, wait for the route and DNS state to settle before testing again.",
+  "Verify whether the VPN preserves access to the backend port, required external APIs, and any SSH or remote-host connection used by Codex.",
+  "If the VPN changes behavior after initial connect, document the exact delay, hostname, port, and failure mode so we can reproduce it on demand.",
+  "Prefer split tunneling or an allowlist for the minimum hosts Codex needs when the VPN is required for development.",
+];
+
 export default function PortabilityScreen() {
   const navigate = useNavigate();
+  const playbookSectionId = "portability-playbook";
 
   const score = useMemo(() => {
     const totals = { done: 0, partial: 0, need: 0 };
@@ -194,6 +206,10 @@ export default function PortabilityScreen() {
   }, []);
 
   const scoreLabel = score.percent >= 80 ? "Strong" : score.percent >= 60 ? "Moderate" : "Needs work";
+
+  const openPlaybook = () => {
+    document.getElementById(playbookSectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
     <AdminShell
@@ -221,6 +237,9 @@ export default function PortabilityScreen() {
               <button type="button" style={adminStyles.secondaryButton} onClick={() => navigate("/admin/hipaa")}>
                 Open HIPAA
               </button>
+              <button type="button" style={adminStyles.secondaryButton} onClick={openPlaybook}>
+                Open Playbook
+              </button>
             </div>
           </div>
 
@@ -233,8 +252,8 @@ export default function PortabilityScreen() {
               <div style={adminStyles.heroStatusTitle}>Readiness score</div>
               <div style={adminStyles.heroStatusText}>
                 {score.percent}% ready now. The app is portable in shape, and the biggest browser-state issue is now
-                handled in code. Storage, backup, and session hardening still need IT-side planning before a real
-                server cutover from the work laptop.
+                handled in code. Storage, backup, and the broader auth/session rollout still need IT-side planning
+                before a real server cutover from the work laptop.
               </div>
             </div>
           </div>
@@ -352,7 +371,7 @@ export default function PortabilityScreen() {
           </div>
         </section>
 
-        <section style={styles.card}>
+        <section id={playbookSectionId} style={styles.card}>
           <div style={styles.cardHeader}>
             <div>
               <div style={adminStyles.sectionKicker}>Portability playbook</div>
@@ -392,15 +411,33 @@ export default function PortabilityScreen() {
         <section style={styles.card}>
           <div style={styles.cardHeader}>
             <div>
+              <div style={adminStyles.sectionKicker}>VPN readiness</div>
+              <h2 style={adminStyles.sectionTitle}>Codex on VPN</h2>
+            </div>
+            <div style={adminStyles.sectionMeta}>Development checklist</div>
+          </div>
+          <div style={styles.playbookCard}>
+            <div style={styles.playbookTitle}>VPN readiness plan</div>
+            <ul style={styles.playbookList}>
+              {vpnReadinessPlan.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <div>
               <div style={adminStyles.sectionKicker}>Final score</div>
               <h2 style={adminStyles.sectionTitle}>Portability score</h2>
             </div>
           </div>
           <p style={styles.calloutText}>
             {score.percent}% ready. The app is directionally portable already, and the latest work made startup,
-            profile, and sign-off paths more portable too. It still needs dev-stage cleanup around server storage
-            mapping, backup planning, and auth/session policy before it should be considered ready for a real server
-            move off the work laptop.
+            profile, sign-off, and session-control paths more portable too. It still needs dev-stage cleanup around
+            server storage mapping, backup planning, and the remaining auth/session rollout before it should be
+            considered ready for a real server move off the work laptop.
           </p>
         </section>
       </section>

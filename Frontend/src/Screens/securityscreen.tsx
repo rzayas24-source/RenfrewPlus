@@ -45,8 +45,15 @@ const authSteps: AuthStep[] = [
   },
   {
     title: "Profile and password reset flow",
-    detail: "Signed-in users can update their own display name, phone number, and password, while admins can reset passwords from Users.",
+    detail:
+      "Signed-in users can update their own display name, phone number, and password, while admins can reset passwords from Users.",
     status: "Done",
+  },
+  {
+    title: "Session timeout and fresh auth",
+    detail:
+      "Idle sessions now lock out, and sensitive admin writes require the signed-in user to re-enter their password before continuing. Profile editing still needs its own separate session policy.",
+    status: "Partial",
   },
   {
     title: "Auth boundary isolation",
@@ -125,19 +132,19 @@ export default function SecurityScreen() {
           </div>
 
           <div style={adminStyles.heroArt}>
-            <div style={adminStyles.heroStatusCard}>
-              <div style={adminStyles.heroStatusTop}>
-                <span style={adminStyles.statusPill}>Auth boundary</span>
-                <span style={adminStyles.statusDot} />
-              </div>
-              <div style={adminStyles.heroStatusTitle}>What we control</div>
-              <div style={adminStyles.heroStatusText}>
-                The app team can harden sign-in, isolate the auth flow, parameterize database calls, manage profile
-                updates, and document the steps taken. IT still owns the host, network, and identity infrastructure
-                around it.
+              <div style={adminStyles.heroStatusCard}>
+                <div style={adminStyles.heroStatusTop}>
+                  <span style={adminStyles.statusPill}>Auth boundary</span>
+                  <span style={adminStyles.statusDot} />
+                </div>
+                <div style={adminStyles.heroStatusTitle}>What we control</div>
+                <div style={adminStyles.heroStatusText}>
+                 The app team can harden sign-in, isolate the auth flow, parameterize database calls, manage profile
+                 updates, and apply session locks and re-auth checks in both the client and backend. IT still owns the
+                 host, network, and identity infrastructure around it.
+                </div>
               </div>
             </div>
-          </div>
         </section>
 
         <section style={styles.summaryGrid}>
@@ -216,7 +223,7 @@ export default function SecurityScreen() {
             <li>The password hashing scheme, salt format, and iteration count.</li>
             <li>SQL parameterization patterns used in auth queries.</li>
             <li>The profile and password reset flow for signed-in users and admins.</li>
-            <li>Lockout, throttling, and session timeout settings.</li>
+            <li>Lockout, throttling, session timeout, fresh-auth settings, and backend session validation.</li>
             <li>Who reviewed and approved the auth boundary design.</li>
           </ul>
         </section>

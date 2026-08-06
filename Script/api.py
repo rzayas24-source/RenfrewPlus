@@ -14,7 +14,7 @@ import hmac
 import secrets
 from functools import lru_cache
 from io import BytesIO, StringIO
-from datetime import datetime
+from datetime import datetime, timedelta
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import quote
@@ -179,9 +179,16 @@ def get_config():
 
 
 @app.put("/config")
-def put_config(payload: dict):
+def put_config(request: Request, payload: dict):
     if not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="Config payload must be an object.")
+
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=True)
+    finally:
+        conn.close()
 
     saved = save_config(payload)
     refresh_runtime_config(saved)
@@ -2330,6 +2337,21 @@ AUTH_USER_TABLE_COLUMNS = [
     ("updated_at", "TEXT NOT NULL"),
 ]
 
+AUTH_SESSION_TABLE_COLUMNS = [
+    ("session_token", "TEXT PRIMARY KEY"),
+    ("user_id", "INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE"),
+    ("created_at", "TEXT NOT NULL"),
+    ("last_activity_at", "TEXT NOT NULL"),
+    ("last_fresh_auth_at", "TEXT NOT NULL"),
+    ("expires_at", "TEXT NOT NULL"),
+    ("revoked_at", "TEXT"),
+    ("revocation_reason", "TEXT"),
+]
+
+SESSION_IDLE_TIMEOUT_SECONDS = 30 * 60
+SESSION_ABSOLUTE_TIMEOUT_SECONDS = 8 * 60 * 60
+SESSION_FRESH_AUTH_TIMEOUT_SECONDS = 5 * 60
+
 MENU_TABLE_COLUMNS = [
     ("id", "INTEGER PRIMARY KEY"),
     ("menu_key", "TEXT NOT NULL"),
@@ -2366,6 +2388,24 @@ DEFAULT_AUTH_ROLES = [
 
 def _utc_now_iso() -> str:
     return datetime.utcnow().isoformat(timespec="seconds")
+
+
+def _parse_utc_iso(value: str | None):
+    if not value:
+        return None
+
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", ""))
+    except ValueError:
+        return None
+
+
+def _utc_now() -> datetime:
+    return datetime.utcnow()
+
+
+def _utc_in_seconds(seconds: int) -> datetime:
+    return _utc_now() + timedelta(seconds=seconds)
 
 
 def _normalize_role_permissions(value) -> list[str]:
@@ -2462,11 +2502,21 @@ def ensure_auth_tables(conn=None):
     user_column_defs = ", ".join(
         f'{_quote_identifier(name)} {definition}' for name, definition in AUTH_USER_TABLE_COLUMNS
     )
+    session_column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in AUTH_SESSION_TABLE_COLUMNS
+    )
 
     cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("roles")} ({role_column_defs})')
     cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("users")} ({user_column_defs})')
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("security_auth_sessions")} ({session_column_defs})')
     cur.execute(
         f'CREATE INDEX IF NOT EXISTS idx_users_role_id ON {_quote_identifier("users")} ({_quote_identifier("role_id")})'
+    )
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS idx_security_auth_sessions_user_id ON {_quote_identifier("security_auth_sessions")} ({_quote_identifier("user_id")})'
+    )
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS idx_security_auth_sessions_expires_at ON {_quote_identifier("security_auth_sessions")} ({_quote_identifier("expires_at")})'
     )
 
     existing_role_columns = {
@@ -2489,6 +2539,17 @@ def ensure_auth_tables(conn=None):
             continue
         cur.execute(
             f'ALTER TABLE {_quote_identifier("users")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+        )
+
+    existing_session_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("security_auth_sessions")})').fetchall()
+    }
+    for column_name, column_type in AUTH_SESSION_TABLE_COLUMNS:
+        if column_name.lower() in existing_session_columns:
+            continue
+        cur.execute(
+            f'ALTER TABLE {_quote_identifier("security_auth_sessions")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
         )
 
     role_count = cur.execute(f'SELECT COUNT(*) AS count FROM {_quote_identifier("roles")}').fetchone()
@@ -2679,6 +2740,28 @@ def _user_row_to_payload(row):
     }
 
 
+def _auth_user_row_to_payload(row):
+    permissions = []
+    try:
+        permissions = json.loads(row["role_permissions_json"] or "[]")
+    except Exception:
+        permissions = []
+
+    return {
+        "id": row["id"],
+        "signin": row["signin"],
+        "display_name": row["display_name"],
+        "phone_number": row["phone_number"],
+        "role": {
+            "id": row["role_id"],
+            "name": row["role_name"],
+            "description": row["role_description"],
+            "permissions": permissions,
+        },
+        "permissions": permissions,
+    }
+
+
 @app.get("/menu")
 def list_menu_entries():
     conn = get_conn()
@@ -2717,9 +2800,11 @@ def get_menu_entries(menu_key: str):
 
 
 @app.put("/menu/{menu_key:path}")
-def save_menu_entries(menu_key: str, payload: dict):
+def save_menu_entries(request: Request, menu_key: str, payload: dict):
     conn = get_conn()
     try:
+        ensure_menu_table(conn)
+        _load_session_context(conn, request, require_fresh=True)
         _replace_menu_rows(conn, menu_key, payload.get("selection"))
         conn.commit()
         conn.row_factory = sqlite3.Row
@@ -2738,10 +2823,12 @@ def save_menu_entries(menu_key: str, payload: dict):
 
 
 @app.delete("/menu/{menu_key:path}")
-def delete_menu_entries(menu_key: str):
+def delete_menu_entries(request: Request, menu_key: str):
     normalized_key = _normalize_menu_key(menu_key)
     conn = get_conn()
     try:
+        ensure_menu_table(conn)
+        _load_session_context(conn, request, require_fresh=True)
         conn.execute(
             f'DELETE FROM {_quote_identifier("Menu")} WHERE {_quote_identifier("menu_key")} = ?',
             (normalized_key,),
@@ -2753,9 +2840,11 @@ def delete_menu_entries(menu_key: str):
 
 
 @app.delete("/menu")
-def delete_all_menu_entries():
+def delete_all_menu_entries(request: Request):
     conn = get_conn()
     try:
+        ensure_menu_table(conn)
+        _load_session_context(conn, request, require_fresh=True)
         conn.execute(f'DELETE FROM {_quote_identifier("Menu")}')
         conn.commit()
         return {"ok": True}
@@ -2825,6 +2914,162 @@ def _get_user_by_signin(conn, signin: str):
         """,
         (signin,),
     ).fetchone()
+
+
+def _get_session_token_from_request(request: Request) -> str:
+    authorization = str(request.headers.get("authorization") or "").strip()
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        if token:
+            return token
+
+    header_token = str(request.headers.get("x-session-token") or "").strip()
+    if header_token:
+        return header_token
+
+    query_token = str(request.query_params.get("session_token") or "").strip()
+    if query_token:
+        return query_token
+
+    return ""
+
+
+def _session_row_to_payload(row):
+    return {
+        "session_token": row["session_token"],
+        "last_activity_at": row["last_activity_at"],
+        "last_fresh_auth_at": row["last_fresh_auth_at"],
+        "expires_at": row["expires_at"],
+    }
+
+
+def _revoke_session(conn, session_token: str, reason: str):
+    timestamp = _utc_now_iso()
+    conn.execute(
+        f"""
+        UPDATE {_quote_identifier("security_auth_sessions")}
+        SET {_quote_identifier("revoked_at")} = ?,
+            {_quote_identifier("revocation_reason")} = ?
+        WHERE {_quote_identifier("session_token")} = ? AND {_quote_identifier("revoked_at")} IS NULL
+        """,
+        (timestamp, reason, session_token),
+    )
+    conn.commit()
+
+
+def _create_session_record(conn, user_id: int):
+    now = _utc_now_iso()
+    expires_at = _utc_in_seconds(SESSION_ABSOLUTE_TIMEOUT_SECONDS).isoformat(timespec="seconds")
+    session_token = secrets.token_urlsafe(32)
+    conn.execute(
+        f"""
+        INSERT INTO {_quote_identifier("security_auth_sessions")} (
+            {_quote_identifier("session_token")},
+            {_quote_identifier("user_id")},
+            {_quote_identifier("created_at")},
+            {_quote_identifier("last_activity_at")},
+            {_quote_identifier("last_fresh_auth_at")},
+            {_quote_identifier("expires_at")},
+            {_quote_identifier("revoked_at")},
+            {_quote_identifier("revocation_reason")}
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL)
+        """,
+        (session_token, user_id, now, now, now, expires_at),
+    )
+    conn.commit()
+    return {
+        "session_token": session_token,
+        "last_activity_at": now,
+        "last_fresh_auth_at": now,
+        "expires_at": expires_at,
+    }
+
+
+def _load_session_context(conn, request: Request, require_fresh: bool = False):
+    session_token = _get_session_token_from_request(request)
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Session token is required")
+
+    session_row = conn.execute(
+        f"""
+        SELECT
+            s.{_quote_identifier("session_token")} AS session_token,
+            s.{_quote_identifier("user_id")} AS user_id,
+            s.{_quote_identifier("created_at")} AS created_at,
+            s.{_quote_identifier("last_activity_at")} AS last_activity_at,
+            s.{_quote_identifier("last_fresh_auth_at")} AS last_fresh_auth_at,
+            s.{_quote_identifier("expires_at")} AS expires_at,
+            s.{_quote_identifier("revoked_at")} AS revoked_at,
+            s.{_quote_identifier("revocation_reason")} AS revocation_reason,
+            u.{_quote_identifier("signin")} AS signin,
+            u.{_quote_identifier("display_name")} AS display_name,
+            u.{_quote_identifier("phone_number")} AS phone_number,
+            u.{_quote_identifier("role_id")} AS role_id,
+            u.{_quote_identifier("active")} AS active,
+            u.{_quote_identifier("password_hash")} AS password_hash,
+            r.{_quote_identifier("name")} AS role_name,
+            r.{_quote_identifier("description")} AS role_description,
+            r.{_quote_identifier("permissions_json")} AS role_permissions_json
+        FROM {_quote_identifier("security_auth_sessions")} s
+        JOIN {_quote_identifier("users")} u ON u.{_quote_identifier("id")} = s.{_quote_identifier("user_id")}
+        LEFT JOIN {_quote_identifier("roles")} r ON r.{_quote_identifier("id")} = u.{_quote_identifier("role_id")}
+        WHERE s.{_quote_identifier("session_token")} = ?
+        """,
+        (session_token,),
+    ).fetchone()
+
+    if not session_row or session_row["revoked_at"]:
+        raise HTTPException(status_code=401, detail="Session has expired. Please sign in again.")
+
+    if not session_row["active"]:
+        _revoke_session(conn, session_token, "User account disabled")
+        raise HTTPException(status_code=401, detail="Session has expired. Please sign in again.")
+
+    now = _utc_now()
+    created_at = _parse_utc_iso(session_row["created_at"]) or now
+    last_activity_at = _parse_utc_iso(session_row["last_activity_at"]) or now
+    last_fresh_auth_at = _parse_utc_iso(session_row["last_fresh_auth_at"]) or now
+    expires_at = _parse_utc_iso(session_row["expires_at"]) or now
+
+    if now - created_at >= timedelta(seconds=SESSION_ABSOLUTE_TIMEOUT_SECONDS) or now >= expires_at:
+        _revoke_session(conn, session_token, "Absolute session timeout")
+        raise HTTPException(status_code=401, detail="Session has expired. Please sign in again.")
+
+    if now - last_activity_at >= timedelta(seconds=SESSION_IDLE_TIMEOUT_SECONDS):
+        _revoke_session(conn, session_token, "Idle session timeout")
+        raise HTTPException(status_code=401, detail="Your session locked after 30 minutes of inactivity. Please sign in again.")
+
+    if require_fresh and now - last_fresh_auth_at >= timedelta(seconds=SESSION_FRESH_AUTH_TIMEOUT_SECONDS):
+        conn.execute(
+            f"""
+            UPDATE {_quote_identifier("security_auth_sessions")}
+            SET {_quote_identifier("last_activity_at")} = ?
+            WHERE {_quote_identifier("session_token")} = ?
+            """,
+            (_utc_now_iso(), session_token),
+        )
+        conn.commit()
+        raise HTTPException(status_code=403, detail="Fresh authentication is required for this action")
+
+    refreshed_at = _utc_now_iso()
+    conn.execute(
+        f"""
+        UPDATE {_quote_identifier("security_auth_sessions")}
+        SET {_quote_identifier("last_activity_at")} = ?
+        WHERE {_quote_identifier("session_token")} = ?
+        """,
+        (refreshed_at, session_token),
+    )
+    conn.commit()
+
+    return {
+        "session_token": session_token,
+        "session": session_row,
+        "user": session_row,
+        "last_activity_at": refreshed_at,
+        "last_fresh_auth_at": session_row["last_fresh_auth_at"],
+        "expires_at": session_row["expires_at"],
+    }
 
 
 def _balsheet_order_clause() -> str:
@@ -3584,6 +3829,49 @@ def _calendar_status_payload():
         "openDays": open_days,
         "closedDays": closed_days,
     }
+
+
+def _latest_table_date(conn, table_name: str, column_name: str):
+    try:
+        rows = conn.execute(
+            f'SELECT {_quote_identifier(column_name)} FROM {_quote_identifier(table_name)}'
+        ).fetchall()
+    except Exception:
+        return None
+
+    latest_date = None
+    latest_sort = None
+    for row in rows:
+        value = row[0] if row else None
+        parsed = _parse_calendar_date(value)
+        if not parsed:
+            continue
+        if latest_sort is None or parsed > latest_sort:
+            latest_sort = parsed
+            latest_date = normalize_mmddyyyy(value)
+
+    return latest_date
+
+
+def _cash_sidebar_dates_payload():
+    conn = get_conn()
+    init_db()
+    ensure_source_table_columns(conn)
+    ensure_eft_tables(conn)
+
+    try:
+        return {
+            "lastEdiDate": _latest_table_date(conn, "EDI", "check_date"),
+            "lastEftDate": _latest_table_date(conn, "EFT", "Date"),
+            "lastLockboxDate": _latest_table_date(conn, "Lockbox", "Deposit Date"),
+        }
+    finally:
+        conn.close()
+
+
+@app.get("/calendar/sidebar-dates")
+def get_calendar_sidebar_dates():
+    return _cash_sidebar_dates_payload()
 
 
 def _calendar_range_payload(start_str, end_str):
@@ -8679,10 +8967,11 @@ def restore_attachment_pending(attachment_id: int):
 
 
 @app.get("/auth/roles")
-def list_roles():
+def list_roles(request: Request):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=False)
         rows = conn.execute(
             f'SELECT * FROM {_quote_identifier("roles")} ORDER BY {_quote_identifier("name")} ASC'
         ).fetchall()
@@ -8692,7 +8981,7 @@ def list_roles():
 
 
 @app.post("/auth/roles")
-def create_role(role: dict):
+def create_role(request: Request, role: dict):
     name = str(role.get("name") or "").strip()
     description = str(role.get("description") or "").strip()
     permissions_json = _json_permissions(role.get("permissions", []))
@@ -8703,6 +8992,7 @@ def create_role(role: dict):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=True)
         now = _utc_now_iso()
         cur = conn.cursor()
         cur.execute(
@@ -8722,10 +9012,11 @@ def create_role(role: dict):
 
 
 @app.put("/auth/roles/{role_id}")
-def update_role(role_id: int, role: dict):
+def update_role(request: Request, role_id: int, role: dict):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=True)
         existing = _fetch_role_or_404(conn, role_id)
         name = str(role.get("name") or existing["name"]).strip()
         description = str(role.get("description") or existing["description"]).strip()
@@ -8747,10 +9038,11 @@ def update_role(role_id: int, role: dict):
 
 
 @app.delete("/auth/roles/{role_id}")
-def delete_role(role_id: int):
+def delete_role(request: Request, role_id: int):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=True)
         existing = _fetch_role_or_404(conn, role_id)
 
         if existing["is_system"]:
@@ -8788,10 +9080,11 @@ def delete_role(role_id: int):
 
 
 @app.get("/auth/users")
-def list_users():
+def list_users(request: Request):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=False)
         rows = conn.execute(
             f"""
             SELECT
@@ -8816,10 +9109,11 @@ def list_users():
 
 
 @app.post("/auth/users")
-def create_user(user: dict):
+def create_user(request: Request, user: dict):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=True)
         user_id = _create_user_record(conn, user)
         conn.commit()
         created = conn.execute(
@@ -8849,10 +9143,11 @@ def create_user(user: dict):
 
 
 @app.put("/auth/users/{user_id}")
-def update_user(user_id: int, user: dict):
+def update_user(request: Request, user_id: int, user: dict):
     conn = get_conn()
     try:
         ensure_auth_tables(conn)
+        _load_session_context(conn, request, require_fresh=True)
         existing = conn.execute(
             f'SELECT * FROM {_quote_identifier("users")} WHERE id = ?',
             (user_id,),
@@ -8935,6 +9230,8 @@ def login(payload: dict):
         )
         conn.commit()
 
+        session = _create_session_record(conn, user["id"])
+
         permissions = []
         try:
             permissions = json.loads(user["role_permissions_json"] or "[]")
@@ -8953,7 +9250,98 @@ def login(payload: dict):
                 "permissions": permissions,
             },
             "permissions": permissions,
+            "session_token": session["session_token"],
+            "session_last_activity_at": session["last_activity_at"],
+            "session_last_fresh_auth_at": session["last_fresh_auth_at"],
+            "session_expires_at": session["expires_at"],
         }
+    finally:
+        conn.close()
+
+
+@app.post("/auth/reauthenticate")
+def reauthenticate(request: Request, payload: dict):
+    password = str(payload.get("password") or "")
+    if not password:
+        raise HTTPException(status_code=400, detail="password is required")
+
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        context = _load_session_context(conn, request, require_fresh=False)
+        user = context["user"]
+
+        if not _verify_password(password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid password")
+
+        now = _utc_now_iso()
+        conn.execute(
+            f"""
+            UPDATE {_quote_identifier("security_auth_sessions")}
+            SET {_quote_identifier("last_activity_at")} = ?,
+                {_quote_identifier("last_fresh_auth_at")} = ?
+            WHERE {_quote_identifier("session_token")} = ?
+            """,
+            (now, now, context["session_token"]),
+        )
+        conn.commit()
+
+        return {
+            "ok": True,
+            "session_token": context["session_token"],
+            "session_last_activity_at": now,
+            "session_last_fresh_auth_at": now,
+            "session_expires_at": context["expires_at"],
+        }
+    finally:
+        conn.close()
+
+
+@app.put("/auth/profile")
+def update_profile(request: Request, user: dict):
+    conn = get_conn()
+    try:
+        ensure_auth_tables(conn)
+        context = _load_session_context(conn, request, require_fresh=False)
+        current_user = context["user"]
+        display_name = str(user.get("display_name") or current_user["display_name"]).strip()
+        phone_number = str(user.get("phone_number") or current_user["phone_number"]).strip()
+        password = str(user.get("password") or "")
+
+        params = [display_name, phone_number, _utc_now_iso(), current_user["id"]]
+        update_clause = [
+            f'{_quote_identifier("display_name")} = ?',
+            f'{_quote_identifier("phone_number")} = ?',
+            f'{_quote_identifier("updated_at")} = ?',
+        ]
+
+        if password:
+            update_clause.insert(2, f'{_quote_identifier("password_hash")} = ?')
+            params.insert(2, _hash_password(password))
+
+        conn.execute(
+            f'UPDATE {_quote_identifier("users")} SET {", ".join(update_clause)} WHERE id = ?',
+            tuple(params),
+        )
+        conn.commit()
+        updated = conn.execute(
+            f"""
+            SELECT
+                u.id,
+                u.signin,
+                u.display_name,
+                u.phone_number,
+                u.role_id,
+                r.name AS role_name,
+                r.description AS role_description,
+                r.permissions_json AS role_permissions_json
+            FROM {_quote_identifier("users")} u
+            LEFT JOIN {_quote_identifier("roles")} r ON r.id = u.role_id
+            WHERE u.id = ?
+            """,
+            (current_user["id"],),
+        ).fetchone()
+        return _auth_user_row_to_payload(updated)
     finally:
         conn.close()
 

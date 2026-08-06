@@ -1,12 +1,14 @@
 import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../auth/auth";
 import { AdminShell } from "../components/AdminShell";
 import { useAppConfigContext, type AppConfig } from "../config/appConfig";
 import { styles as adminStyles } from "./adminscreen";
 
 export default function AdminConfigScreen() {
   const navigate = useNavigate();
+  const { requireFreshAuth } = useAuth();
   const { config, loading, error, saveConfig, refreshConfig } = useAppConfigContext();
   const [draft, setDraft] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -30,6 +32,10 @@ export default function AdminConfigScreen() {
     setSaveMessage(null);
     try {
       const parsed = JSON.parse(draft) as Record<string, unknown>;
+      const allowed = await requireFreshAuth();
+      if (!allowed) {
+        return;
+      }
       await saveConfig(parsed as AppConfig);
       setSaveError(null);
       setSaveMessage("Config saved and reloaded.");

@@ -9,6 +9,7 @@ import {
   type AdminRole,
   type AdminUser,
 } from "../api/admin_access_api";
+import { useAuth } from "../auth/auth";
 import { AdminShell } from "../components/AdminShell";
 import { styles as adminStyles } from "./adminscreen";
 
@@ -32,6 +33,7 @@ const emptyUserForm = (roleId = ""): UserFormState => ({
 
 export default function AdminUserScreen() {
   const navigate = useNavigate();
+  const { requireFreshAuth } = useAuth();
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [userForm, setUserForm] = useState<UserFormState>(emptyUserForm());
@@ -119,6 +121,11 @@ export default function AdminUserScreen() {
 
     if (editingUserId === null && !userForm.password.trim()) {
       setError("Password is required for a new user");
+      return;
+    }
+
+    const allowed = await requireFreshAuth();
+    if (!allowed) {
       return;
     }
 

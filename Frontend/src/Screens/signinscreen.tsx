@@ -5,7 +5,7 @@ import { useAuth } from "../auth/auth";
 
 export default function SignInScreen() {
   const navigate = useNavigate();
-  const { currentUser, signIn } = useAuth();
+  const { currentUser, signIn, sessionNotice } = useAuth();
   const [signin, setSignin] = useState("");
   const [password, setPassword] = useState("");
   const [saving, setSaving] = useState(false);
@@ -43,6 +43,8 @@ export default function SignInScreen() {
           <img src="/renfrewplus-banner-tight.png" alt="RenfrewPlus wordmark" style={signInStyles.wordmark} />
           <p style={signInStyles.tagline}>Sign in to continue into the workflow admin shell.</p>
         </header>
+
+        {sessionNotice && <div style={signInStyles.noticeBanner}>{sessionNotice}</div>}
 
         <section style={signInStyles.card} aria-label="Login credentials">
           <div style={signInStyles.cardHeader}>
@@ -151,6 +153,16 @@ const signInStyles: Record<string, CSSProperties> = {
     padding: "24px",
     display: "grid",
     gap: "18px",
+  },
+  noticeBanner: {
+    padding: "12px 14px",
+    borderRadius: "16px",
+    border: "1px solid rgba(216, 182, 92, 0.24)",
+    background: "rgba(255, 248, 227, 0.96)",
+    color: "#8b6a1a",
+    fontSize: "13px",
+    lineHeight: 1.45,
+    fontWeight: 700,
   },
   cardHeader: {
     display: "grid",

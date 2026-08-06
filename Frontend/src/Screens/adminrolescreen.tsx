@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { createAdminRole, deleteAdminRole, getAdminRoles, updateAdminRole, type AdminRole } from "../api/admin_access_api";
+import { useAuth } from "../auth/auth";
 import { AdminShell } from "../components/AdminShell";
 import { getMenuOptions, type MenuOption } from "../navigation/menuConfig";
 import { styles as adminStyles } from "./adminscreen";
@@ -40,6 +41,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export default function AdminRolesScreen() {
   const navigate = useNavigate();
+  const { requireFreshAuth } = useAuth();
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
   const [form, setForm] = useState<RoleFormState>(emptyRoleForm());
@@ -212,6 +214,11 @@ export default function AdminRolesScreen() {
       return;
     }
 
+    const allowed = await requireFreshAuth();
+    if (!allowed) {
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
@@ -241,6 +248,11 @@ export default function AdminRolesScreen() {
   const deleteRole = async (role: AdminRole) => {
     const confirmed = window.confirm(`Delete the role "${role.name}"? This cannot be undone.`);
     if (!confirmed) {
+      return;
+    }
+
+    const allowed = await requireFreshAuth();
+    if (!allowed) {
       return;
     }
 

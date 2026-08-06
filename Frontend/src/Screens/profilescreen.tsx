@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { updateAdminUser } from "../api/admin_access_api";
+import { updateCurrentProfile } from "../api/admin_access_api";
 import { useAuth } from "../auth/auth";
 import { AdminShell, styles as adminStyles } from "../components/AdminShell";
 
@@ -61,17 +61,14 @@ export default function ProfileScreen() {
         ...(password ? { password } : {}),
       };
 
-      const response = await updateAdminUser(currentUser.id, {
-        signin: currentUser.signin,
-        role_id: currentUser.role.id,
-        active: true,
-        ...payload,
-      });
+      const response = await updateCurrentProfile(payload);
 
       updateCurrentUser({
         ...currentUser,
         display_name: response.data.display_name,
         phone_number: response.data.phone_number,
+        role: response.data.role,
+        permissions: response.data.permissions,
       });
       setForm((current) => ({ ...current, password: "", confirm_password: "" }));
       setNotice("Profile saved.");

@@ -1,12 +1,15 @@
 import axios from "axios";
 import type { AppConfig } from "../config/appConfig";
 import { API_BASE } from "../config/apiBase";
+import { installSessionAuth } from "../api/session_auth";
 
 const MENU_REQUEST_TIMEOUT_MS = 15000;
 const menuApi = axios.create({
   baseURL: API_BASE,
   timeout: MENU_REQUEST_TIMEOUT_MS,
 });
+
+installSessionAuth(menuApi);
 
 export type MenuOption = {
   id: string;
