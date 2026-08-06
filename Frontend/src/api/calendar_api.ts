@@ -40,7 +40,15 @@ export interface CalendarWorkDayLookup {
   bankDay: string | null;
 }
 
+export interface CashSidebarDates {
+  lastEdiDate: string | null;
+  lastEftDate: string | null;
+  lastLockboxDate: string | null;
+}
+
 export const getCalendarStatus = () => axios.get<CalendarStatus>(`${API_BASE}/calendar/status`);
+
+export const getCashSidebarDates = () => axios.get<CashSidebarDates>(`${API_BASE}/calendar/sidebar-dates`);
 
 export const lookupCalendarBankDay = (work_day: string) =>
   axios.get<CalendarWorkDayLookup>(`${API_BASE}/calendar/work-day/lookup`, { params: { work_day } });

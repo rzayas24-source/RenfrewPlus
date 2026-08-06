@@ -1,28 +1,10 @@
 TO DO
-835 BUFFER WINDOW SETTING
-
 ENSURE FORCED PARTIAL MATCH CAN WILL WORK IN ERA/HTML CONVERTER
-
-FIX CONVERT TO ADD SPACE MM.DD.YY TO EDI/HTML CONVERT
-
-STOP DOWNLOADING EMAIL BANNER.
 
 FIND AND POST ZERO PAYS
 
-Advance Day feedback.
-
-separate user access from main. 
-log in 
-feature vs nav
-
-
-jane doe
-misc 
-discrepancy report
 balance fixer
 
-hero freeze
 hero edit dunning messages.
 
-gazebo menu- ensure users favorites exist for each person. per user, not globally.
 

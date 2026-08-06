@@ -37,6 +37,15 @@ This repo is already in a better place than before, but the move from a work lap
 - Run login, attachments, snapshots, worklists, and imports end to end.
 - Test backup and restore before cutover, then switch daily use.
 
+## VPN Readiness Plan
+
+- Confirm whether Codex is running locally on the laptop, on a remote host, or through a remote connection before debugging VPN issues.
+- Separate `localhost` checks from external-network checks. A passing local test does not prove the VPN path is healthy.
+- After connecting the VPN, wait for the route and DNS state to settle before testing again. If connectivity works briefly and then drops, treat that as a VPN policy or routing change, not a Codex code issue.
+- Verify whether the VPN preserves access to the backend port, required external APIs, and any SSH or remote-host connection used by Codex.
+- If the VPN changes behavior after initial connect, document the exact delay, hostname, port, and failure mode so we can reproduce it on demand.
+- Prefer split tunneling or an allowlist for the minimum hosts Codex needs when the VPN is required for development.
+
 ## Quick Wins
 
 - Keep paths in `Script/config.json` and avoid hardcoded absolute folders.
@@ -46,6 +55,7 @@ This repo is already in a better place than before, but the move from a work lap
 - Keep browser-held workflow state out of `localStorage` when the data matters beyond one machine.
 - Prefer `Path`, `resolve_path`, and relative paths over manual string joins.
 - Document any platform-specific dependency instead of letting it look universal.
+- Treat VPN behavior as a portability variable: `localhost` may still work briefly after connect, then routing or DNS can change and break external calls.
 
 ## Medium Fixes
 
@@ -66,3 +76,4 @@ This repo is already in a better place than before, but the move from a work lap
 ## Rule Of Thumb
 
 If a feature depends on one workstation, one shell, or one operating system, make that dependency explicit and optional whenever possible.
+If a feature depends on stable network routing, document whether VPNs, split tunneling, or DNS changes can affect it, because local-only tests can pass while real connectivity still drops.
