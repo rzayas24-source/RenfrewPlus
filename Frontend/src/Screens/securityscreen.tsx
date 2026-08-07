@@ -99,15 +99,19 @@ export default function SecurityScreen() {
       if (item.status === "Partial") totals.partial += 1;
       if (item.status === "Need to do") totals.need += 1;
     }
-    return totals;
+    const rawScore = ((totals.done * 100) + (totals.partial * 50)) / authSteps.length;
+    return {
+      ...totals,
+      percent: Math.round(rawScore),
+    };
   }, []);
 
   return (
     <AdminShell
       sidebarCopy="Document what the auth side has already done, what still needs to happen, and how the boundary is shaped."
-      sidebarCardLabel="Auth steps"
-      sidebarCardValue={`${counts.done} done`}
-      sidebarCardMeta={`${counts.partial} partial, ${counts.need} remaining.`}
+      sidebarCardLabel="Security"
+      sidebarCardValue={`${counts.percent}%`}
+      sidebarCardMeta={`${counts.done} done, ${counts.partial} partial, ${counts.need} remaining.`}
       onBack={() => navigate("/admin")}
       hideBackButton
       useGlobalMenuFallback={false}

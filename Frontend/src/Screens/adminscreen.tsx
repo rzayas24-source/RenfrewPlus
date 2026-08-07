@@ -1,13 +1,119 @@
 import type { CSSProperties } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 
+type Status = "Done" | "Partial" | "Need to do";
+
+type AdminCoverageItem = {
+  area: string;
+  detail: string;
+  status: Status;
+};
+
+const adminCoverageItems: AdminCoverageItem[] = [
+  {
+    area: "Config editor",
+    detail: "The shared runtime config is editable from the admin shell.",
+    status: "Done",
+  },
+  {
+    area: "Users",
+    detail: "User accounts and password management are already exposed.",
+    status: "Done",
+  },
+  {
+    area: "Roles",
+    detail: "Role-based access screens are available for access control work.",
+    status: "Done",
+  },
+  {
+    area: "Tables",
+    detail: "The SQLite browser is present for inspecting live data.",
+    status: "Done",
+  },
+  {
+    area: "Menu builder",
+    detail: "Sidebar navigation can be shaped from the admin console.",
+    status: "Done",
+  },
+  {
+    area: "Sites",
+    detail: "Site names and site records can be maintained from the shell.",
+    status: "Done",
+  },
+  {
+    area: "Portability",
+    detail: "The migration plan is tracked and visible from admin.",
+    status: "Done",
+  },
+  {
+    area: "Security",
+    detail: "The auth-side security record is wired into the admin area.",
+    status: "Done",
+  },
+  {
+    area: "HIPAA",
+    detail: "The compliance checklist is accessible from the same shell.",
+    status: "Done",
+  },
+  {
+    area: "Dependencies",
+    detail: "Server prerequisites are documented and linked from admin.",
+    status: "Done",
+  },
+  {
+    area: "Schema",
+    detail: "The table structure review screen is exposed in the same hub.",
+    status: "Done",
+  },
+  {
+    area: "Auditors",
+    detail: "Technical data sheets are available for deeper review.",
+    status: "Done",
+  },
+  {
+    area: "Daily worklist",
+    detail: "The work queue editor is surfaced from the admin launch area.",
+    status: "Partial",
+  },
+  {
+    area: "Misc editor",
+    detail: "Lookup maintenance is already reachable, but could be folded deeper into admin structure.",
+    status: "Partial",
+  },
+  {
+    area: "Admin audit trail",
+    detail: "A consolidated record of admin actions is still the next hardening step.",
+    status: "Need to do",
+  },
+];
+
 export default function AdminScreen() {
   const navigate = useNavigate();
+  const score = useMemo(() => {
+    const totals = { done: 0, partial: 0, need: 0 };
+    for (const item of adminCoverageItems) {
+      if (item.status === "Done") totals.done += 1;
+      if (item.status === "Partial") totals.partial += 1;
+      if (item.status === "Need to do") totals.need += 1;
+    }
+
+    const rawScore = ((totals.done * 100) + (totals.partial * 50)) / adminCoverageItems.length;
+    return {
+      done: totals.done,
+      partial: totals.partial,
+      need: totals.need,
+      percent: Math.round(rawScore),
+    };
+  }, []);
 
   return (
     <AdminShell
       sidebarCopy="A soft admin console for RenfrewPlus support, visibility, and system oversight."
+      sidebarCardLabel="Admin"
+      sidebarCardValue={`${score.percent}%`}
+      sidebarCardMeta={`${score.done} done, ${score.partial} partial, ${score.need} remaining.`}
       onBack={() => navigate("/")}
       hideBackButton
       useGlobalMenuFallback={false}
