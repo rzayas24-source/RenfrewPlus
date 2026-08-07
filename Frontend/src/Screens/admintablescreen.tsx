@@ -166,7 +166,7 @@ export default function AdminTableScreen() {
         <section style={styles.heroShell}>
           <div style={styles.heroCopy}>
             <div style={styles.kicker}>Table viewer</div>
-            <p style={styles.subtitle}>A read-only view of every SQLite table in the active workflow database.</p>
+            <p style={styles.subtitle}>A read-only view of every SQLite table in the active RenfrewPlus database.</p>
 
             <div style={styles.heroActions}>
               <button

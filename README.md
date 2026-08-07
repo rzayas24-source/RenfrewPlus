@@ -1,4 +1,4 @@
-# Renfrew Workflow
+# RenfrewPlus
 
 This repo is organized so the backend and frontend can move with the same folder tree.
 
@@ -31,11 +31,24 @@ Or use the helper script:
 .\Start-WorkflowBackend.ps1
 ```
 
+To start both the backend and the Vite dev server together:
+
+```powershell
+python Start-RenfrewPlusDev.py
+```
+
 On Linux or macOS:
 
 ```bash
 chmod +x Start-WorkflowBackend.sh
 ./Start-WorkflowBackend.sh
+```
+
+To start both dev servers on Linux or macOS:
+
+```bash
+chmod +x Start-RenfrewPlusDev.sh
+./Start-RenfrewPlusDev.sh
 ```
 
 If you deploy to another machine, update `Script/config.json` so `workflow_root` and the folder paths point at that server's layout.
@@ -71,7 +84,7 @@ If you prefer PowerShell on Windows, you can still run:
 
 The screens that show source folders now read from config instead of hardcoding machine-specific absolute paths.
 The snapshot helper also prefers configured or bundled tool paths before falling back to local defaults.
-The repo-level portability playbook lives in [PORTABILITY_PLAYBOOK.md](/C:/Renfrew/Workflow/PORTABILITY_PLAYBOOK.md).
+The repo-level portability playbook lives in [PORTABILITY_PLAYBOOK.md](PORTABILITY_PLAYBOOK.md).
 
 ## Windows-Only Pieces
 

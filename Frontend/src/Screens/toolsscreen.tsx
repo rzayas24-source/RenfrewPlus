@@ -149,7 +149,7 @@ export default function ToolsScreen() {
 
   return (
     <AdminShell
-      sidebarCopy="A soft tools console for helpers, utilities, and workflow support."
+      sidebarCopy="A soft tools console for helpers, utilities, and RenfrewPlus support."
       onBack={() => navigate("/cash")}
       hideBackButton
     >

@@ -188,7 +188,7 @@ export default function WorklistEditorScreen() {
         <div style={styles.hero}>
           <div>
             <div style={adminStyles.sectionKicker}>Daily worklist</div>
-            <h1 style={styles.title}>Prepopulated workflow editor</h1>
+            <h1 style={styles.title}>Prepopulated worklist editor</h1>
             <p style={styles.subtitle}>
               Tune the starter list, save it to the browser, and send it into the live work list when you want to use it.
             </p>

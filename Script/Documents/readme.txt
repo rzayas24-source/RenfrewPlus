@@ -1,7 +1,7 @@
 📘 Lockbox Loading***
 file: Lockbox-Load.py
 Overview
-This script automates the loading of Lockbox Excel files into the main Lockbox table inside the workflow database. It performs staging, validation, duplicate prevention, loading, archiving, and diagnostics in one run.
+This script automates the loading of Lockbox Excel files into the main Lockbox table inside the RenfrewPlus database. It performs staging, validation, duplicate prevention, loading, archiving, and diagnostics in one run.
 
 The script is designed to be run manually whenever a new Lockbox file is available.
 
@@ -99,9 +99,9 @@ If duplicates exist, the load is cancelled and the file stays in Downloads
 📘 EDI Loader Module — Protected Version*****
 file Balsheet-Entry-Bulk.py
 
-Staging‑Safe, Duplicate‑Protected TRN Loader for Renfrew Workflow
+Staging‑Safe, Duplicate‑Protected TRN Loader for RenfrewPlus
 📌 Overview
-The EDI Loader Module — Protected Version is a controlled ingestion tool designed to safely load converted TRN‑style .txt files into the EDI table inside the Renfrew Workflow database.
+The EDI Loader Module — Protected Version is a controlled ingestion tool designed to safely load converted TRN‑style .txt files into the EDI table inside the RenfrewPlus database.
 
 This loader is built for data integrity, duplicate prevention, and safe archiving.
 It ensures that no TRN file is ever archived unless it contributes at least one new check number.

@@ -7,7 +7,7 @@ export default function AdminScreen() {
 
   return (
     <AdminShell
-      sidebarCopy="A soft admin console for workflow support, visibility, and system oversight."
+      sidebarCopy="A soft admin console for RenfrewPlus support, visibility, and system oversight."
       onBack={() => navigate("/")}
       hideBackButton
       useGlobalMenuFallback={false}
