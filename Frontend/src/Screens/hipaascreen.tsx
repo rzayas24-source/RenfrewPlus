@@ -274,14 +274,18 @@ export default function HipaaScreen() {
         if (item.appStatus === "Need to do") counts.need += 1;
       }
     }
-    return counts;
+    const rawScore = ((counts.done * 100) + (counts.partial * 50)) / sections.reduce((sum, section) => sum + section.items.length, 0);
+    return {
+      ...counts,
+      percent: Math.round(rawScore),
+    };
   }, []);
 
   return (
     <AdminShell
       sidebarCopy="A practical HIPAA and financial-data readiness checklist for this internal app."
-      sidebarCardLabel="Checklist"
-      sidebarCardValue={`${totals.done} done`}
+      sidebarCardLabel="HIPAA"
+      sidebarCardValue={`${totals.percent}%`}
       sidebarCardMeta={`${totals.partial} partial, ${totals.need} remaining.`}
       onBack={() => navigate("/admin")}
       hideBackButton
