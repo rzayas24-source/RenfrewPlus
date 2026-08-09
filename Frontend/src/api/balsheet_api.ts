@@ -1,6 +1,7 @@
 import axios from "axios";
 
 import { API_BASE } from "../config/apiBase";
+import type { FlywirePayload } from "./keyproof_api";
 
 export interface BalsheetEntry {
   entry_id?: string;
@@ -154,9 +155,102 @@ export interface ImagingBalsheetAssociationRow {
   amount: number;
   payer: string;
   checkNumber: string;
+  eob: string;
+  flywire: {
+    available: boolean;
+    documentCount: number;
+    exactMatchCount: number;
+    ambiguous: boolean;
+    confidence: number;
+  } | null;
+  siteAssociation: ImagingSitePageAssociation | null;
   linkedFiles: ImagingDocumentLink[];
   matches: ImagingDocumentSuggestion[];
   recommendations: ImagingLockboxRecommendation[];
+}
+
+export interface ImagingFlywireDocument extends FlywirePayload {
+  matched_row_ids: number[];
+}
+
+export interface ImagingFlywireDetailsResponse {
+  entryId: string;
+  postingDate: string;
+  site: string;
+  amount: number;
+  available: boolean;
+  documentCount: number;
+  exactMatchCount: number;
+  ambiguous: boolean;
+  documents: ImagingFlywireDocument[];
+}
+
+export interface ImagingSitePageAssociation {
+  associationId: string;
+  importedFileId: number;
+  fileName: string;
+  pageStart: number;
+  pageEnd: number | null;
+  bookmarkTitle: string;
+  note: string;
+  markerX: number | null;
+  markerY: number | null;
+  markerWidth: number | null;
+  markerHeight: number | null;
+  markerStatus: "post" | "do_not_post";
+  keyproof: ImagingKeyproofSummary;
+}
+
+export interface ImagingKeyproofSummary {
+  available: boolean;
+  attachmentId: number;
+  site?: string;
+  batchDate?: string;
+  keyproofTotal?: number;
+  paperworkTotal?: number;
+  amounts?: {
+    cash: number;
+    check: number;
+    creditCard: number;
+    eft: number;
+    lockbox: number;
+    foreignCheck: number;
+    wireTransfer: number;
+    misc: number;
+  };
+}
+
+export interface ImagingSiteQueueItem {
+  queueNumber: number;
+  entryId: string;
+  postingDate: string;
+  site: string;
+  amount: number;
+  payer: string;
+  checkNumber: string;
+  eob: string;
+  association: ImagingSitePageAssociation | null;
+}
+
+export interface ImagingSiteDocument {
+  importedFileId: number;
+  fileName: string;
+  site: string;
+  batchDate: string;
+  total: number;
+  pageCount: number;
+  openUrl: string;
+  keyproof: ImagingKeyproofSummary;
+}
+
+export interface ImagingSiteWorkbenchResponse {
+  postingDate: string;
+  site: string;
+  queueTotal: number;
+  queueCount: number;
+  associatedCount: number;
+  queue: ImagingSiteQueueItem[];
+  documents: ImagingSiteDocument[];
 }
 
 export interface ImagingBalsheetAssociationResponse {
@@ -391,6 +485,49 @@ export function findImagingLockboxMatches(postingDate: string) {
   return axios.post<ImagingBalsheetAssociationResponse>(`${API_BASE}/imaging/lockbox-associations/find-matches`, {
     posting_date: postingDate,
   });
+}
+
+export function getImagingFlywireDetails(entryId: string) {
+  return axios.get<ImagingFlywireDetailsResponse>(`${API_BASE}/imaging/balsheet/${encodeURIComponent(entryId)}/flywire`);
+}
+
+export function getImagingSiteWorkbench(postingDate: string, site: string) {
+  return axios.get<ImagingSiteWorkbenchResponse>(`${API_BASE}/imaging/site-workbench`, {
+    params: { posting_date: postingDate, site },
+  });
+}
+
+export function saveImagingSitePageAssociation(payload: {
+  entryId: string;
+  importedFileId: number;
+  pageNumber: number;
+  note?: string;
+  marker?: { x: number; y: number; width: number; height: number } | null;
+  markerStatus?: "post" | "do_not_post";
+}) {
+  return axios.post<ImagingSiteWorkbenchResponse>(`${API_BASE}/imaging/site-page-associations`, {
+    entry_id: payload.entryId,
+    imported_file_id: payload.importedFileId,
+    page_number: payload.pageNumber,
+    note: payload.note ?? "",
+    marker: payload.marker ?? null,
+    marker_status: payload.markerStatus ?? "post",
+  });
+}
+
+export function deleteImagingSitePageAssociation(entryId: string) {
+  return axios.delete<ImagingSiteWorkbenchResponse>(
+    `${API_BASE}/imaging/site-page-associations/${encodeURIComponent(entryId)}`
+  );
+}
+
+export function buildImagingSitePageUrl(importedFileId: number, pageNumber: number) {
+  return `${API_BASE}/imaging/site-documents/${importedFileId}/pages/${pageNumber}`;
+}
+
+export function buildImagingSiteDocumentOpenUrl(importedFileId: number, page?: number) {
+  const pageFragment = page && page > 0 ? `#page=${page}` : "";
+  return `${API_BASE}/imaging/site-documents/${importedFileId}/open${pageFragment}`;
 }
 
 export function getMisc(postingDate?: string) {

@@ -105,6 +105,7 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/business", label: "Business", meta: "Business tools.", kind: "screen", path: "/business" },
   { id: "/discrepancy", label: "Discrepancy", meta: "Discrepancy workspace.", kind: "screen", path: "/discrepancy" },
   { id: "/sites", label: "Sites", meta: "Sites browser.", kind: "screen", path: "/sites" },
+  { id: "/view-images", label: "View Images", meta: "Image viewer.", kind: "screen", path: "/view-images" },
 ];
 
 function getLabelOverrides(config?: AppConfig) {

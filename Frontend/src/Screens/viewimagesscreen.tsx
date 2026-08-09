@@ -1,5 +1,5 @@
 ﻿import type { CSSProperties } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell, styles as adminStyles } from "../components/AdminShell";
 import { API_BASE } from "../config/apiBase";
@@ -7,26 +7,135 @@ import { styles as cashStyles } from "./cashscreen";
 import { createPortal } from "react-dom";
 import {
   buildImagingFileOpenUrl,
+  buildImagingSiteDocumentOpenUrl,
+  buildImagingSitePageUrl,
   commitImagingExactMatches,
   confirmImagingBalsheetLink,
   deleteImagingBalsheetLink,
+  deleteImagingSitePageAssociation,
   findImagingLockboxMatches,
+  getImagingFlywireDetails,
+  getImagingSiteWorkbench,
   getImagingBalsheetAssociations,
   refreshImagingBalsheetAssociations,
+  saveImagingSitePageAssociation,
   type ImagingBalsheetAssociationResponse,
   type ImagingBalsheetAssociationRow,
   type ImagingDocumentSuggestion,
+  type ImagingFlywireDetailsResponse,
+  type ImagingKeyproofSummary,
+  type ImagingSitePageAssociation,
+  type ImagingSiteWorkbenchResponse,
 } from "../api/balsheet_api";
 
-type ImagingPhase = "idle" | "loaded" | "matched" | "review" | "lockbox";
+type ImagingPhase = "idle" | "loaded" | "matched" | "review" | "lockbox" | "site";
 type ImagingReviewFile = {
-  filePath: string;
+  filePath?: string;
   fileName: string;
-  source: "linked" | "suggested";
+  source: "linked" | "site" | "suggested";
   matchMethod?: string;
   confidence?: number;
   bookmarkPage?: number;
+  openUrl?: string;
+  keyproof?: ImagingKeyproofSummary;
+  pageImageUrl?: string;
+  marker?: SitePostingMarker | null;
+  markerStatus?: SiteMarkerStatus;
+  markerLabel?: string;
+  itemDetails?: ImagingAssociatedItemDetails;
 };
+type SiteMarkerStatus = "post" | "do_not_post";
+type SitePostingMarker = { x: number; y: number; width: number; height: number };
+type ImagingAssociatedItemDetails = {
+  site: string;
+  postingDate: string;
+  amount: number;
+  payer: string;
+  checkNumber: string;
+  eob: string;
+  note: string;
+  markerStatus: SiteMarkerStatus;
+};
+
+function markerFromAssociation(association: ImagingSitePageAssociation | null): SitePostingMarker | null {
+  if (
+    association?.markerX == null ||
+    association.markerY == null ||
+    association.markerWidth == null ||
+    association.markerHeight == null
+  ) {
+    return null;
+  }
+  return {
+    x: association.markerX,
+    y: association.markerY,
+    width: association.markerWidth,
+    height: association.markerHeight,
+  };
+}
+
+const keyproofAmountLabels: Record<string, string> = {
+  cash: "Cash",
+  check: "Check",
+  creditCard: "Credit Card",
+  eft: "EFT",
+  lockbox: "Lockbox",
+  foreignCheck: "Foreign Check",
+  wireTransfer: "Wire Transfer",
+  misc: "Misc",
+};
+
+function KeyproofDetailsBanner({ details }: { details: ImagingKeyproofSummary | null | undefined }) {
+  if (!details?.available) {
+    return <div style={viewImagesStyles.keyproofBannerEmpty}>No saved KeyProof details are linked to this document.</div>;
+  }
+
+  const amounts = Object.entries(details.amounts ?? {}).filter(([, amount]) => Math.abs(Number(amount)) > 0.005);
+  return (
+    <section style={viewImagesStyles.keyproofBanner} aria-label="Related KeyProof details">
+      <div style={viewImagesStyles.keyproofBannerLead}>
+        <span style={viewImagesStyles.keyproofBannerKicker}>KeyProof</span>
+        <strong>{details.site || "Site not recorded"}</strong>
+        <span>{details.batchDate || "Date not recorded"}</span>
+      </div>
+      <div style={viewImagesStyles.keyproofBannerTotals}>
+        <span>KeyProof total <strong>{formatCurrency(details.keyproofTotal ?? 0)}</strong></span>
+        <span>Paperwork <strong>{formatCurrency(details.paperworkTotal ?? 0)}</strong></span>
+      </div>
+      <div style={viewImagesStyles.keyproofBannerAmounts}>
+        {amounts.map(([field, amount]) => (
+          <span key={field} style={viewImagesStyles.keyproofAmountPill}>
+            {keyproofAmountLabels[field] || field} <strong>{formatCurrency(Number(amount))}</strong>
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function AssociatedItemBanner({ details }: { details: ImagingAssociatedItemDetails }) {
+  return (
+    <section style={viewImagesStyles.associatedItemBanner} aria-label="Associated itemization details">
+      <div style={viewImagesStyles.associatedItemLead}>
+        <span style={viewImagesStyles.keyproofBannerKicker}>Associated itemization</span>
+        <strong>{details.site || "Site not recorded"}</strong>
+        <span>{details.postingDate || "Date not recorded"}</span>
+      </div>
+      <div style={viewImagesStyles.associatedItemAmount}>{formatCurrency(details.amount)}</div>
+      <div style={viewImagesStyles.associatedItemFacts}>
+        <span>Payer <strong>{details.payer || "Not recorded"}</strong></span>
+        <span>Reference <strong>{details.checkNumber || "Not recorded"}</strong></span>
+        <span>EOB <strong>{details.eob || "Not recorded"}</strong></span>
+        <span>
+          Decision <strong style={{ color: details.markerStatus === "do_not_post" ? "#b4232a" : "#8a6500" }}>
+            {details.markerStatus === "do_not_post" ? "Do Not Post" : "Post"}
+          </strong>
+        </span>
+        {details.note && <span>Note <strong>{details.note}</strong></span>}
+      </div>
+    </section>
+  );
+}
 
 export default function ViewImagesScreen() {
   const navigate = useNavigate();
@@ -34,17 +143,41 @@ export default function ViewImagesScreen() {
   const initialDate = searchParams.get("day") ?? "";
 
   const [postingDate, setPostingDate] = useState(() => displayDateToIso(initialDate));
-  const [phase, setPhase] = useState<ImagingPhase>(initialDate ? "loaded" : "idle");
+  const [phase, setPhase] = useState<ImagingPhase>(initialDate ? "review" : "idle");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ImagingBalsheetAssociationResponse | null>(null);
   const [previewPath, setPreviewPath] = useState("");
+  const [previewDirectUrl, setPreviewDirectUrl] = useState("");
+  const [previewKeyproof, setPreviewKeyproof] = useState<ImagingKeyproofSummary | null>(null);
+  const [previewPageImageUrl, setPreviewPageImageUrl] = useState("");
+  const [previewMarker, setPreviewMarker] = useState<SitePostingMarker | null>(null);
+  const [previewMarkerStatus, setPreviewMarkerStatus] = useState<SiteMarkerStatus>("post");
+  const [previewMarkerLabel, setPreviewMarkerLabel] = useState("");
+  const [previewItemDetails, setPreviewItemDetails] = useState<ImagingAssociatedItemDetails | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewPage, setPreviewPage] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [lockboxRowId, setLockboxRowId] = useState("");
   const [lockboxError, setLockboxError] = useState<string | null>(null);
   const [actionDetail, setActionDetail] = useState<string | null>(null);
+  const [flywireRow, setFlywireRow] = useState<ImagingBalsheetAssociationRow | null>(null);
+  const [flywireDetails, setFlywireDetails] = useState<ImagingFlywireDetailsResponse | null>(null);
+  const [flywireLoading, setFlywireLoading] = useState(false);
+  const [flywireError, setFlywireError] = useState<string | null>(null);
+  const [siteWorkbench, setSiteWorkbench] = useState<ImagingSiteWorkbenchResponse | null>(null);
+  const [siteWorkbenchLoading, setSiteWorkbenchLoading] = useState(false);
+  const [siteWorkbenchSaving, setSiteWorkbenchSaving] = useState(false);
+  const [siteWorkbenchError, setSiteWorkbenchError] = useState<string | null>(null);
+  const [siteWorkbenchEntryId, setSiteWorkbenchEntryId] = useState("");
+  const [siteWorkbenchDocumentId, setSiteWorkbenchDocumentId] = useState(0);
+  const [siteWorkbenchPage, setSiteWorkbenchPage] = useState(1);
+  const [siteWorkbenchNote, setSiteWorkbenchNote] = useState("");
+  const [siteMarkerStatus, setSiteMarkerStatus] = useState<SiteMarkerStatus>("post");
+  const [siteMarker, setSiteMarker] = useState<SitePostingMarker | null>(null);
+  const [siteMarkerDrawing, setSiteMarkerDrawing] = useState(false);
+  const [siteMarkerStart, setSiteMarkerStart] = useState<{ x: number; y: number } | null>(null);
+  const loadRequestRef = useRef(0);
 
   useEffect(() => {
     if (!initialDate) {
@@ -56,9 +189,10 @@ export default function ViewImagesScreen() {
   }, [initialDate]);
 
   const phaseTitle = useMemo(() => {
-    if (phase === "matched") return "Matches refreshed";
+    if (phase === "matched") return "Image index refreshed";
     if (phase === "review") return "Reviewing rows";
     if (phase === "lockbox") return "Lockbox image association";
+    if (phase === "site") return "Site image association";
     if (phase === "loaded") return "Date loaded";
     return "Awaiting date";
   }, [phase]);
@@ -73,7 +207,28 @@ export default function ViewImagesScreen() {
     [data]
   );
 
+  const siteRows = useMemo(
+    () =>
+      data?.rows.filter((row) => {
+        const type = row.type.trim().toLowerCase();
+        return type !== "eft" && type !== "lockbox";
+      }) ?? [],
+    [data]
+  );
+  const siteImageQueueRows = useMemo(
+    () => siteRows.filter((row) => row.eob.trim().toUpperCase() !== "P"),
+    [siteRows]
+  );
+
   const allRows = useMemo(() => data?.rows ?? [], [data]);
+  const selectedSiteWorkbenchDocument = useMemo(
+    () => siteWorkbench?.documents.find((document) => document.importedFileId === siteWorkbenchDocumentId) ?? null,
+    [siteWorkbench, siteWorkbenchDocumentId]
+  );
+  const selectedSiteWorkbenchItem = useMemo(
+    () => siteWorkbench?.queue.find((item) => item.entryId === siteWorkbenchEntryId) ?? null,
+    [siteWorkbench, siteWorkbenchEntryId]
+  );
 
   const nonReviewGridStyle =
     phase === "lockbox"
@@ -126,24 +281,35 @@ export default function ViewImagesScreen() {
 
   async function loadDate(nextDate = postingDate) {
     const normalizedDate = isoDateToDisplay(nextDate);
-    if (!normalizedDate) {
+    const inputDate = displayDateToIso(nextDate);
+    if (!normalizedDate || !inputDate) {
       setError("Enter a date first.");
       setData(null);
       return;
     }
 
+    const requestId = ++loadRequestRef.current;
+    setPostingDate(inputDate);
     setLoading(true);
     setError(null);
     try {
       const response = await getImagingBalsheetAssociations(normalizedDate);
+      if (requestId !== loadRequestRef.current) {
+        return;
+      }
       setData(response.data);
-      setPhase("loaded");
-      setSearchParams({ day: normalizedDate }, { replace: true });
+      setPhase("review");
+      setSearchParams({ day: inputDate }, { replace: true });
     } catch (loadError) {
+      if (requestId !== loadRequestRef.current) {
+        return;
+      }
       setData(null);
       setError(formatImagingError(loadError, "GET", `${API_BASE}/imaging/balsheet-associations?posting_date=${encodeURIComponent(normalizedDate)}`));
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestRef.current) {
+        setLoading(false);
+      }
     }
   }
 
@@ -161,7 +327,7 @@ export default function ViewImagesScreen() {
       setData(response.data);
       setPhase("matched");
       setSearchParams({ day: normalizedDate }, { replace: true });
-      setActionDetail(`Auto Match refreshed ${response.data.rowCount} row${response.data.rowCount === 1 ? "" : "s"} from ${response.data.indexCount} indexed file${response.data.indexCount === 1 ? "" : "s"}.`);
+      setActionDetail(`Image index refreshed. Recalculated ${response.data.rowCount} row${response.data.rowCount === 1 ? "" : "s"} from ${response.data.indexCount} indexed file${response.data.indexCount === 1 ? "" : "s"}.`);
     } catch (refreshError) {
       setError(
         formatImagingError(
@@ -213,6 +379,7 @@ export default function ViewImagesScreen() {
   }
 
   async function confirmMatch(row: ImagingBalsheetAssociationRow, match: ImagingDocumentSuggestion) {
+    const returnPhase: ImagingPhase = phase === "site" ? "site" : "review";
     setLoading(true);
     setError(null);
     try {
@@ -227,7 +394,7 @@ export default function ViewImagesScreen() {
         amount: row.amount,
       });
       await loadDate(displayDateToIso(data?.postingDate ?? isoDateToDisplay(postingDate)));
-      setPhase("review");
+      setPhase(returnPhase);
       setPreviewPath(match.filePath);
       setPreviewTitle(match.fileName);
     } catch (confirmError) {
@@ -420,6 +587,13 @@ export default function ViewImagesScreen() {
 
   function setPreviewDocument(filePath: string, fileName: string, page = 0) {
     setPreviewPath(filePath);
+    setPreviewDirectUrl("");
+    setPreviewKeyproof(null);
+    setPreviewPageImageUrl("");
+    setPreviewMarker(null);
+    setPreviewMarkerStatus("post");
+    setPreviewMarkerLabel("");
+    setPreviewItemDetails(null);
     setPreviewTitle(fileName);
     setPreviewPage(page);
   }
@@ -428,6 +602,184 @@ export default function ViewImagesScreen() {
     setPreviewDocument(filePath, fileName, page);
     setIsPreviewOpen(true);
     setPhase(nextPhase);
+  }
+
+  function openReviewDocument(file: ImagingReviewFile) {
+    setPreviewPath(file.filePath ?? "");
+    setPreviewDirectUrl(file.openUrl ?? "");
+    setPreviewKeyproof(file.keyproof ?? null);
+    setPreviewPageImageUrl(file.pageImageUrl ?? "");
+    setPreviewMarker(file.marker ?? null);
+    setPreviewMarkerStatus(file.markerStatus ?? "post");
+    setPreviewMarkerLabel(file.markerLabel ?? "");
+    setPreviewItemDetails(file.itemDetails ?? null);
+    setPreviewTitle(file.fileName);
+    setPreviewPage(file.bookmarkPage ?? 0);
+    setIsPreviewOpen(true);
+    setPhase("review");
+  }
+
+  async function openFlywireDetails(row: ImagingBalsheetAssociationRow) {
+    setFlywireRow(row);
+    setFlywireDetails(null);
+    setFlywireError(null);
+    setFlywireLoading(true);
+    try {
+      const response = await getImagingFlywireDetails(row.entryId);
+      setFlywireDetails(response.data);
+    } catch (detailsError) {
+      setFlywireError(formatImagingError(detailsError, "GET", `${API_BASE}/imaging/balsheet/${row.entryId}/flywire`));
+    } finally {
+      setFlywireLoading(false);
+    }
+  }
+
+  function selectSiteWorkbenchItem(entryId: string, workbench = siteWorkbench) {
+    const item = workbench?.queue.find((candidate) => candidate.entryId === entryId);
+    if (!item) return;
+    setSiteWorkbenchEntryId(entryId);
+    setSiteWorkbenchNote(item.association?.note ?? "");
+    setSiteMarker(markerFromAssociation(item.association));
+    setSiteMarkerStatus(item.association?.markerStatus ?? "post");
+    setSiteMarkerDrawing(false);
+    setSiteMarkerStart(null);
+    if (item.association) {
+      setSiteWorkbenchDocumentId(item.association.importedFileId);
+      setSiteWorkbenchPage(item.association.pageStart);
+    }
+  }
+
+  async function openSiteWorkbench(row: ImagingBalsheetAssociationRow) {
+    setSiteWorkbenchLoading(true);
+    setSiteWorkbenchError(null);
+    setSiteWorkbench(null);
+    setSiteWorkbenchEntryId(row.entryId);
+    try {
+      const response = await getImagingSiteWorkbench(row.postingDate, row.type);
+      const workbench = response.data;
+      setSiteWorkbench(workbench);
+      const selectedDocument = workbench.documents[0];
+      const requestedItem = workbench.queue.find((item) => item.entryId === row.entryId);
+      const firstPending = workbench.queue.find((item) => !item.association);
+      const selectedItem = requestedItem?.association ? requestedItem : firstPending ?? requestedItem ?? workbench.queue[0];
+      setSiteWorkbenchDocumentId(selectedItem?.association?.importedFileId ?? selectedDocument?.importedFileId ?? 0);
+      setSiteWorkbenchEntryId(selectedItem?.entryId ?? "");
+      setSiteWorkbenchPage(selectedItem?.association?.pageStart ?? 1);
+      setSiteWorkbenchNote(selectedItem?.association?.note ?? "");
+      setSiteMarker(markerFromAssociation(selectedItem?.association ?? null));
+      setSiteMarkerStatus(selectedItem?.association?.markerStatus ?? "post");
+      setSiteMarkerDrawing(false);
+      setSiteMarkerStart(null);
+    } catch (workbenchError) {
+      setSiteWorkbenchError(
+        formatImagingError(workbenchError, "GET", `${API_BASE}/imaging/site-workbench?posting_date=${row.postingDate}&site=${row.type}`)
+      );
+    } finally {
+      setSiteWorkbenchLoading(false);
+    }
+  }
+
+  async function bookmarkAndAssociateSitePage() {
+    if (!siteWorkbench || !selectedSiteWorkbenchItem || !selectedSiteWorkbenchDocument) return;
+    setSiteWorkbenchSaving(true);
+    setSiteWorkbenchError(null);
+    try {
+      const response = await saveImagingSitePageAssociation({
+        entryId: selectedSiteWorkbenchItem.entryId,
+        importedFileId: selectedSiteWorkbenchDocument.importedFileId,
+        pageNumber: siteWorkbenchPage,
+        note: siteWorkbenchNote,
+        marker: siteMarker,
+        markerStatus: siteMarkerStatus,
+      });
+      const updated = response.data;
+      setSiteWorkbench(updated);
+      const currentIndex = updated.queue.findIndex((item) => item.entryId === selectedSiteWorkbenchItem.entryId);
+      const nextPending = [
+        ...updated.queue.slice(currentIndex + 1),
+        ...updated.queue.slice(0, Math.max(currentIndex, 0)),
+      ].find((item) => !item.association);
+      if (nextPending) {
+        setSiteWorkbenchEntryId(nextPending.entryId);
+        setSiteWorkbenchNote("");
+        setSiteMarker(null);
+        setSiteMarkerStatus("post");
+        setSiteMarkerDrawing(false);
+        setSiteWorkbenchPage((currentPage) =>
+          Math.min(currentPage + 1, selectedSiteWorkbenchDocument.pageCount || currentPage + 1)
+        );
+      }
+      await loadDate(displayDateToIso(updated.postingDate));
+      setPhase("site");
+    } catch (associationError) {
+      setSiteWorkbenchError(
+        formatImagingError(associationError, "POST", `${API_BASE}/imaging/site-page-associations`)
+      );
+    } finally {
+      setSiteWorkbenchSaving(false);
+    }
+  }
+
+  function changeSiteWorkbenchPage(page: number) {
+    setSiteWorkbenchPage(Math.max(1, Math.min(page, selectedSiteWorkbenchDocument?.pageCount || page)));
+    setSiteMarker(null);
+    setSiteMarkerDrawing(false);
+    setSiteMarkerStart(null);
+  }
+
+  function siteMarkerPoint(event: ReactPointerEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width)),
+      y: Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)),
+    };
+  }
+
+  function beginSiteMarker(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!siteMarkerDrawing) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const point = siteMarkerPoint(event);
+    setSiteMarkerStart(point);
+    setSiteMarker({ x: point.x, y: point.y, width: 0, height: 0 });
+  }
+
+  function updateSiteMarker(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!siteMarkerDrawing || !siteMarkerStart) return;
+    const point = siteMarkerPoint(event);
+    setSiteMarker({
+      x: Math.min(siteMarkerStart.x, point.x),
+      y: Math.min(siteMarkerStart.y, point.y),
+      width: Math.abs(point.x - siteMarkerStart.x),
+      height: Math.abs(point.y - siteMarkerStart.y),
+    });
+  }
+
+  function finishSiteMarker(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!siteMarkerStart) return;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    setSiteMarkerStart(null);
+    setSiteMarkerDrawing(false);
+    setSiteMarker((marker) => (marker && marker.width >= 0.01 && marker.height >= 0.01 ? marker : null));
+  }
+
+  async function removeSitePageAssociation(entryId: string) {
+    setSiteWorkbenchSaving(true);
+    setSiteWorkbenchError(null);
+    try {
+      const response = await deleteImagingSitePageAssociation(entryId);
+      setSiteWorkbench(response.data);
+      selectSiteWorkbenchItem(entryId, response.data);
+      await loadDate(displayDateToIso(response.data.postingDate));
+      setPhase("site");
+    } catch (associationError) {
+      setSiteWorkbenchError(
+        formatImagingError(associationError, "DELETE", `${API_BASE}/imaging/site-page-associations/${entryId}`)
+      );
+    } finally {
+      setSiteWorkbenchSaving(false);
+    }
   }
 
   function getReviewFile(row: ImagingBalsheetAssociationRow): ImagingReviewFile | null {
@@ -440,6 +792,33 @@ export default function ViewImagesScreen() {
         matchMethod: linked.matchMethod,
         confidence: linked.confidence,
         bookmarkPage: linked.bookmarkPage,
+      };
+    }
+
+    const siteAssociation = row.siteAssociation;
+    if (siteAssociation) {
+      return {
+        fileName: siteAssociation.fileName,
+        source: "site",
+        matchMethod: "site-page-bookmark",
+        confidence: 1,
+        bookmarkPage: siteAssociation.pageStart,
+        openUrl: buildImagingSiteDocumentOpenUrl(siteAssociation.importedFileId, siteAssociation.pageStart),
+        keyproof: siteAssociation.keyproof,
+        pageImageUrl: buildImagingSitePageUrl(siteAssociation.importedFileId, siteAssociation.pageStart),
+        marker: markerFromAssociation(siteAssociation),
+        markerStatus: siteAssociation.markerStatus,
+        markerLabel: `${siteAssociation.markerStatus === "do_not_post" ? "DO NOT POST" : "POST"} · ${formatCurrency(row.amount)}`,
+        itemDetails: {
+          site: row.type,
+          postingDate: row.postingDate,
+          amount: row.amount,
+          payer: row.payer,
+          checkNumber: row.checkNumber,
+          eob: row.eob,
+          note: siteAssociation.note,
+          markerStatus: siteAssociation.markerStatus,
+        },
       };
     }
 
@@ -458,14 +837,17 @@ export default function ViewImagesScreen() {
     return null;
   }
 
-  const sidebarActions = (
+  const sidebarControls = (
     <div style={viewImagesStyles.sidebarStack}>
       <label style={viewImagesStyles.sidebarDateField}>
-        <span style={viewImagesStyles.dateLabel}>Date</span>
         <input
           type="date"
           value={postingDate}
-          onChange={(event) => setPostingDate(event.target.value)}
+          onChange={(event) => {
+            const nextDate = event.target.value;
+            setPostingDate(nextDate);
+            void loadDate(nextDate);
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault();
@@ -480,16 +862,44 @@ export default function ViewImagesScreen() {
 
       <button
         type="button"
-        onClick={() => void loadDate()}
+        onClick={() => void refreshMatches()}
         style={{
           ...adminStyles.navButton,
-          ...(phase === "loaded" ? adminStyles.navButtonBack : null),
+          ...(phase === "matched" ? adminStyles.navButtonBack : null),
         }}
         disabled={loading}
       >
-        <span style={adminStyles.navButtonLabel}>Load Date</span>
+        <span style={adminStyles.navButtonLabel}>Phase 1 - 835</span>
         <span style={adminStyles.navButtonGlyph}>&gt;</span>
       </button>
+
+      <div style={{ display: "grid", gap: "8px" }}>
+        <button
+          type="button"
+          onClick={() => setPhase("lockbox")}
+          style={{
+            ...adminStyles.navButton,
+            ...(phase === "lockbox" ? adminStyles.navButtonBack : null),
+          }}
+          disabled={!data}
+        >
+          <span style={adminStyles.navButtonLabel}>Phase 2 - Lockbox</span>
+          <span style={adminStyles.navButtonGlyph}>&gt;</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPhase("site")}
+          style={{
+            ...adminStyles.navButton,
+            ...(phase === "site" ? adminStyles.navButtonBack : null),
+          }}
+          disabled={!data}
+        >
+          <span style={adminStyles.navButtonLabel}>Phase 3 - Sites</span>
+          <span style={adminStyles.navButtonGlyph}>&gt;</span>
+        </button>
+      </div>
 
       <button
         type="button"
@@ -500,18 +910,7 @@ export default function ViewImagesScreen() {
         }}
         disabled={loading || !postingDate.trim()}
       >
-        <span style={adminStyles.navButtonLabel}>Auto Match</span>
-        <span style={adminStyles.navButtonGlyph}>&gt;</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => void commitExactMatches()}
-        style={adminStyles.navButton}
-        disabled={loading || !data}
-        title={exactMatchCount > 0 ? `Commit ${exactMatchCount} exact match${exactMatchCount === 1 ? "" : "es"}` : "Commit exact matches if any are available"}
-      >
-        <span style={adminStyles.navButtonLabel}>Commit 100% {exactMatchCount > 0 ? `(${exactMatchCount})` : ""}</span>
+        <span style={adminStyles.navButtonLabel}>Update</span>
         <span style={adminStyles.navButtonGlyph}>&gt;</span>
       </button>
 
@@ -524,27 +923,10 @@ export default function ViewImagesScreen() {
         }}
         disabled={!data}
       >
-        <span style={adminStyles.navButtonLabel}>Review Matches</span>
+        <span style={adminStyles.navButtonLabel}>View</span>
         <span style={adminStyles.navButtonGlyph}>&gt;</span>
       </button>
 
-      <button
-        type="button"
-        onClick={() => setPhase("lockbox")}
-        style={{
-          ...adminStyles.navButton,
-          ...(phase === "lockbox" ? adminStyles.navButtonBack : null),
-        }}
-        disabled={!data}
-      >
-        <span style={adminStyles.navButtonLabel}>Lockbox Images</span>
-        <span style={adminStyles.navButtonGlyph}>&gt;</span>
-      </button>
-
-      <button type="button" onClick={() => navigate("/collections")} style={adminStyles.navButton}>
-        <span style={adminStyles.navButtonLabel}>Collections</span>
-        <span style={adminStyles.navButtonGlyph}>&gt;</span>
-      </button>
     </div>
   );
 
@@ -563,23 +945,36 @@ export default function ViewImagesScreen() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isPreviewOpen]);
 
-  const previewUrl = previewPath ? buildImagingFileOpenUrl(previewPath, previewPage) : "";
+  useEffect(() => {
+    if (!siteWorkbench) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.tagName === "INPUT" || target?.tagName === "TEXTAREA") return;
+      if (event.key === "Escape") {
+        setSiteWorkbench(null);
+      } else if (event.key === "ArrowRight" || event.key === "PageDown") {
+        setSiteWorkbenchPage((page) => Math.min(page + 1, selectedSiteWorkbenchDocument?.pageCount || page + 1));
+        setSiteMarker(null);
+        setSiteMarkerDrawing(false);
+      } else if (event.key === "ArrowLeft" || event.key === "PageUp") {
+        setSiteWorkbenchPage((page) => Math.max(1, page - 1));
+        setSiteMarker(null);
+        setSiteMarkerDrawing(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [selectedSiteWorkbenchDocument?.pageCount, siteWorkbench]);
+
+  const previewUrl = previewDirectUrl || (previewPath ? buildImagingFileOpenUrl(previewPath, previewPage) : "");
 
   return (
     <AdminShell
       sidebarCopy="A dedicated imaging workspace for matching Balsheet rows to source files and opening the original PDF."
       onBack={() => navigate("/collections")}
-      useGlobalMenuFallback={false}
-      hideSidebarBackMenu
-      hideSidebarBackStyles
-      sidebarAction={sidebarActions}
-      sidebarCardLabel="Status"
-      sidebarCardValue={phaseTitle}
-      sidebarCardMeta={
-        data
-          ? `${data.rowCount} row${data.rowCount === 1 ? "" : "s"} loaded, ${data.indexCount} indexed file${data.indexCount === 1 ? "" : "s"} available.`
-          : "Enter a date and load the day's Balsheet rows."
-      }
+      backButtonFirst
+      useGlobalMenuFallback
+      sidebarTopCard={sidebarControls}
     >
       <section style={viewImagesStyles.content}>
         <section style={viewImagesStyles.heroShell}>
@@ -619,8 +1014,29 @@ export default function ViewImagesScreen() {
                   Considering: {data?.postingDate || postingDate || "No date selected"}
                 </div>
               </div>
-              <div style={adminStyles.sectionMeta}>
-                Confirm a suggested file to save the association, then use the view button to open the original PDF.
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                <div style={adminStyles.sectionMeta}>
+                  Confirm a suggested file to save the association, then use the view button to open the original PDF.
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void commitExactMatches()}
+                  style={{
+                    ...adminStyles.navButton,
+                    paddingInline: "18px",
+                    minHeight: "56px",
+                    ...(phase === "review" ? adminStyles.navButtonBack : null),
+                  }}
+                  disabled={loading || !data}
+                  title={
+                    exactMatchCount > 0
+                      ? `Commit ${exactMatchCount} exact match${exactMatchCount === 1 ? "" : "es"}`
+                      : "Commit exact matches if any are available"
+                  }
+                >
+                  <span style={adminStyles.navButtonLabel}>Commit 100% {exactMatchCount > 0 ? `(${exactMatchCount})` : ""}</span>
+                  <span style={adminStyles.navButtonGlyph}>&gt;</span>
+                </button>
               </div>
             </div>
 
@@ -634,7 +1050,7 @@ export default function ViewImagesScreen() {
                       <section key={group.type} style={viewImagesStyles.reviewGroup}>
                         <div style={viewImagesStyles.reviewGroupHeader}>
                           <div>
-                            <div style={adminStyles.sectionKicker}>Review matches</div>
+                            <div style={adminStyles.sectionKicker}>View</div>
                             <h3 style={adminStyles.sectionTitle}>{group.type}</h3>
                           </div>
                           <div style={viewImagesStyles.reviewGroupMeta}>
@@ -652,6 +1068,7 @@ export default function ViewImagesScreen() {
 
                         {group.rows.map((row) => {
                           const reviewFile = getReviewFile(row);
+                          const isPaymentPlan = row.eob.trim().toUpperCase() === "P";
                           return (
                             <div key={row.entryId} style={viewImagesStyles.reviewTableRow}>
                               <div style={viewImagesStyles.reviewColumnType}>{row.type || group.type}</div>
@@ -659,20 +1076,42 @@ export default function ViewImagesScreen() {
                               <div style={viewImagesStyles.reviewColumnPayer}>{row.payer || "Untitled payer"}</div>
                               <div style={viewImagesStyles.reviewColumnCheck}>{row.checkNumber || "No check number"}</div>
                               <div style={viewImagesStyles.reviewColumnImage}>
-                                {reviewFile ? (
+                                {reviewFile || isPaymentPlan ? (
                                   <div style={viewImagesStyles.reviewImageInline}>
-                                    <button
-                                      type="button"
-                                      style={viewImagesStyles.smallButton}
-                                      onClick={() => openDocument(reviewFile.filePath, reviewFile.fileName, reviewFile.bookmarkPage || 0)}
-                                    >
-                                      View Image
-                                    </button>
-                                    <span style={viewImagesStyles.reviewImageMeta}>
-                                      {typeof reviewFile.confidence === "number"
-                                        ? `${Math.round(reviewFile.confidence * 100)}% match`
-                                        : "Matched"}
-                                    </span>
+                                    {reviewFile && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          style={viewImagesStyles.smallButton}
+                                          onClick={() => openReviewDocument(reviewFile)}
+                                        >
+                                          View Image
+                                        </button>
+                                        <span style={viewImagesStyles.reviewImageMeta}>
+                                          {typeof reviewFile.confidence === "number"
+                                            ? `${Math.round(reviewFile.confidence * 100)}% image`
+                                            : "Image matched"}
+                                        </span>
+                                      </>
+                                    )}
+                                    {isPaymentPlan && (
+                                      <>
+                                        <button
+                                          type="button"
+                                          style={viewImagesStyles.flywireButton}
+                                          onClick={() => void openFlywireDetails(row)}
+                                        >
+                                          View Fly Wire
+                                        </button>
+                                        <span style={viewImagesStyles.reviewImageMeta}>
+                                          {row.flywire?.exactMatchCount
+                                            ? `${Math.round(row.flywire.confidence * 100)}% Fly Wire${row.flywire.ambiguous ? ` · ${row.flywire.exactMatchCount} candidates` : ""}`
+                                            : row.flywire?.available
+                                              ? "Fly Wire found · no amount match"
+                                              : "Fly Wire missing"}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                 ) : (
                                   <span style={viewImagesStyles.reviewImageMeta}>No image matched</span>
@@ -846,21 +1285,72 @@ export default function ViewImagesScreen() {
 
                 {phase !== "lockbox" && (
                   <div style={viewImagesStyles.rowsColumn}>
-                    {allRows.length === 0 ? (
-                      <div style={viewImagesStyles.emptyState}>No Balsheet rows were found for {data.postingDate}.</div>
+                    {phase === "site" && (
+                      <div style={viewImagesStyles.siteImagesHeader}>
+                        <div>
+                          <div style={adminStyles.sectionKicker}>Site images</div>
+                          <h3 style={adminStyles.sectionTitle}>Scanned paperwork by site</h3>
+                        </div>
+                        <div style={viewImagesStyles.siteImagesHeaderActions}>
+                          <div style={viewImagesStyles.siteImagesMeta}>
+                            {siteImageQueueRows.filter((row) => !row.siteAssociation).length} of {siteImageQueueRows.length} item
+                            {siteImageQueueRows.length === 1 ? "" : "s"} need page association. Payment Plans use Fly Wire details.
+                          </div>
+                          {Array.from(new Map(siteImageQueueRows.map((row) => [row.type.trim().toLowerCase(), row])).values()).map((row) => (
+                            <button
+                              key={row.type}
+                              type="button"
+                              style={viewImagesStyles.siteWorkbenchButton}
+                              onClick={() => void openSiteWorkbench(row)}
+                            >
+                              Open {row.type || "Site"} Queue
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {(phase === "site" ? siteRows : allRows).length === 0 ? (
+                      <div style={viewImagesStyles.emptyState}>
+                        {phase === "site"
+                          ? `No Site Image rows were found for ${data.postingDate}.`
+                          : `No Balsheet rows were found for ${data.postingDate}.`}
+                      </div>
                     ) : (
-                      allRows.map((row) => (
+                      (phase === "site" ? siteRows : allRows).map((row) => (
                         <article key={row.entryId} style={viewImagesStyles.rowCard}>
                           <div style={viewImagesStyles.rowTop}>
                             <div>
-                              <div style={viewImagesStyles.rowTitle}>{row.payer || "Untitled payer"}</div>
+                              <div style={viewImagesStyles.rowTitle}>
+                                {phase === "site" ? row.type || "Unspecified site" : row.payer || "Untitled payer"}
+                              </div>
                               <div style={viewImagesStyles.rowMeta}>
+                                {phase === "site" && row.payer ? `${row.payer} · ` : ""}
                                 {row.postingDate} · {formatCurrency(row.amount)} · {row.checkNumber || "No check number"}
                               </div>
                             </div>
-                            <span style={viewImagesStyles.rowBadge}>
-                              {row.linkedFiles.length > 0 ? `${row.linkedFiles.length} linked` : `${row.matches.length} suggested`}
-                            </span>
+                            <div style={viewImagesStyles.rowTopActions}>
+                              {phase === "site" && row.eob.trim().toUpperCase() === "P" && (
+                                <button
+                                  type="button"
+                                  style={viewImagesStyles.flywireButton}
+                                  onClick={() => void openFlywireDetails(row)}
+                                >
+                                  View Fly Wire Details
+                                </button>
+                              )}
+                              <span style={viewImagesStyles.rowBadge}>
+                                {phase === "site" && row.eob.trim().toUpperCase() === "P"
+                                  ? row.flywire?.exactMatchCount
+                                    ? "Fly Wire 100%"
+                                    : "Fly Wire"
+                                  : phase === "site" && row.siteAssociation
+                                  ? `Page ${row.siteAssociation.pageStart} associated`
+                                  : row.linkedFiles.length > 0
+                                    ? `${row.linkedFiles.length} linked`
+                                    : `${row.matches.length} suggested`}
+                              </span>
+                            </div>
                           </div>
 
                           <div style={viewImagesStyles.fileList}>
@@ -880,7 +1370,9 @@ export default function ViewImagesScreen() {
                                       <button
                                         type="button"
                                         style={viewImagesStyles.smallButton}
-                                        onClick={() => openDocument(file.filePath, file.fileName)}
+                                        onClick={() =>
+                                          openDocument(file.filePath, file.fileName, file.bookmarkPage || 0, phase === "site" ? "site" : "review")
+                                        }
                                       >
                                         View PDF
                                       </button>
@@ -914,7 +1406,7 @@ export default function ViewImagesScreen() {
                                       <button
                                         type="button"
                                         style={viewImagesStyles.smallButton}
-                                        onClick={() => openDocument(match.filePath, match.fileName)}
+                                        onClick={() => openDocument(match.filePath, match.fileName, match.bookmarkPage || 0, phase === "site" ? "site" : "review")}
                                       >
                                         View PDF
                                       </button>
@@ -942,7 +1434,7 @@ export default function ViewImagesScreen() {
               </div>
             )}
 
-            {isPreviewOpen && previewPath
+            {isPreviewOpen && previewUrl
               ? createPortal(
                   <div
                     style={viewImagesStyles.previewOverlay}
@@ -974,11 +1466,470 @@ export default function ViewImagesScreen() {
                         </div>
                       </div>
 
-                      <iframe
-                        title={previewTitle || "Original PDF"}
-                        src={previewUrl}
-                        style={viewImagesStyles.previewFrame}
-                      />
+                      {previewItemDetails
+                        ? <AssociatedItemBanner details={previewItemDetails} />
+                        : previewKeyproof && <KeyproofDetailsBanner details={previewKeyproof} />}
+
+                      {previewPageImageUrl ? (
+                        <div style={viewImagesStyles.reviewMarkedPageCanvas}>
+                          <div style={viewImagesStyles.sitePageImageStage}>
+                            <img
+                              src={previewPageImageUrl}
+                              alt={`${previewTitle || "Site image"}, page ${previewPage}`}
+                              style={viewImagesStyles.sitePageImage}
+                              draggable={false}
+                            />
+                            {previewMarker && (
+                              <div
+                                style={{
+                                  ...viewImagesStyles.sitePostingMarker,
+                                  ...(previewMarkerStatus === "do_not_post"
+                                    ? viewImagesStyles.sitePostingMarkerStop
+                                    : viewImagesStyles.sitePostingMarkerPost),
+                                  left: `${previewMarker.x * 100}%`,
+                                  top: `${previewMarker.y * 100}%`,
+                                  width: `${previewMarker.width * 100}%`,
+                                  height: `${previewMarker.height * 100}%`,
+                                }}
+                              >
+                                <span style={viewImagesStyles.sitePostingMarkerLabel}>
+                                  {previewMarkerLabel || (previewMarkerStatus === "do_not_post" ? "DO NOT POST" : "POST")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <iframe
+                          title={previewTitle || "Original PDF"}
+                          src={previewUrl}
+                          style={viewImagesStyles.previewFrame}
+                        />
+                      )}
+                    </div>
+                  </div>,
+                  document.body
+                )
+              : null}
+
+            {siteWorkbench || siteWorkbenchLoading || siteWorkbenchError
+              ? createPortal(
+                  <div style={viewImagesStyles.previewOverlay} role="dialog" aria-modal="true" aria-label="Site image association workbench">
+                    <div style={viewImagesStyles.siteWorkbenchModal}>
+                      <div style={viewImagesStyles.siteWorkbenchTopbar}>
+                        <div>
+                          <div style={adminStyles.sectionKicker}>Site image association workbench</div>
+                          <div style={viewImagesStyles.siteWorkbenchTitleRow}>
+                            <h2 style={adminStyles.sectionTitle}>{siteWorkbench?.site || "Loading site queue"}</h2>
+                            {selectedSiteWorkbenchItem && (
+                              <div style={viewImagesStyles.siteMarkerControls}>
+                                <button
+                                  type="button"
+                                  style={{
+                                    ...viewImagesStyles.siteMarkerChoice,
+                                    ...viewImagesStyles.siteMarkerChoicePost,
+                                    ...(siteMarkerStatus === "post" ? viewImagesStyles.siteMarkerChoiceActive : null),
+                                  }}
+                                  onClick={() => setSiteMarkerStatus("post")}
+                                >
+                                  Post
+                                </button>
+                                <button
+                                  type="button"
+                                  style={{
+                                    ...viewImagesStyles.siteMarkerChoice,
+                                    ...viewImagesStyles.siteMarkerChoiceStop,
+                                    ...(siteMarkerStatus === "do_not_post" ? viewImagesStyles.siteMarkerChoiceActive : null),
+                                  }}
+                                  onClick={() => setSiteMarkerStatus("do_not_post")}
+                                >
+                                  Do Not Post
+                                </button>
+                                <button
+                                  type="button"
+                                  style={viewImagesStyles.smallButtonSecondary}
+                                  onClick={() => {
+                                    setSiteMarker(null);
+                                    setSiteMarkerDrawing(true);
+                                  }}
+                                >
+                                  {siteMarker ? "Redraw Marker" : "Draw Marker"}
+                                </button>
+                                {siteMarker && (
+                                  <button type="button" style={viewImagesStyles.siteMarkerClear} onClick={() => setSiteMarker(null)}>
+                                    Clear
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div style={viewImagesStyles.previewMeta}>
+                            {siteWorkbench
+                              ? `${siteWorkbench.postingDate} · ${siteWorkbench.associatedCount} of ${siteWorkbench.queueCount} associated · ${formatCurrency(siteWorkbench.queueTotal)}`
+                              : "Finding accepted Site Review paperwork..."}
+                          </div>
+                        </div>
+                        <div style={viewImagesStyles.previewHeaderActions}>
+                          {selectedSiteWorkbenchDocument && (
+                            <a
+                              href={buildImagingSiteDocumentOpenUrl(selectedSiteWorkbenchDocument.importedFileId)}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={viewImagesStyles.previewOpenLink}
+                            >
+                              Open original PDF
+                            </a>
+                          )}
+                          <button
+                            type="button"
+                            style={viewImagesStyles.smallButtonSecondary}
+                            onClick={() => {
+                              setSiteWorkbench(null);
+                              setSiteWorkbenchError(null);
+                            }}
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+
+                      <div style={viewImagesStyles.siteWorkbenchBody}>
+                        {siteWorkbenchError && <div style={viewImagesStyles.errorBanner}>{siteWorkbenchError}</div>}
+                        {siteWorkbenchLoading && <div style={viewImagesStyles.emptyState}>Loading accepted paperwork and queue...</div>}
+
+                        {siteWorkbench && (
+                          <div style={viewImagesStyles.siteWorkbenchLayout}>
+                          <section style={viewImagesStyles.siteWorkbenchViewer}>
+                            <div style={viewImagesStyles.siteWorkbenchControls}>
+                              <select
+                                value={siteWorkbenchDocumentId}
+                                onChange={(event) => {
+                                  setSiteWorkbenchDocumentId(Number(event.target.value));
+                                  setSiteWorkbenchPage(1);
+                                  setSiteMarker(null);
+                                  setSiteMarkerDrawing(false);
+                                }}
+                                style={viewImagesStyles.siteWorkbenchSelect}
+                                aria-label="Accepted Site Review document"
+                              >
+                                {siteWorkbench.documents.map((document) => (
+                                  <option key={document.importedFileId} value={document.importedFileId}>
+                                    {document.fileName} · {formatCurrency(document.total)}
+                                  </option>
+                                ))}
+                              </select>
+                              <div style={viewImagesStyles.sitePageControls}>
+                                <button
+                                  type="button"
+                                  style={viewImagesStyles.smallButton}
+                                  onClick={() => changeSiteWorkbenchPage(siteWorkbenchPage - 1)}
+                                  disabled={siteWorkbenchPage <= 1}
+                                >
+                                  Previous
+                                </button>
+                                <label style={viewImagesStyles.sitePageField}>
+                                  Page
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={selectedSiteWorkbenchDocument?.pageCount || undefined}
+                                    value={siteWorkbenchPage}
+                                    onChange={(event) => changeSiteWorkbenchPage(Number(event.target.value) || 1)}
+                                    style={viewImagesStyles.sitePageInput}
+                                  />
+                                  <span>of {selectedSiteWorkbenchDocument?.pageCount || "?"}</span>
+                                </label>
+                                <button
+                                  type="button"
+                                  style={viewImagesStyles.smallButton}
+                                  onClick={() => changeSiteWorkbenchPage(siteWorkbenchPage + 1)}
+                                  disabled={Boolean(
+                                    selectedSiteWorkbenchDocument?.pageCount &&
+                                      siteWorkbenchPage >= selectedSiteWorkbenchDocument.pageCount
+                                  )}
+                                >
+                                  Next
+                                </button>
+                                <button
+                                  type="button"
+                                  style={viewImagesStyles.siteAssociateButton}
+                                  onClick={() => void bookmarkAndAssociateSitePage()}
+                                  disabled={siteWorkbenchSaving || !selectedSiteWorkbenchDocument || !selectedSiteWorkbenchItem}
+                                >
+                                  {siteWorkbenchSaving
+                                    ? "Saving..."
+                                    : selectedSiteWorkbenchItem
+                                      ? `Associate Page ${siteWorkbenchPage} to Item #${selectedSiteWorkbenchItem.queueNumber}`
+                                      : "Select a Queue Item"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {selectedSiteWorkbenchItem && (
+                              <AssociatedItemBanner
+                                details={{
+                                  site: selectedSiteWorkbenchItem.site,
+                                  postingDate: selectedSiteWorkbenchItem.postingDate,
+                                  amount: selectedSiteWorkbenchItem.amount,
+                                  payer: selectedSiteWorkbenchItem.payer,
+                                  checkNumber: selectedSiteWorkbenchItem.checkNumber,
+                                  eob: selectedSiteWorkbenchItem.eob,
+                                  note: siteWorkbenchNote,
+                                  markerStatus: siteMarkerStatus,
+                                }}
+                              />
+                            )}
+
+                            {selectedSiteWorkbenchDocument ? (
+                              <div style={viewImagesStyles.sitePageCanvas}>
+                                <div
+                                  style={{
+                                    ...viewImagesStyles.sitePageImageStage,
+                                    ...(siteMarkerDrawing ? viewImagesStyles.sitePageImageStageDrawing : null),
+                                  }}
+                                  onPointerDown={beginSiteMarker}
+                                  onPointerMove={updateSiteMarker}
+                                  onPointerUp={finishSiteMarker}
+                                  onPointerCancel={finishSiteMarker}
+                                >
+                                  <img
+                                    key={`${selectedSiteWorkbenchDocument.importedFileId}-${siteWorkbenchPage}`}
+                                    src={buildImagingSitePageUrl(selectedSiteWorkbenchDocument.importedFileId, siteWorkbenchPage)}
+                                    alt={`${selectedSiteWorkbenchDocument.fileName}, page ${siteWorkbenchPage}`}
+                                    style={viewImagesStyles.sitePageImage}
+                                    draggable={false}
+                                  />
+                                  {siteMarker && siteMarker.width > 0 && siteMarker.height > 0 && (
+                                    <div
+                                      style={{
+                                        ...viewImagesStyles.sitePostingMarker,
+                                        ...(siteMarkerStatus === "do_not_post"
+                                          ? viewImagesStyles.sitePostingMarkerStop
+                                          : viewImagesStyles.sitePostingMarkerPost),
+                                        left: `${siteMarker.x * 100}%`,
+                                        top: `${siteMarker.y * 100}%`,
+                                        width: `${siteMarker.width * 100}%`,
+                                        height: `${siteMarker.height * 100}%`,
+                                      }}
+                                    >
+                                      <span style={viewImagesStyles.sitePostingMarkerLabel}>
+                                        #{selectedSiteWorkbenchItem?.queueNumber || "?"} · {siteMarkerStatus === "do_not_post" ? "DO NOT POST" : "POST"}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={viewImagesStyles.emptyState}>No accepted Site Review PDF matches this site and date.</div>
+                            )}
+
+                            {selectedSiteWorkbenchItem && (
+                              <div style={viewImagesStyles.siteBookmarkBar}>
+                                <div style={viewImagesStyles.siteBookmarkIdentity}>
+                                  <span style={viewImagesStyles.siteQueueNumber}>{selectedSiteWorkbenchItem.queueNumber}</span>
+                                  <div>
+                                    <strong>{formatCurrency(selectedSiteWorkbenchItem.amount)}</strong>
+                                    <span>{selectedSiteWorkbenchItem.payer || "Untitled payer"}</span>
+                                  </div>
+                                </div>
+                                <input
+                                  value={siteWorkbenchNote}
+                                  onChange={(event) => setSiteWorkbenchNote(event.target.value)}
+                                  placeholder="Optional breadcrumb note"
+                                  style={viewImagesStyles.siteBookmarkNote}
+                                />
+                                <span style={viewImagesStyles.siteBookmarkHint}>
+                                  {siteMarkerDrawing
+                                    ? "Drag a box over the details on the page."
+                                    : "Save with the green association button."}
+                                </span>
+                              </div>
+                            )}
+                          </section>
+
+                          <aside style={viewImagesStyles.siteQueuePanel}>
+                            <div style={viewImagesStyles.siteQueueHeader}>
+                              <div>
+                                <div style={adminStyles.sectionKicker}>Association queue</div>
+                                <strong>{siteWorkbench.queueCount - siteWorkbench.associatedCount} remaining</strong>
+                              </div>
+                              <span>Click an item to make it active.</span>
+                            </div>
+                            <div style={viewImagesStyles.siteQueueList}>
+                              {siteWorkbench.queue.map((item) => {
+                                const active = item.entryId === siteWorkbenchEntryId;
+                                return (
+                                  <button
+                                    key={item.entryId}
+                                    type="button"
+                                    style={{
+                                      ...viewImagesStyles.siteQueueItem,
+                                      ...(active ? viewImagesStyles.siteQueueItemActive : null),
+                                      ...(item.association ? viewImagesStyles.siteQueueItemComplete : null),
+                                    }}
+                                    onClick={() => selectSiteWorkbenchItem(item.entryId)}
+                                  >
+                                    <span style={viewImagesStyles.siteQueueNumber}>{item.queueNumber}</span>
+                                    <span style={viewImagesStyles.siteQueueCopy}>
+                                      <strong>{formatCurrency(item.amount)}</strong>
+                                      <span>{item.payer || "Untitled payer"}</span>
+                                      <small>{item.checkNumber || "No reference"}</small>
+                                    </span>
+                                    <span style={viewImagesStyles.siteQueueStatus}>
+                                      {item.association
+                                        ? `${item.association.markerWidth ? (item.association.markerStatus === "do_not_post" ? "Do Not Post" : "Post") + " · " : ""}Page ${item.association.pageStart}`
+                                        : "Pending"}
+                                    </span>
+                                    {item.association && (
+                                      <span
+                                        role="button"
+                                        tabIndex={0}
+                                        style={viewImagesStyles.siteUndoButton}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          void removeSitePageAssociation(item.entryId);
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            event.stopPropagation();
+                                            void removeSitePageAssociation(item.entryId);
+                                          }
+                                        }}
+                                      >
+                                        Undo
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </aside>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>,
+                  document.body
+                )
+              : null}
+
+            {flywireRow
+              ? createPortal(
+                  <div
+                    style={viewImagesStyles.previewOverlay}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Fly Wire details"
+                    onClick={() => setFlywireRow(null)}
+                  >
+                    <div style={viewImagesStyles.flywireModal} onClick={(event) => event.stopPropagation()}>
+                      <div style={viewImagesStyles.previewHeader}>
+                        <div>
+                          <div style={adminStyles.sectionKicker}>Payment Plan · Fly Wire</div>
+                          <h2 style={adminStyles.sectionTitle}>{flywireRow.type || "Site payment plan"}</h2>
+                          <div style={viewImagesStyles.previewMeta}>
+                            {flywireRow.postingDate} · {formatCurrency(flywireRow.amount)} · {flywireRow.payer || "No payer"}
+                          </div>
+                        </div>
+                        <button type="button" style={viewImagesStyles.smallButtonSecondary} onClick={() => setFlywireRow(null)}>
+                          Close
+                        </button>
+                      </div>
+
+                      <div style={viewImagesStyles.flywireModalBody}>
+                        {flywireLoading && <div style={viewImagesStyles.emptyState}>Loading the Fly Wire workbook details...</div>}
+                        {flywireError && <div style={viewImagesStyles.errorBanner}>{flywireError}</div>}
+                        {!flywireLoading && !flywireError && flywireDetails && !flywireDetails.available && (
+                          <div style={viewImagesStyles.emptyState}>No Fly Wire workbook was found for this Payment Plan date.</div>
+                        )}
+
+                        {!flywireLoading && flywireDetails?.available && (
+                          <>
+                            <div style={viewImagesStyles.flywireMatchSummary}>
+                              <strong>
+                                {flywireDetails.exactMatchCount} exact amount match
+                                {flywireDetails.exactMatchCount === 1 ? "" : "es"}
+                              </strong>
+                              <span>
+                                {flywireDetails.ambiguous
+                                  ? "More than one Fly Wire row has this amount. Review the highlighted candidates."
+                                  : "The highlighted row matches the Balsheet posting date and amount."}
+                              </span>
+                            </div>
+
+                            {flywireDetails.documents.map((documentPayload) => (
+                              <section key={documentPayload.document?.id ?? documentPayload.document?.source_filename} style={viewImagesStyles.flywireDocument}>
+                                <div style={viewImagesStyles.flywireDocumentHeader}>
+                                  <div>
+                                    <div style={viewImagesStyles.fileGroupLabel}>Imported workbook</div>
+                                    <div style={viewImagesStyles.flywireDocumentTitle}>
+                                      {documentPayload.document?.source_filename || "Fly Wire workbook"}
+                                    </div>
+                                    <div style={viewImagesStyles.flywireDocumentMeta}>
+                                      Sheet {documentPayload.document?.sheet_name || "unknown"} · Batch {documentPayload.document?.batch_id || "unknown"}
+                                    </div>
+                                  </div>
+                                  <div style={viewImagesStyles.flywireDocumentTotal}>
+                                    {formatCurrency(documentPayload.document?.total_amount ?? 0)}
+                                    <span>{documentPayload.rows.length} rows</span>
+                                  </div>
+                                </div>
+
+                                <div style={viewImagesStyles.flywireRows}>
+                                  {[...documentPayload.rows]
+                                    .sort((left, right) => {
+                                      const matchDifference =
+                                        Number(documentPayload.matched_row_ids.includes(right.id)) -
+                                        Number(documentPayload.matched_row_ids.includes(left.id));
+                                      return matchDifference || (left.position ?? 0) - (right.position ?? 0);
+                                    })
+                                    .map((flywireItem) => {
+                                      const isMatch = documentPayload.matched_row_ids.includes(flywireItem.id);
+                                      return (
+                                      <article
+                                        key={flywireItem.id}
+                                        style={{
+                                          ...viewImagesStyles.flywireRow,
+                                          ...(isMatch ? viewImagesStyles.flywireRowMatched : null),
+                                        }}
+                                      >
+                                        <div style={viewImagesStyles.flywireRowTop}>
+                                          <div>
+                                            <div style={viewImagesStyles.flywireRowTitle}>
+                                              {flywireItem.patient_name || flywireItem.billing_name || `Fly Wire row ${flywireItem.position}`}
+                                            </div>
+                                            <div style={viewImagesStyles.flywireRowMeta}>
+                                              {[flywireItem.location, flywireItem.department, flywireItem.payment_method, flywireItem.payment_type]
+                                                .filter(Boolean)
+                                                .join(" · ") || "No payment metadata"}
+                                            </div>
+                                          </div>
+                                          <div style={viewImagesStyles.flywireRowAmount}>
+                                            {formatCurrency(flywireItem.amount ?? 0)}
+                                            {isMatch && <span style={viewImagesStyles.flywireExactBadge}>Exact match</span>}
+                                          </div>
+                                        </div>
+                                        <div style={viewImagesStyles.flywireFacts}>
+                                          <span>Flywire ID: {flywireItem.flywire_id || "—"}</span>
+                                          <span>Account: {flywireItem.account_number || "—"}</span>
+                                          <span>Billing: {flywireItem.billing_name || "—"}</span>
+                                          <span>Application: {flywireItem.application || "—"}</span>
+                                          <span>Time: {flywireItem.time_text || "—"}</span>
+                                        </div>
+                                        <details style={viewImagesStyles.flywireRawDetails}>
+                                          <summary>All imported fields</summary>
+                                          <pre style={viewImagesStyles.flywireRawJson}>{formatFlywireRawJson(flywireItem.raw_json)}</pre>
+                                        </details>
+                                      </article>
+                                      );
+                                    })}
+                                </div>
+                              </section>
+                            ))}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>,
                   document.body
@@ -996,6 +1947,15 @@ function formatCurrency(value: unknown) {
   return Number.isFinite(parsed)
     ? parsed.toLocaleString("en-US", { style: "currency", currency: "USD" })
     : "$0.00";
+}
+
+function formatFlywireRawJson(value: string | null | undefined) {
+  if (!value) return "No original row data was stored.";
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
 }
 
 function isoDateToDisplay(value: string | null | undefined) {
@@ -1234,7 +2194,7 @@ const viewImagesStyles: Record<string, CSSProperties> = {
   },
   reviewTableHeader: {
     display: "grid",
-    gridTemplateColumns: "110px 120px minmax(180px, 1fr) 160px 160px",
+    gridTemplateColumns: "110px 120px minmax(180px, 1fr) 160px minmax(280px, auto)",
     gap: "10px",
     padding: "8px 12px",
     borderRadius: "14px",
@@ -1247,7 +2207,7 @@ const viewImagesStyles: Record<string, CSSProperties> = {
   },
   reviewTableRow: {
     display: "grid",
-    gridTemplateColumns: "110px 120px minmax(180px, 1fr) 160px 160px",
+    gridTemplateColumns: "110px 120px minmax(180px, 1fr) 160px minmax(280px, auto)",
     gap: "10px",
     alignItems: "center",
     padding: "10px 12px",
@@ -1288,7 +2248,7 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     alignItems: "center",
     gap: "8px",
     whiteSpace: "nowrap",
-    flexWrap: "nowrap",
+    flexWrap: "wrap",
     minWidth: 0,
   },
   reviewImageMeta: {
@@ -1302,6 +2262,44 @@ const viewImagesStyles: Record<string, CSSProperties> = {
   rowsColumn: {
     display: "grid",
     gap: "10px",
+  },
+  siteImagesHeader: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: "18px",
+    flexWrap: "wrap",
+    padding: "16px 18px",
+    borderRadius: "22px",
+    border: "1px solid rgba(52, 122, 102, 0.20)",
+    background:
+      "linear-gradient(135deg, rgba(235, 249, 241, 0.98) 0%, rgba(247, 252, 255, 0.96) 58%, rgba(255, 247, 235, 0.94) 100%)",
+    boxShadow: "0 18px 38px rgba(38, 92, 77, 0.08)",
+  },
+  siteImagesMeta: {
+    maxWidth: "58ch",
+    color: "#4f6f66",
+    fontSize: "13px",
+    fontWeight: 700,
+    lineHeight: 1.5,
+  },
+  siteImagesHeaderActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+  siteWorkbenchButton: {
+    border: "1px solid rgba(31, 108, 86, 0.28)",
+    borderRadius: "999px",
+    padding: "9px 13px",
+    background: "#185f4d",
+    color: "#ffffff",
+    fontSize: "11px",
+    fontWeight: 900,
+    cursor: "pointer",
+    boxShadow: "0 12px 24px rgba(24, 95, 77, 0.16)",
   },
   rowCard: {
     borderRadius: "22px",
@@ -1317,6 +2315,24 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: "10px",
+  },
+  rowTopActions: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  flywireButton: {
+    border: "1px solid rgba(32, 116, 91, 0.28)",
+    borderRadius: "999px",
+    padding: "7px 11px",
+    background: "linear-gradient(135deg, #176b55 0%, #278a6d 100%)",
+    color: "#ffffff",
+    fontSize: "11px",
+    fontWeight: 900,
+    cursor: "pointer",
+    boxShadow: "0 10px 22px rgba(23, 107, 85, 0.18)",
   },
   rowTitle: {
     fontSize: "16px",
@@ -1478,6 +2494,17 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     borderRadius: "16px",
     background: "#ffffff",
   },
+  reviewMarkedPageCanvas: {
+    minHeight: 0,
+    overflow: "auto",
+    display: "grid",
+    justifyItems: "center",
+    alignItems: "start",
+    padding: "40px 12px 14px",
+    borderRadius: "16px",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+    background: "radial-gradient(circle at top, #53635f 0%, #27332f 72%)",
+  },
   previewOverlay: {
     position: "fixed",
     inset: 0,
@@ -1493,7 +2520,7 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     height: "calc(100vh - 24px)",
     maxHeight: "calc(100vh - 24px)",
     display: "grid",
-    gridTemplateRows: "auto minmax(0, 1fr)",
+    gridTemplateRows: "auto auto minmax(0, 1fr)",
     gap: "14px",
     padding: "16px",
     borderRadius: "26px",
@@ -1501,6 +2528,579 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     background: "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(245,249,254,0.98) 100%)",
     boxShadow: "0 32px 80px rgba(7, 17, 29, 0.34)",
     overflow: "hidden",
+  },
+  flywireModal: {
+    width: "min(1440px, calc(100vw - 24px))",
+    height: "calc(100vh - 24px)",
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    gap: "14px",
+    padding: "18px",
+    borderRadius: "26px",
+    border: "1px solid rgba(49, 120, 99, 0.22)",
+    background: "linear-gradient(180deg, rgba(250,255,252,0.99) 0%, rgba(241,248,246,0.99) 100%)",
+    boxShadow: "0 32px 80px rgba(7, 31, 24, 0.34)",
+    overflow: "hidden",
+  },
+  siteWorkbenchModal: {
+    width: "min(1780px, calc(100vw - 20px))",
+    height: "calc(100vh - 20px)",
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    gap: "12px",
+    padding: "16px",
+    borderRadius: "24px",
+    border: "1px solid rgba(43, 104, 87, 0.24)",
+    background: "linear-gradient(180deg, #f8fcfa 0%, #eaf3ef 100%)",
+    boxShadow: "0 32px 90px rgba(6, 31, 24, 0.42)",
+    overflow: "hidden",
+  },
+  siteWorkbenchBody: {
+    minHeight: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: "10px",
+    overflow: "hidden",
+  },
+  siteWorkbenchTopbar: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
+  siteWorkbenchTitleRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    flexWrap: "wrap",
+    marginTop: "2px",
+  },
+  siteWorkbenchLayout: {
+    minHeight: 0,
+    height: "100%",
+    flex: "1 1 auto",
+    display: "flex",
+    alignItems: "stretch",
+    gap: "12px",
+    flexWrap: "nowrap",
+    overflow: "hidden",
+  },
+  siteWorkbenchViewer: {
+    minWidth: 0,
+    minHeight: 0,
+    height: "100%",
+    flex: "1 1 680px",
+    display: "grid",
+    gridTemplateRows: "auto auto minmax(0, 1fr) auto",
+    gap: "10px",
+    padding: "12px",
+    borderRadius: "20px",
+    background: "rgba(255,255,255,0.94)",
+    border: "1px solid rgba(85, 127, 115, 0.18)",
+    overflow: "hidden",
+  },
+  siteWorkbenchControls: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  siteWorkbenchSelect: {
+    minWidth: "min(420px, 100%)",
+    maxWidth: "100%",
+    height: "40px",
+    borderRadius: "13px",
+    border: "1px solid rgba(85, 127, 115, 0.22)",
+    background: "#ffffff",
+    color: "#183f35",
+    padding: "0 10px",
+    fontSize: "12px",
+    fontWeight: 800,
+  },
+  keyproofBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    flexWrap: "wrap",
+    padding: "10px 12px",
+    borderRadius: "14px",
+    border: "1px solid rgba(24, 92, 72, 0.20)",
+    background: "linear-gradient(135deg, #edf8f2 0%, #fffdf4 100%)",
+    color: "#183f35",
+    boxShadow: "0 8px 22px rgba(28, 80, 64, 0.07)",
+  },
+  keyproofBannerEmpty: {
+    padding: "9px 12px",
+    borderRadius: "12px",
+    border: "1px dashed rgba(93, 113, 135, 0.28)",
+    background: "rgba(247,250,252,0.86)",
+    color: "#6b7d8d",
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+  keyproofBannerLead: {
+    minWidth: "210px",
+    display: "grid",
+    gap: "2px",
+    fontSize: "11px",
+    color: "#537168",
+  },
+  keyproofBannerKicker: {
+    color: "#187054",
+    fontSize: "9px",
+    fontWeight: 900,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+  },
+  keyproofBannerTotals: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+    paddingRight: "12px",
+    borderRight: "1px solid rgba(47, 103, 86, 0.16)",
+    color: "#49675e",
+    fontSize: "11px",
+    fontWeight: 700,
+  },
+  keyproofBannerAmounts: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    flex: "1 1 340px",
+    flexWrap: "wrap",
+  },
+  keyproofAmountPill: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    padding: "5px 8px",
+    borderRadius: "999px",
+    background: "#ffffff",
+    border: "1px solid rgba(47, 103, 86, 0.14)",
+    color: "#587069",
+    fontSize: "10px",
+    fontWeight: 800,
+  },
+  associatedItemBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: "14px",
+    flexWrap: "wrap",
+    padding: "11px 13px",
+    borderRadius: "14px",
+    border: "1px solid rgba(24, 92, 72, 0.20)",
+    background: "linear-gradient(135deg, #edf8f2 0%, #fff9df 100%)",
+    color: "#183f35",
+    boxShadow: "0 8px 22px rgba(28, 80, 64, 0.07)",
+  },
+  associatedItemLead: {
+    minWidth: "220px",
+    display: "grid",
+    gap: "2px",
+    color: "#537168",
+    fontSize: "11px",
+  },
+  associatedItemAmount: {
+    color: "#173f34",
+    fontSize: "22px",
+    fontWeight: 950,
+  },
+  associatedItemFacts: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px 14px",
+    flex: "1 1 440px",
+    flexWrap: "wrap",
+    color: "#5a716a",
+    fontSize: "10px",
+    fontWeight: 800,
+  },
+  sitePageControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flexWrap: "wrap",
+  },
+  sitePageField: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    color: "#4f6c63",
+    fontSize: "11px",
+    fontWeight: 800,
+  },
+  sitePageInput: {
+    width: "62px",
+    height: "34px",
+    borderRadius: "10px",
+    border: "1px solid rgba(85, 127, 115, 0.22)",
+    textAlign: "center",
+    color: "#173f34",
+    fontWeight: 900,
+  },
+  sitePageCanvas: {
+    minHeight: 0,
+    overflow: "auto",
+    overscrollBehavior: "contain",
+    scrollbarGutter: "stable",
+    display: "grid",
+    justifyItems: "center",
+    alignItems: "start",
+    padding: "10px",
+    borderRadius: "16px",
+    background: "radial-gradient(circle at top, #53635f 0%, #27332f 72%)",
+  },
+  sitePageImageStage: {
+    position: "relative",
+    width: "min(100%, 1040px)",
+    height: "fit-content",
+    flex: "0 0 auto",
+    userSelect: "none",
+  },
+  sitePageImageStageDrawing: {
+    cursor: "crosshair",
+    touchAction: "none",
+  },
+  sitePageImage: {
+    display: "block",
+    width: "100%",
+    height: "auto",
+    background: "#ffffff",
+    boxShadow: "0 18px 48px rgba(0,0,0,0.32)",
+  },
+  sitePostingMarker: {
+    position: "absolute",
+    zIndex: 2,
+    boxSizing: "border-box",
+    pointerEvents: "none",
+    borderRadius: "4px",
+  },
+  sitePostingMarkerPost: {
+    border: "3px solid #e1a800",
+    background: "rgba(255, 213, 51, 0.24)",
+    boxShadow: "0 0 0 2px rgba(255,255,255,0.72), 0 8px 20px rgba(100,72,0,0.22)",
+  },
+  sitePostingMarkerStop: {
+    border: "3px solid #c52f32",
+    background: "rgba(225, 53, 57, 0.20)",
+    boxShadow: "0 0 0 2px rgba(255,255,255,0.72), 0 8px 20px rgba(92,14,17,0.24)",
+  },
+  sitePostingMarkerLabel: {
+    position: "absolute",
+    left: "-3px",
+    top: "-28px",
+    whiteSpace: "nowrap",
+    borderRadius: "6px 6px 6px 0",
+    padding: "4px 7px",
+    background: "#172d28",
+    color: "#ffffff",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "0.04em",
+  },
+  siteBookmarkBar: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+    padding: "10px",
+    borderRadius: "16px",
+    border: "1px solid rgba(38, 126, 98, 0.22)",
+    background: "linear-gradient(135deg, rgba(224,247,237,0.98), rgba(248,253,251,0.98))",
+  },
+  siteBookmarkIdentity: {
+    display: "flex",
+    alignItems: "center",
+    gap: "9px",
+    minWidth: "220px",
+  },
+  siteBookmarkNote: {
+    flex: "1 1 220px",
+    height: "40px",
+    borderRadius: "12px",
+    border: "1px solid rgba(70, 125, 108, 0.22)",
+    padding: "0 11px",
+    color: "#173f34",
+    fontSize: "12px",
+    fontWeight: 700,
+  },
+  siteBookmarkHint: {
+    color: "#54736a",
+    fontSize: "11px",
+    fontWeight: 800,
+    lineHeight: 1.35,
+  },
+  siteMarkerControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    flexWrap: "wrap",
+  },
+  siteMarkerChoice: {
+    minHeight: "36px",
+    borderRadius: "10px",
+    padding: "0 11px",
+    fontSize: "11px",
+    fontWeight: 900,
+    cursor: "pointer",
+  },
+  siteMarkerChoicePost: {
+    border: "1px solid #d9a400",
+    background: "#ffe171",
+    color: "#5c4300",
+  },
+  siteMarkerChoiceStop: {
+    border: "1px solid #b92a2e",
+    background: "#e5484d",
+    color: "#ffffff",
+  },
+  siteMarkerChoiceActive: {
+    boxShadow: "0 0 0 3px rgba(20, 58, 48, 0.22)",
+    transform: "translateY(-1px)",
+  },
+  siteMarkerClear: {
+    minHeight: "34px",
+    border: 0,
+    background: "transparent",
+    color: "#875052",
+    fontSize: "11px",
+    fontWeight: 900,
+    cursor: "pointer",
+    textDecoration: "underline",
+  },
+  siteAssociateButton: {
+    minHeight: "42px",
+    border: 0,
+    borderRadius: "13px",
+    padding: "0 16px",
+    background: "linear-gradient(135deg, #156247 0%, #238b67 100%)",
+    color: "#ffffff",
+    fontSize: "12px",
+    fontWeight: 900,
+    cursor: "pointer",
+    boxShadow: "0 14px 28px rgba(21, 98, 71, 0.20)",
+  },
+  siteQueuePanel: {
+    minWidth: "280px",
+    minHeight: 0,
+    height: "100%",
+    flex: "0 1 340px",
+    display: "grid",
+    gridTemplateRows: "auto minmax(0, 1fr)",
+    gap: "10px",
+    padding: "12px",
+    borderRadius: "20px",
+    background: "rgba(248,252,250,0.98)",
+    border: "1px solid rgba(85, 127, 115, 0.18)",
+    overflow: "hidden",
+  },
+  siteQueueHeader: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: "10px",
+    color: "#5d766e",
+    fontSize: "10px",
+    fontWeight: 700,
+  },
+  siteQueueList: {
+    minHeight: 0,
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    scrollbarGutter: "stable",
+    display: "grid",
+    alignContent: "start",
+    gap: "8px",
+  },
+  siteQueueItem: {
+    width: "100%",
+    display: "grid",
+    gridTemplateColumns: "36px minmax(0, 1fr) auto",
+    gap: "9px",
+    alignItems: "center",
+    padding: "10px",
+    borderRadius: "15px",
+    border: "1px solid rgba(100, 137, 126, 0.16)",
+    background: "#ffffff",
+    color: "#173f34",
+    textAlign: "left",
+    cursor: "pointer",
+  },
+  siteQueueItemActive: {
+    borderColor: "rgba(33, 126, 96, 0.56)",
+    boxShadow: "inset 4px 0 0 #217e60, 0 10px 24px rgba(33, 126, 96, 0.10)",
+  },
+  siteQueueItemComplete: {
+    background: "rgba(227, 246, 238, 0.96)",
+  },
+  siteQueueNumber: {
+    width: "30px",
+    height: "30px",
+    display: "inline-grid",
+    placeItems: "center",
+    borderRadius: "10px",
+    background: "#174f3f",
+    color: "#ffffff",
+    fontSize: "12px",
+    fontWeight: 900,
+    flexShrink: 0,
+  },
+  siteQueueCopy: {
+    minWidth: 0,
+    display: "grid",
+    gap: "2px",
+    fontSize: "12px",
+  },
+  siteQueueStatus: {
+    color: "#527067",
+    fontSize: "10px",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  },
+  siteUndoButton: {
+    gridColumn: "3",
+    color: "#9b3c31",
+    fontSize: "10px",
+    fontWeight: 900,
+    textDecoration: "underline",
+  },
+  flywireModalBody: {
+    minHeight: 0,
+    overflowY: "auto",
+    display: "grid",
+    alignContent: "start",
+    gap: "14px",
+    paddingRight: "4px",
+  },
+  flywireMatchSummary: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "14px",
+    flexWrap: "wrap",
+    padding: "13px 16px",
+    borderRadius: "18px",
+    background: "rgba(224, 244, 235, 0.92)",
+    border: "1px solid rgba(49, 120, 99, 0.18)",
+    color: "#275f4f",
+    fontSize: "13px",
+  },
+  flywireDocument: {
+    display: "grid",
+    gap: "12px",
+    padding: "16px",
+    borderRadius: "22px",
+    background: "rgba(255,255,255,0.94)",
+    border: "1px solid rgba(92, 132, 120, 0.16)",
+    boxShadow: "0 18px 36px rgba(45, 84, 72, 0.07)",
+  },
+  flywireDocumentHeader: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: "16px",
+    flexWrap: "wrap",
+  },
+  flywireDocumentTitle: {
+    marginTop: "4px",
+    color: "#183f35",
+    fontSize: "16px",
+    fontWeight: 900,
+  },
+  flywireDocumentMeta: {
+    marginTop: "4px",
+    color: "#668077",
+    fontSize: "12px",
+    fontWeight: 700,
+  },
+  flywireDocumentTotal: {
+    display: "grid",
+    justifyItems: "end",
+    color: "#174c3d",
+    fontSize: "20px",
+    fontWeight: 900,
+  },
+  flywireRows: {
+    display: "grid",
+    gap: "9px",
+  },
+  flywireRow: {
+    display: "grid",
+    gap: "10px",
+    padding: "12px 14px",
+    borderRadius: "17px",
+    border: "1px solid rgba(110, 140, 131, 0.14)",
+    background: "rgba(247, 251, 249, 0.92)",
+  },
+  flywireRowMatched: {
+    borderColor: "rgba(27, 135, 102, 0.48)",
+    background: "linear-gradient(135deg, rgba(224,247,237,0.98), rgba(251,255,253,0.98))",
+    boxShadow: "inset 4px 0 0 #238767, 0 12px 26px rgba(35, 135, 103, 0.10)",
+  },
+  flywireRowTop: {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "14px",
+  },
+  flywireRowTitle: {
+    color: "#173f34",
+    fontSize: "14px",
+    fontWeight: 900,
+  },
+  flywireRowMeta: {
+    marginTop: "3px",
+    color: "#668078",
+    fontSize: "12px",
+    fontWeight: 700,
+  },
+  flywireRowAmount: {
+    display: "grid",
+    justifyItems: "end",
+    gap: "4px",
+    color: "#173f34",
+    fontSize: "15px",
+    fontWeight: 900,
+    whiteSpace: "nowrap",
+  },
+  flywireExactBadge: {
+    padding: "3px 7px",
+    borderRadius: "999px",
+    background: "#238767",
+    color: "#ffffff",
+    fontSize: "9px",
+    fontWeight: 900,
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+  },
+  flywireFacts: {
+    display: "flex",
+    gap: "8px 16px",
+    flexWrap: "wrap",
+    color: "#58736b",
+    fontSize: "11px",
+    fontWeight: 700,
+  },
+  flywireRawDetails: {
+    color: "#49675e",
+    fontSize: "11px",
+    fontWeight: 800,
+    cursor: "pointer",
+  },
+  flywireRawJson: {
+    margin: "8px 0 0",
+    padding: "12px",
+    borderRadius: "12px",
+    overflowX: "auto",
+    background: "#15342c",
+    color: "#dff4eb",
+    fontSize: "11px",
+    lineHeight: 1.45,
+    fontWeight: 500,
+    whiteSpace: "pre-wrap",
   },
   previewEmpty: {
     minHeight: "420px",

@@ -21,7 +21,7 @@ from urllib.parse import quote
 from xml.etree import ElementTree as ET
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from openpyxl import load_workbook
 
 from config_manager import CONFIG_PATH, load_config, resolve_path, save_config
@@ -1304,6 +1304,28 @@ IMAGING_BALSHEET_LINK_COLUMNS = [
     ("updated_at", "TEXT NOT NULL"),
 ]
 
+IMAGING_SITE_PAGE_ASSOCIATION_COLUMNS = [
+    ("association_id", "TEXT PRIMARY KEY"),
+    ("entry_id", "TEXT NOT NULL UNIQUE"),
+    ("imported_file_id", "INTEGER NOT NULL"),
+    ("posting_date", "TEXT NOT NULL"),
+    ("site", "TEXT NOT NULL"),
+    ("queue_number", "INTEGER NOT NULL"),
+    ("file_path", "TEXT NOT NULL"),
+    ("file_name", "TEXT NOT NULL"),
+    ("page_start", "INTEGER NOT NULL"),
+    ("page_end", "INTEGER"),
+    ("bookmark_title", "TEXT NOT NULL"),
+    ("note", "TEXT NOT NULL DEFAULT ''"),
+    ("marker_x", "REAL"),
+    ("marker_y", "REAL"),
+    ("marker_width", "REAL"),
+    ("marker_height", "REAL"),
+    ("marker_status", "TEXT NOT NULL DEFAULT 'post'"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+]
+
 IMAGING_PDF_TOOL_NAMES = {
     "pdfinfo": "pdfinfo",
     "pdftotext": "pdftotext",
@@ -1540,7 +1562,7 @@ def _search_lockbox_documents(posting_date: str, query: str) -> list[dict]:
             continue
 
         text_content, page_count, outline_json = _extract_pdf_search_bundle(str(path), file_stat.st_mtime)
-        page_texts = [page.strip() for page in text_content.split("\f") if page.strip()]
+        page_texts = [page.strip() for page in text_content.split("\f")]
         outline = json.loads(outline_json or "[]")
         normalized_file_name = _normalize_search_text(path.name)
         normalized_text = _normalize_search_text(text_content)
@@ -1771,7 +1793,8 @@ def _build_lockbox_row_recommendations(posting_date: str, row: dict, document_ro
             outline = json.loads(document_row["outline_json"] or "[]")
         except Exception:
             outline = []
-        page_texts = [page.strip() for page in text_content.split("\f") if page.strip()]
+        # Keep empty pages so PDF page numbers continue to line up with bookmarks.
+        page_texts = [page.strip() for page in text_content.split("\f")]
         matched_page = 0
         matched_title = ""
         matched_check = ""
@@ -1788,7 +1811,7 @@ def _build_lockbox_row_recommendations(posting_date: str, row: dict, document_ro
                 notes.append("check")
             else:
                 for page_number, page_text in enumerate(page_texts, start=1):
-                    normalized_page = _normalize_search_text(page_text)
+                    normalized_page = _normalize_imaging_check_number(page_text)
                     if entry_check not in normalized_page:
                         continue
                     matched_page = page_number
@@ -1821,17 +1844,40 @@ def _build_lockbox_row_recommendations(posting_date: str, row: dict, document_ro
             notes.append("payer")
 
         if outline:
-            for outline_item in outline:
+            for outline_index, outline_item in enumerate(outline):
                 title = str(outline_item.get("title") or "")
                 normalized_title = _normalize_search_text(title)
-                if entry_check and entry_check not in normalized_title:
+                bookmark_amount = next((token for token in amount_tokens if token in normalized_title), "")
+                if amount_tokens and not bookmark_amount:
                     continue
-                if amount_tokens and not any(token in normalized_title for token in amount_tokens):
+
+                bookmark_page = int(outline_item.get("page") or 0)
+                next_bookmark_page = (
+                    int(outline[outline_index + 1].get("page") or 0)
+                    if outline_index + 1 < len(outline)
+                    else len(page_texts) + 1
+                )
+                section_end = max(bookmark_page, next_bookmark_page - 1)
+                check_page = 0
+                if entry_check and bookmark_page > 0:
+                    for page_number in range(bookmark_page, min(section_end, len(page_texts)) + 1):
+                        if entry_check in _normalize_imaging_check_number(page_texts[page_number - 1]):
+                            check_page = page_number
+                            break
+                if entry_check and not check_page:
                     continue
+
                 matched_title = title
-                matched_page = int(outline_item.get("page") or matched_page or 0)
-                score = max(score, 0.9)
-                notes.append("bookmark")
+                matched_page = bookmark_page or check_page or matched_page
+                if bookmark_amount:
+                    matched_amount = bookmark_amount
+                if check_page:
+                    matched_check = entry_check
+                    score = 1.0
+                    notes.append("bookmark-amount-check")
+                else:
+                    score = max(score, 0.9)
+                    notes.append("bookmark-amount")
                 break
 
         if matched_page == 0 and outline:
@@ -1842,7 +1888,7 @@ def _build_lockbox_row_recommendations(posting_date: str, row: dict, document_ro
 
         if matched_page == 0 and page_texts:
             for page_number, page_text in enumerate(page_texts, start=1):
-                normalized_page = _normalize_search_text(page_text)
+                normalized_page = _normalize_imaging_check_number(page_text)
                 if (entry_check and entry_check in normalized_page) or any(token in normalized_page for token in amount_tokens):
                     matched_page = page_number
                     break
@@ -1907,6 +1953,58 @@ def _is_within_root(candidate_path: str, root_path: Path) -> bool:
         return False
 
 
+def _rebase_imaging_file_path(file_path: str) -> str:
+    """Map an absolute imaging path from a previous install to the current root."""
+    root = _imaging_root_folder()
+    original = Path(file_path)
+    if _is_within_root(str(original), root):
+        return str(original.resolve())
+
+    root_name = root.name.casefold()
+    parts = original.parts
+    for index, part in enumerate(parts):
+        if part.casefold() != root_name:
+            continue
+        candidate = root.joinpath(*parts[index + 1 :]).resolve()
+        if candidate.exists() and _is_within_root(str(candidate), root):
+            return str(candidate)
+
+    return file_path
+
+
+def _migrate_imaging_link_paths(conn) -> int:
+    rows = conn.execute(
+        f'SELECT {_quote_identifier("link_id")}, {_quote_identifier("file_path")} '
+        f'FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")}'
+    ).fetchall()
+    migrated = 0
+    for link_id, file_path in rows:
+        current_path = _rebase_imaging_file_path(str(file_path or ""))
+        if current_path == file_path:
+            continue
+        duplicate = conn.execute(
+            f'SELECT 1 FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")} '
+            f'WHERE {_quote_identifier("entry_id")} = ('
+            f'SELECT {_quote_identifier("entry_id")} FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")} '
+            f'WHERE {_quote_identifier("link_id")} = ?) AND {_quote_identifier("file_path")} = ?',
+            (link_id, current_path),
+        ).fetchone()
+        if duplicate:
+            conn.execute(
+                f'DELETE FROM {_quote_identifier("Imaging_BalsheetDocumentLinks")} '
+                f'WHERE {_quote_identifier("link_id")} = ?',
+                (link_id,),
+            )
+        else:
+            conn.execute(
+                f'UPDATE {_quote_identifier("Imaging_BalsheetDocumentLinks")} '
+                f'SET {_quote_identifier("file_path")} = ? WHERE {_quote_identifier("link_id")} = ?',
+                (current_path, link_id),
+            )
+        migrated += 1
+    return migrated
+
+
 def ensure_imaging_tables(conn=None):
     close_conn = False
     if conn is None:
@@ -1938,6 +2036,23 @@ def ensure_imaging_tables(conn=None):
                 f'ALTER TABLE {_quote_identifier("Imaging_BalsheetDocumentLinks")} ADD COLUMN {_quote_identifier(column_name)} {column_type}'
             )
 
+    site_column_defs = ", ".join(
+        f'{_quote_identifier(name)} {definition}' for name, definition in IMAGING_SITE_PAGE_ASSOCIATION_COLUMNS
+    )
+    cur.execute(
+        f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Imaging_SitePageAssociations")} ({site_column_defs})'
+    )
+    site_columns = {
+        row[1].lower()
+        for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Imaging_SitePageAssociations")})').fetchall()
+    }
+    for column_name, column_type in IMAGING_SITE_PAGE_ASSOCIATION_COLUMNS:
+        if column_name.lower() not in site_columns:
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier("Imaging_SitePageAssociations")} '
+                f'ADD COLUMN {_quote_identifier(column_name)} {column_type}'
+            )
+
     cur.execute(
         f'CREATE INDEX IF NOT EXISTS {_quote_identifier("idx_imaging_links_posting_date")} '
         f'ON {_quote_identifier("Imaging_BalsheetDocumentLinks")} ({_quote_identifier("posting_date")})'
@@ -1946,7 +2061,13 @@ def ensure_imaging_tables(conn=None):
         f'CREATE INDEX IF NOT EXISTS {_quote_identifier("idx_imaging_links_check_number")} '
         f'ON {_quote_identifier("Imaging_BalsheetDocumentLinks")} ({_quote_identifier("check_number")})'
     )
+    cur.execute(
+        f'CREATE INDEX IF NOT EXISTS {_quote_identifier("idx_imaging_site_pages_date_site")} '
+        f'ON {_quote_identifier("Imaging_SitePageAssociations")} '
+        f'({_quote_identifier("posting_date")}, {_quote_identifier("site")})'
+    )
 
+    _migrate_imaging_link_paths(conn)
     conn.commit()
 
     if close_conn:
@@ -2050,8 +2171,15 @@ def rebuild_imaging_document_index(conn=None):
 
 def _load_imaging_document_index(conn):
     ensure_imaging_tables(conn)
-    row_count = conn.execute(f'SELECT COUNT(*) FROM {_quote_identifier("Imaging_DocumentFileIndex")}').fetchone()[0]
-    if not row_count:
+    indexed_paths = conn.execute(
+        f'SELECT {_quote_identifier("file_path")} FROM {_quote_identifier("Imaging_DocumentFileIndex")}'
+    ).fetchall()
+    root = _imaging_root_folder()
+    index_is_stale = any(
+        not _is_within_root(str(row[0] or ""), root)
+        for row in indexed_paths
+    )
+    if not indexed_paths or index_is_stale:
         rebuild_imaging_document_index(conn)
 
     conn.row_factory = sqlite3.Row
@@ -2137,6 +2265,91 @@ def _imaging_match_score(entry_check: str, posting_date: str, document_row) -> t
     return 0.0, "none"
 
 
+def _imaging_flywire_match_summary(conn, posting_date: str, amount: float) -> dict:
+    normalized_posting_date = normalize_mmddyyyy(posting_date)
+    try:
+        batch_date = datetime.strptime(normalized_posting_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        batch_date = ""
+
+    document_rows = conn.execute(
+        f'''
+        SELECT *
+        FROM {_quote_identifier("Import_FlywireDocuments")}
+        WHERE {_quote_identifier("batch_date")} = ?
+        ORDER BY {_quote_identifier("updated_at")} DESC, {_quote_identifier("id")} DESC
+        ''',
+        (batch_date,),
+    ).fetchall()
+
+    seen_documents = set()
+    document_count = 0
+    exact_match_count = 0
+    for document_row in document_rows:
+        document_key = (
+            str(document_row["source_filename"] or "").casefold(),
+            int(document_row["row_count"] or 0),
+            round(float(document_row["total_amount"] or 0), 2),
+        )
+        if document_key in seen_documents:
+            continue
+        seen_documents.add(document_key)
+        document_count += 1
+        exact_match_count += conn.execute(
+            f'''
+            SELECT COUNT(*)
+            FROM {_quote_identifier("Import_FlywireRows")}
+            WHERE {_quote_identifier("document_id")} = ?
+              AND ABS(COALESCE({_quote_identifier("amount")}, 0) - ?) < 0.005
+            ''',
+            (document_row["id"], float(amount or 0)),
+        ).fetchone()[0]
+
+    return {
+        "available": document_count > 0,
+        "documentCount": document_count,
+        "exactMatchCount": exact_match_count,
+        "ambiguous": exact_match_count > 1,
+        "confidence": 1.0 if exact_match_count > 0 else 0.0,
+    }
+
+
+def _imaging_keyproof_summary(conn, imported_file_id: int) -> dict:
+    row = conn.execute(
+        f'''SELECT {_quote_identifier("payload_json")} FROM {_quote_identifier("keyproof")}
+            WHERE {_quote_identifier("attachment_id")} = ?''',
+        (imported_file_id,),
+    ).fetchone()
+    if not row or not row[0]:
+        return {"available": False, "attachmentId": imported_file_id}
+
+    try:
+        payload = json.loads(row[0])
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {"available": False, "attachmentId": imported_file_id}
+
+    form = payload.get("form") if isinstance(payload, dict) else None
+    if not isinstance(form, dict):
+        return {"available": False, "attachmentId": imported_file_id}
+
+    field_names = (
+        "cash", "check", "creditCard", "eft", "lockbox",
+        "foreignCheck", "wireTransfer", "misc",
+    )
+    amounts = {field: round(_parse_amount(form.get(field)), 2) for field in field_names}
+    batch_date = payload.get("batchDate") or form.get("batchDate") or ""
+    paperwork_total = round(_parse_amount(payload.get("paperworkTotal") or form.get("paperworkTotal")), 2)
+    return {
+        "available": True,
+        "attachmentId": imported_file_id,
+        "site": str(form.get("site") or ""),
+        "batchDate": str(batch_date),
+        "keyproofTotal": round(sum(amounts.values()), 2),
+        "paperworkTotal": paperwork_total,
+        "amounts": amounts,
+    }
+
+
 def _build_imaging_association_payload(conn, posting_date: str):
     balsheet_rows = _load_balsheet_review_day_rows(conn, posting_date)
     index_rows = _load_imaging_document_index(conn)
@@ -2154,6 +2367,13 @@ def _build_imaging_association_payload(conn, posting_date: str):
     confirmed_links_by_entry: dict[str, list[sqlite3.Row]] = {}
     for link_row in link_rows:
         confirmed_links_by_entry.setdefault(str(link_row["entry_id"]), []).append(link_row)
+
+    site_association_rows = conn.execute(
+        f'''SELECT * FROM {_quote_identifier("Imaging_SitePageAssociations")}
+            WHERE {_quote_identifier("posting_date")} = ?''',
+        (posting_date,),
+    ).fetchall()
+    site_associations_by_entry = {str(row["entry_id"]): row for row in site_association_rows}
 
     rows = []
     for balsheet_row in balsheet_rows:
@@ -2179,6 +2399,13 @@ def _build_imaging_association_payload(conn, posting_date: str):
 
         matches.sort(key=lambda item: (item["confidence"], item["fileExt"].lower() == "pdf", not item["isArchived"], item["fileName"]), reverse=True)
         linked_rows = confirmed_links_by_entry.get(entry_id, [])
+        site_association = site_associations_by_entry.get(entry_id)
+        is_payment_plan = str(balsheet_row.get("eob") or "").strip().upper() == "P"
+        flywire_summary = (
+            _imaging_flywire_match_summary(conn, posting_date, float(balsheet_row.get("amount") or 0))
+            if is_payment_plan
+            else None
+        )
 
         rows.append(
             {
@@ -2188,6 +2415,27 @@ def _build_imaging_association_payload(conn, posting_date: str):
                 "amount": float(balsheet_row.get("amount") or 0),
                 "payer": str(balsheet_row.get("payer") or ""),
                 "checkNumber": str(balsheet_row.get("check_number") or ""),
+                "eob": str(balsheet_row.get("eob") or ""),
+                "flywire": flywire_summary,
+                "siteAssociation": (
+                    {
+                        "associationId": site_association["association_id"],
+                        "importedFileId": int(site_association["imported_file_id"]),
+                        "fileName": site_association["file_name"],
+                        "pageStart": int(site_association["page_start"]),
+                        "pageEnd": int(site_association["page_end"]) if site_association["page_end"] is not None else None,
+                        "bookmarkTitle": site_association["bookmark_title"],
+                        "note": site_association["note"],
+                        "markerX": site_association["marker_x"],
+                        "markerY": site_association["marker_y"],
+                        "markerWidth": site_association["marker_width"],
+                        "markerHeight": site_association["marker_height"],
+                        "markerStatus": site_association["marker_status"] or "post",
+                        "keyproof": _imaging_keyproof_summary(conn, int(site_association["imported_file_id"])),
+                    }
+                    if site_association
+                    else None
+                ),
                 "linkedFiles": [
                     {
                         "linkId": link_row["link_id"],
@@ -2241,10 +2489,11 @@ def _build_imaging_lockbox_recommendations_payload(conn, posting_date: str):
 
 def _safe_imaging_file_response(file_path: str):
     root = _imaging_root_folder()
-    if not _is_within_root(file_path, root):
+    current_path = _rebase_imaging_file_path(file_path)
+    if not _is_within_root(current_path, root):
         raise HTTPException(status_code=404, detail="File not found")
 
-    resolved = Path(file_path).resolve()
+    resolved = Path(current_path).resolve()
     if not resolved.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
@@ -7732,6 +7981,481 @@ def find_imaging_lockbox_matches(payload: dict | None = None):
         conn.close()
 
 
+def _rebase_workflow_file_path(file_path: str) -> str:
+    root = Path(WORKFLOW_ROOT).resolve()
+    original = Path(str(file_path or ""))
+    if _is_within_root(str(original), root) and original.exists():
+        return str(original.resolve())
+
+    parts = original.parts
+    for index, part in enumerate(parts):
+        if part.casefold() not in {"4.emails", "snapshots"}:
+            continue
+        candidate = root.joinpath(*parts[index:]).resolve()
+        if candidate.exists() and _is_within_root(str(candidate), root):
+            return str(candidate)
+    return str(file_path or "")
+
+
+def _site_review_document_path(imported_row) -> str:
+    candidates = [
+        imported_row["moved_to"],
+        imported_row["archived_to"],
+        imported_row["moved_from"],
+        str(Path(WORKFLOW_ROOT) / "4.Emails" / str(imported_row["filename"] or "")),
+    ]
+    for candidate in candidates:
+        resolved = _rebase_workflow_file_path(str(candidate or ""))
+        if resolved and Path(resolved).is_file():
+            return resolved
+    return ""
+
+
+def _site_pdf_page_count(file_path: str) -> int:
+    output = _run_text_command([_poppler_tool_path("pdfinfo"), file_path])
+    for line in output.splitlines():
+        if line.startswith("Pages:"):
+            try:
+                return int(line.split(":", 1)[1].strip())
+            except ValueError:
+                return 0
+    return 0
+
+
+def _site_workbench_payload(conn, posting_date: str, site: str) -> dict:
+    normalized_date = normalize_mmddyyyy(posting_date)
+    if not normalized_date or not str(site or "").strip():
+        raise HTTPException(status_code=400, detail="posting_date and site are required")
+
+    try:
+        parsed_date = datetime.strptime(normalized_date, "%m/%d/%Y")
+        batch_date = parsed_date.strftime("%Y-%m-%d")
+        filename_prefix = parsed_date.strftime("%m.%d.%y") + "%"
+    except ValueError:
+        batch_date = ""
+        filename_prefix = ""
+
+    balsheet_rows = conn.execute(
+        f'''
+        SELECT rowid, *
+        FROM {_quote_identifier("Balsheet")}
+        WHERE {_quote_identifier("PostingDate")} = ?
+          AND LOWER(TRIM({_quote_identifier("Type")})) = LOWER(TRIM(?))
+          AND LOWER(TRIM({_quote_identifier("Type")})) NOT IN ('eft', 'lockbox')
+          AND UPPER(TRIM(COALESCE({_quote_identifier("EOB")}, ''))) != 'P'
+        ORDER BY rowid ASC
+        ''',
+        (normalized_date, site),
+    ).fetchall()
+    association_rows = conn.execute(
+        f'''
+        SELECT * FROM {_quote_identifier("Imaging_SitePageAssociations")}
+        WHERE {_quote_identifier("posting_date")} = ?
+          AND LOWER(TRIM({_quote_identifier("site")})) = LOWER(TRIM(?))
+        ''',
+        (normalized_date, site),
+    ).fetchall()
+    associations = {str(row["entry_id"]): row for row in association_rows}
+
+    queue = []
+    for queue_number, balsheet_row in enumerate(balsheet_rows, start=1):
+        balsheet = _balsheet_row_to_payload(balsheet_row)
+        entry_id = str(balsheet.get("entry_id") or "")
+        association = associations.get(entry_id)
+        queue.append(
+            {
+                "queueNumber": queue_number,
+                "entryId": entry_id,
+                "postingDate": normalized_date,
+                "site": str(balsheet.get("type") or ""),
+                "amount": float(balsheet.get("amount") or 0),
+                "payer": str(balsheet.get("payer") or ""),
+                "checkNumber": str(balsheet.get("check_number") or ""),
+                "eob": str(balsheet.get("eob") or ""),
+                "association": (
+                    {
+                        "associationId": association["association_id"],
+                        "importedFileId": int(association["imported_file_id"]),
+                        "fileName": association["file_name"],
+                        "pageStart": int(association["page_start"]),
+                        "pageEnd": int(association["page_end"]) if association["page_end"] is not None else None,
+                        "bookmarkTitle": association["bookmark_title"],
+                        "note": association["note"],
+                        "markerX": association["marker_x"],
+                        "markerY": association["marker_y"],
+                        "markerWidth": association["marker_width"],
+                        "markerHeight": association["marker_height"],
+                        "markerStatus": association["marker_status"] or "post",
+                        "keyproof": _imaging_keyproof_summary(conn, int(association["imported_file_id"])),
+                    }
+                    if association
+                    else None
+                ),
+            }
+        )
+
+    imported_rows = conn.execute(
+        f'''
+        SELECT * FROM {_quote_identifier("imported_files")}
+        WHERE {_quote_identifier("review_status")} = 'Approved'
+          AND LOWER(TRIM({_quote_identifier("site")})) = LOWER(TRIM(?))
+          AND (
+            {_quote_identifier("batch_date")} IN (?, ?)
+            OR {_quote_identifier("filename")} LIKE ?
+          )
+        ORDER BY {_quote_identifier("id")} ASC
+        ''',
+        (site, batch_date, normalized_date, filename_prefix),
+    ).fetchall()
+    documents = []
+    for imported_row in imported_rows:
+        file_path = _site_review_document_path(imported_row)
+        if not file_path or Path(file_path).suffix.lower() != ".pdf":
+            continue
+        documents.append(
+            {
+                "importedFileId": int(imported_row["id"]),
+                "fileName": str(imported_row["filename"] or Path(file_path).name),
+                "site": str(imported_row["site"] or ""),
+                "batchDate": str(imported_row["batch_date"] or ""),
+                "total": float(imported_row["amount"] or 0),
+                "pageCount": _site_pdf_page_count(file_path),
+                "openUrl": f"/imaging/site-documents/{int(imported_row['id'])}/open",
+                "keyproof": _imaging_keyproof_summary(conn, int(imported_row["id"])),
+            }
+        )
+
+    return {
+        "postingDate": normalized_date,
+        "site": site,
+        "queueTotal": round(sum(float(item["amount"] or 0) for item in queue), 2),
+        "queueCount": len(queue),
+        "associatedCount": sum(1 for item in queue if item["association"]),
+        "queue": queue,
+        "documents": documents,
+    }
+
+
+@app.get("/imaging/site-workbench")
+def get_imaging_site_workbench(posting_date: str, site: str):
+    init_db()
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        return _site_workbench_payload(conn, posting_date, site)
+    finally:
+        conn.close()
+
+
+def _approved_site_document(conn, imported_file_id: int):
+    row = conn.execute(
+        f'SELECT * FROM {_quote_identifier("imported_files")} '
+        f'WHERE {_quote_identifier("id")} = ? AND {_quote_identifier("review_status")} = ?',
+        (imported_file_id, "Approved"),
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Accepted Site Review document not found")
+    file_path = _site_review_document_path(row)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="Accepted Site Review PDF not found")
+    return row, file_path
+
+
+@app.get("/imaging/site-documents/{imported_file_id}/open")
+def open_imaging_site_document(imported_file_id: int):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        _row, file_path = _approved_site_document(conn, imported_file_id)
+        return FileResponse(file_path, media_type="application/pdf")
+    finally:
+        conn.close()
+
+
+@app.get("/imaging/site-documents/{imported_file_id}/pages/{page_number}")
+def render_imaging_site_document_page(imported_file_id: int, page_number: int):
+    if page_number < 1:
+        raise HTTPException(status_code=400, detail="page_number must be at least 1")
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        _row, file_path = _approved_site_document(conn, imported_file_id)
+    finally:
+        conn.close()
+
+    page_count = _site_pdf_page_count(file_path)
+    if page_count and page_number > page_count:
+        raise HTTPException(status_code=404, detail="Page not found")
+    with tempfile.TemporaryDirectory() as temp_dir:
+        output_prefix = str(Path(temp_dir) / "page")
+        command = [
+            _poppler_tool_path("pdftoppm"),
+            "-f",
+            str(page_number),
+            "-l",
+            str(page_number),
+            "-singlefile",
+            "-r",
+            "130",
+            "-png",
+            file_path,
+            output_prefix,
+        ]
+        result = subprocess.run(command, capture_output=True, check=False)
+        output_path = Path(f"{output_prefix}.png")
+        if result.returncode != 0 or not output_path.exists():
+            raise HTTPException(status_code=500, detail="Unable to render PDF page")
+        return Response(content=output_path.read_bytes(), media_type="image/png", headers={"Cache-Control": "private, max-age=300"})
+
+
+@app.post("/imaging/site-page-associations")
+def save_imaging_site_page_association(payload: dict | None = None):
+    payload = payload or {}
+    entry_id = str(payload.get("entry_id") or "").strip()
+    imported_file_id = int(payload.get("imported_file_id") or 0)
+    page_number = int(payload.get("page_number") or 0)
+    note = str(payload.get("note") or "").strip()
+    marker = payload.get("marker") if isinstance(payload.get("marker"), dict) else None
+    marker_status = str(payload.get("marker_status") or "post").strip().lower()
+    if marker_status not in {"post", "do_not_post"}:
+        raise HTTPException(status_code=400, detail="marker_status must be post or do_not_post")
+    marker_values = None
+    if marker:
+        try:
+            marker_values = tuple(float(marker[key]) for key in ("x", "y", "width", "height"))
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(status_code=400, detail="marker requires numeric x, y, width, and height") from exc
+        marker_x, marker_y, marker_width, marker_height = marker_values
+        if not (
+            0 <= marker_x < 1
+            and 0 <= marker_y < 1
+            and 0 < marker_width <= 1
+            and 0 < marker_height <= 1
+            and marker_x + marker_width <= 1.001
+            and marker_y + marker_height <= 1.001
+        ):
+            raise HTTPException(status_code=400, detail="marker coordinates must stay within the page")
+    if not entry_id or imported_file_id <= 0 or page_number <= 0:
+        raise HTTPException(status_code=400, detail="entry_id, imported_file_id, and page_number are required")
+
+    init_db()
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        balsheet_row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        ).fetchone()
+        if not balsheet_row:
+            raise HTTPException(status_code=404, detail="Balsheet row not found")
+        imported_row, file_path = _approved_site_document(conn, imported_file_id)
+        balsheet = _balsheet_row_to_payload(balsheet_row)
+        posting_date = normalize_mmddyyyy(balsheet.get("posting_date")) or str(balsheet.get("posting_date") or "")
+        site = str(balsheet.get("type") or "")
+        if str(balsheet.get("eob") or "").strip().upper() == "P":
+            raise HTTPException(status_code=400, detail="Payment Plan rows use Fly Wire details and are not queued for image association")
+        if str(imported_row["site"] or "").strip().casefold() != site.strip().casefold():
+            raise HTTPException(status_code=400, detail="Accepted document site does not match the Balsheet site")
+        try:
+            expected_batch_date = datetime.strptime(posting_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+        except ValueError:
+            expected_batch_date = ""
+        if str(imported_row["batch_date"] or "").strip() not in {expected_batch_date, posting_date}:
+            raise HTTPException(status_code=400, detail="Accepted document date does not match the Balsheet date")
+
+        queue_rows = conn.execute(
+            f'''SELECT {_quote_identifier("EntryID")} FROM {_quote_identifier("Balsheet")}
+                WHERE {_quote_identifier("PostingDate")} = ?
+                  AND LOWER(TRIM({_quote_identifier("Type")})) = LOWER(TRIM(?))
+                  AND UPPER(TRIM(COALESCE({_quote_identifier("EOB")}, ''))) != 'P'
+                ORDER BY rowid ASC''',
+            (posting_date, site),
+        ).fetchall()
+        queue_ids = [str(row[0]) for row in queue_rows]
+        queue_number = queue_ids.index(entry_id) + 1 if entry_id in queue_ids else 1
+        bookmark_title = (
+            f"#{queue_number} · ${float(balsheet.get('amount') or 0):,.2f} · "
+            f"{str(balsheet.get('payer') or 'Untitled payer')}"
+        )
+        now = datetime.now().isoformat(timespec="seconds")
+
+        previous = conn.execute(
+            f'''SELECT * FROM {_quote_identifier("Imaging_SitePageAssociations")}
+                WHERE {_quote_identifier("imported_file_id")} = ?
+                  AND {_quote_identifier("entry_id")} != ?
+                  AND {_quote_identifier("page_end")} IS NULL
+                  AND {_quote_identifier("page_start")} <= ?
+                ORDER BY {_quote_identifier("page_start")} DESC, {_quote_identifier("updated_at")} DESC
+                LIMIT 1''',
+            (imported_file_id, entry_id, page_number),
+        ).fetchone()
+        if previous and page_number > int(previous["page_start"]):
+            conn.execute(
+                f'''UPDATE {_quote_identifier("Imaging_SitePageAssociations")}
+                    SET {_quote_identifier("page_end")} = ?, {_quote_identifier("updated_at")} = ?
+                    WHERE {_quote_identifier("association_id")} = ?''',
+                (page_number - 1, now, previous["association_id"]),
+            )
+
+        association_id = f"SIA-{uuid.uuid4().hex[:12].upper()}"
+        conn.execute(
+            f'''
+            INSERT INTO {_quote_identifier("Imaging_SitePageAssociations")} (
+                association_id, entry_id, imported_file_id, posting_date, site, queue_number,
+                file_path, file_name, page_start, page_end, bookmark_title, note,
+                marker_x, marker_y, marker_width, marker_height, marker_status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(entry_id) DO UPDATE SET
+                imported_file_id=excluded.imported_file_id, posting_date=excluded.posting_date,
+                site=excluded.site, queue_number=excluded.queue_number, file_path=excluded.file_path,
+                file_name=excluded.file_name, page_start=excluded.page_start, page_end=NULL,
+                bookmark_title=excluded.bookmark_title, note=excluded.note,
+                marker_x=excluded.marker_x, marker_y=excluded.marker_y,
+                marker_width=excluded.marker_width, marker_height=excluded.marker_height,
+                marker_status=excluded.marker_status, updated_at=excluded.updated_at
+            ''',
+            (
+                association_id,
+                entry_id,
+                imported_file_id,
+                posting_date,
+                site,
+                queue_number,
+                file_path,
+                str(imported_row["filename"] or Path(file_path).name),
+                page_number,
+                bookmark_title,
+                note,
+                marker_values[0] if marker_values else None,
+                marker_values[1] if marker_values else None,
+                marker_values[2] if marker_values else None,
+                marker_values[3] if marker_values else None,
+                marker_status,
+                now,
+                now,
+            ),
+        )
+        conn.commit()
+        return _site_workbench_payload(conn, posting_date, site)
+    finally:
+        conn.close()
+
+
+@app.delete("/imaging/site-page-associations/{entry_id}")
+def delete_imaging_site_page_association(entry_id: str):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        ensure_imaging_tables(conn)
+        association = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Imaging_SitePageAssociations")} WHERE entry_id = ?',
+            (entry_id,),
+        ).fetchone()
+        if not association:
+            raise HTTPException(status_code=404, detail="Site page association not found")
+        conn.execute(
+            f'DELETE FROM {_quote_identifier("Imaging_SitePageAssociations")} WHERE entry_id = ?',
+            (entry_id,),
+        )
+        conn.execute(
+            f'''UPDATE {_quote_identifier("Imaging_SitePageAssociations")}
+                SET page_end = NULL, updated_at = ?
+                WHERE imported_file_id = ? AND page_end = ?''',
+            (datetime.now().isoformat(timespec="seconds"), association["imported_file_id"], int(association["page_start"]) - 1),
+        )
+        conn.commit()
+        return _site_workbench_payload(conn, association["posting_date"], association["site"])
+    finally:
+        conn.close()
+
+
+@app.get("/imaging/balsheet/{entry_id}/flywire")
+def get_imaging_balsheet_flywire(entry_id: str):
+    init_db()
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    try:
+        ensure_balsheet_table(conn)
+        ensure_flywire_tables(conn)
+        balsheet_row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        ).fetchone()
+        if not balsheet_row:
+            raise HTTPException(status_code=404, detail="Balsheet row not found")
+
+        balsheet = _balsheet_row_to_payload(balsheet_row)
+        if str(balsheet.get("eob") or "").strip().upper() != "P":
+            raise HTTPException(status_code=400, detail="Balsheet row is not a Payment Plan")
+
+        posting_date = normalize_mmddyyyy(balsheet.get("posting_date"))
+        try:
+            batch_date = datetime.strptime(posting_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+        except (TypeError, ValueError):
+            batch_date = ""
+
+        document_rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Import_FlywireDocuments")}
+            WHERE {_quote_identifier("batch_date")} = ?
+            ORDER BY {_quote_identifier("updated_at")} DESC, {_quote_identifier("id")} DESC
+            ''',
+            (batch_date,),
+        ).fetchall()
+
+        amount = float(balsheet.get("amount") or 0)
+        documents = []
+        seen_documents = set()
+        exact_match_count = 0
+        for document_row in document_rows:
+            document_key = (
+                str(document_row["source_filename"] or "").casefold(),
+                int(document_row["row_count"] or 0),
+                round(float(document_row["total_amount"] or 0), 2),
+            )
+            if document_key in seen_documents:
+                continue
+            seen_documents.add(document_key)
+
+            flywire_rows = conn.execute(
+                f'''
+                SELECT *
+                FROM {_quote_identifier("Import_FlywireRows")}
+                WHERE {_quote_identifier("document_id")} = ?
+                ORDER BY {_quote_identifier("position")} ASC, {_quote_identifier("id")} ASC
+                ''',
+                (document_row["id"],),
+            ).fetchall()
+            document_payload = _flywire_document_payload(document_row, flywire_rows)
+            matched_row_ids = [
+                int(row["id"])
+                for row in flywire_rows
+                if abs(float(row["amount"] or 0) - amount) < 0.005
+            ]
+            exact_match_count += len(matched_row_ids)
+            document_payload["matched_row_ids"] = matched_row_ids
+            documents.append(document_payload)
+
+        return {
+            "entryId": entry_id,
+            "postingDate": posting_date or str(balsheet.get("posting_date") or ""),
+            "site": str(balsheet.get("type") or ""),
+            "amount": amount,
+            "available": bool(documents),
+            "documentCount": len(documents),
+            "exactMatchCount": exact_match_count,
+            "ambiguous": exact_match_count > 1,
+            "documents": documents,
+        }
+    finally:
+        conn.close()
+
+
 @app.post("/imaging/balsheet-links/confirm")
 def confirm_imaging_balsheet_link(payload: dict | None = None):
     payload = payload or {}
@@ -7812,6 +8536,7 @@ def _upsert_imaging_balsheet_link(
     source_query: str = "",
     lockbox_image_date: str = "",
 ):
+    file_path = _rebase_imaging_file_path(file_path)
     balsheet_row = conn.execute(
         f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
         (entry_id,),

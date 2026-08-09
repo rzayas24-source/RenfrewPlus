@@ -107,6 +107,10 @@ function buildFlywireCheckNumber(row: FlywireRow) {
     return `Amex-${lastFour}`;
   }
 
+  if (/discover/i.test(paymentMethod)) {
+    return `DC-${lastFour}`;
+  }
+
   return paymentMethod || "";
 }
 
