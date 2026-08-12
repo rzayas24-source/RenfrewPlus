@@ -1,5 +1,5 @@
 ﻿import type { CSSProperties } from "react";
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell, styles as adminStyles } from "../components/AdminShell";
 import { API_BASE } from "../config/apiBase";
@@ -18,6 +18,7 @@ import {
   getImagingSiteWorkbench,
   getImagingBalsheetAssociations,
   refreshImagingBalsheetAssociations,
+  replaceImagingFile,
   saveImagingSitePageAssociation,
   type ImagingBalsheetAssociationResponse,
   type ImagingBalsheetAssociationRow,
@@ -44,7 +45,7 @@ type ImagingReviewFile = {
   markerLabel?: string;
   itemDetails?: ImagingAssociatedItemDetails;
 };
-type SiteMarkerStatus = "post" | "do_not_post";
+type SiteMarkerStatus = "post" | "do_not_post" | "misc";
 type SitePostingMarker = { x: number; y: number; width: number; height: number };
 type ImagingAssociatedItemDetails = {
   site: string;
@@ -56,6 +57,39 @@ type ImagingAssociatedItemDetails = {
   note: string;
   markerStatus: SiteMarkerStatus;
 };
+
+function formatSiteMarkerStatus(status: SiteMarkerStatus | null | undefined) {
+  switch (status) {
+    case "do_not_post":
+      return "Do Not Post";
+    case "misc":
+      return "Misc";
+    default:
+      return "Post";
+  }
+}
+
+function siteMarkerStatusColor(status: SiteMarkerStatus | null | undefined) {
+  switch (status) {
+    case "do_not_post":
+      return "#b4232a";
+    case "misc":
+      return "#7a5a1a";
+    default:
+      return "#8a6500";
+  }
+}
+
+function siteMarkerStatusFillStyle(status: SiteMarkerStatus | null | undefined) {
+  switch (status) {
+    case "do_not_post":
+      return viewImagesStyles.sitePostingMarkerStop;
+    case "misc":
+      return viewImagesStyles.sitePostingMarkerMisc;
+    default:
+      return viewImagesStyles.sitePostingMarkerPost;
+  }
+}
 
 function markerFromAssociation(association: ImagingSitePageAssociation | null): SitePostingMarker | null {
   if (
@@ -72,6 +106,16 @@ function markerFromAssociation(association: ImagingSitePageAssociation | null): 
     width: association.markerWidth,
     height: association.markerHeight,
   };
+}
+
+function appendCacheToken(url: string, token: number) {
+  if (!token) {
+    return url;
+  }
+
+  const [base, hash = ""] = url.split("#", 2);
+  const separator = base.includes("?") ? "&" : "?";
+  return `${base}${separator}v=${token}${hash ? `#${hash}` : ""}`;
 }
 
 const keyproofAmountLabels: Record<string, string> = {
@@ -113,12 +157,31 @@ function KeyproofDetailsBanner({ details }: { details: ImagingKeyproofSummary | 
   );
 }
 
-function AssociatedItemBanner({ details }: { details: ImagingAssociatedItemDetails }) {
+function AssociatedItemBanner({
+  details,
+  note,
+  onNoteChange,
+  drawing,
+  queueNumber,
+  notesOpen,
+  onToggleNotes,
+}: {
+  details: ImagingAssociatedItemDetails;
+  note?: string;
+  onNoteChange?: (value: string) => void;
+  drawing?: boolean;
+  queueNumber?: number;
+  notesOpen?: boolean;
+  onToggleNotes?: () => void;
+}) {
   return (
     <section style={viewImagesStyles.associatedItemBanner} aria-label="Associated itemization details">
       <div style={viewImagesStyles.associatedItemLead}>
         <span style={viewImagesStyles.keyproofBannerKicker}>Associated itemization</span>
-        <strong>{details.site || "Site not recorded"}</strong>
+        <strong>
+          {queueNumber ? `#${queueNumber} · ` : ""}
+          {details.site || "Site not recorded"}
+        </strong>
         <span>{details.postingDate || "Date not recorded"}</span>
       </div>
       <div style={viewImagesStyles.associatedItemAmount}>{formatCurrency(details.amount)}</div>
@@ -127,12 +190,32 @@ function AssociatedItemBanner({ details }: { details: ImagingAssociatedItemDetai
         <span>Reference <strong>{details.checkNumber || "Not recorded"}</strong></span>
         <span>EOB <strong>{details.eob || "Not recorded"}</strong></span>
         <span>
-          Decision <strong style={{ color: details.markerStatus === "do_not_post" ? "#b4232a" : "#8a6500" }}>
-            {details.markerStatus === "do_not_post" ? "Do Not Post" : "Post"}
+          Decision <strong style={{ color: siteMarkerStatusColor(details.markerStatus) }}>
+            {formatSiteMarkerStatus(details.markerStatus)}
           </strong>
         </span>
-        {details.note && <span>Note <strong>{details.note}</strong></span>}
+        {details.note && <span>Saved note <strong>{details.note}</strong></span>}
       </div>
+      {onNoteChange && (
+        <div style={viewImagesStyles.associatedItemControls}>
+          <button type="button" style={viewImagesStyles.siteNotesButton} onClick={onToggleNotes}>
+            Notes
+          </button>
+          {notesOpen && (
+            <input
+              value={note ?? ""}
+              onChange={(event) => onNoteChange(event.target.value)}
+              placeholder="Notes"
+              style={viewImagesStyles.siteBookmarkNote}
+            />
+          )}
+          {notesOpen && (
+            <span style={viewImagesStyles.siteBookmarkHint}>
+              {drawing ? "Drag a box over the details on the page." : "Save with the green association button."}
+            </span>
+          )}
+        </div>
+      )}
     </section>
   );
 }
@@ -141,6 +224,9 @@ export default function ViewImagesScreen() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialDate = searchParams.get("day") ?? "";
+  const initialEntryId = searchParams.get("entryId") ?? "";
+  const replaceFileInputRef = useRef<HTMLInputElement | null>(null);
+  const autoOpenedReviewEntryIdRef = useRef("");
 
   const [postingDate, setPostingDate] = useState(() => displayDateToIso(initialDate));
   const [phase, setPhase] = useState<ImagingPhase>(initialDate ? "review" : "idle");
@@ -151,13 +237,16 @@ export default function ViewImagesScreen() {
   const [previewDirectUrl, setPreviewDirectUrl] = useState("");
   const [previewKeyproof, setPreviewKeyproof] = useState<ImagingKeyproofSummary | null>(null);
   const [previewPageImageUrl, setPreviewPageImageUrl] = useState("");
+  const [previewPageImageBaseUrl, setPreviewPageImageBaseUrl] = useState("");
   const [previewMarker, setPreviewMarker] = useState<SitePostingMarker | null>(null);
   const [previewMarkerStatus, setPreviewMarkerStatus] = useState<SiteMarkerStatus>("post");
   const [previewMarkerLabel, setPreviewMarkerLabel] = useState("");
   const [previewItemDetails, setPreviewItemDetails] = useState<ImagingAssociatedItemDetails | null>(null);
   const [previewTitle, setPreviewTitle] = useState("");
   const [previewPage, setPreviewPage] = useState(0);
+  const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [replacementTarget, setReplacementTarget] = useState<ImagingReviewFile | null>(null);
   const [lockboxRowId, setLockboxRowId] = useState("");
   const [lockboxError, setLockboxError] = useState<string | null>(null);
   const [actionDetail, setActionDetail] = useState<string | null>(null);
@@ -173,20 +262,71 @@ export default function ViewImagesScreen() {
   const [siteWorkbenchDocumentId, setSiteWorkbenchDocumentId] = useState(0);
   const [siteWorkbenchPage, setSiteWorkbenchPage] = useState(1);
   const [siteWorkbenchNote, setSiteWorkbenchNote] = useState("");
+  const [siteWorkbenchNotesOpen, setSiteWorkbenchNotesOpen] = useState(false);
   const [siteMarkerStatus, setSiteMarkerStatus] = useState<SiteMarkerStatus>("post");
   const [siteMarker, setSiteMarker] = useState<SitePostingMarker | null>(null);
   const [siteMarkerDrawing, setSiteMarkerDrawing] = useState(false);
   const [siteMarkerStart, setSiteMarkerStart] = useState<{ x: number; y: number } | null>(null);
+  const [selectedReviewEntryId, setSelectedReviewEntryId] = useState(initialEntryId);
   const loadRequestRef = useRef(0);
+  const initial835RefreshDoneRef = useRef(false);
+  const reviewModeRequestedRef = useRef(false);
+  const replacementTargetRef = useRef<ImagingReviewFile | null>(null);
 
   useEffect(() => {
     if (!initialDate) {
       return;
     }
 
-    void loadDate(initialDate);
+    let cancelled = false;
+    const runInitialLoad = async () => {
+      await loadDate(initialDate);
+      if (cancelled) {
+        return;
+      }
+
+      if (!initial835RefreshDoneRef.current) {
+        initial835RefreshDoneRef.current = true;
+        await refreshMatches(initialDate);
+      }
+    };
+
+    void runInitialLoad();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      cancelled = true;
+    };
   }, [initialDate]);
+
+  useEffect(() => {
+    if (!initialEntryId) {
+      setSelectedReviewEntryId("");
+      autoOpenedReviewEntryIdRef.current = "";
+      return;
+    }
+
+    setSelectedReviewEntryId(initialEntryId);
+  }, [initialEntryId]);
+
+  useEffect(() => {
+    if (!initialEntryId || !data?.rows.length) {
+      return;
+    }
+
+    const selectedRow = data.rows.find((row) => row.entryId === initialEntryId);
+    if (!selectedRow) {
+      return;
+    }
+
+    const reviewFile = getReviewFile(selectedRow);
+    if (!reviewFile || autoOpenedReviewEntryIdRef.current === selectedRow.entryId) {
+      return;
+    }
+
+    autoOpenedReviewEntryIdRef.current = selectedRow.entryId;
+    setSelectedReviewEntryId(selectedRow.entryId);
+    openReviewDocument(reviewFile);
+  }, [data, initialEntryId]);
 
   const phaseTitle = useMemo(() => {
     if (phase === "matched") return "Image index refreshed";
@@ -221,6 +361,15 @@ export default function ViewImagesScreen() {
   );
 
   const allRows = useMemo(() => data?.rows ?? [], [data]);
+  const getFlywireMatchCount = (
+    flywire:
+      | {
+          matchCount?: number;
+          exactMatchCount?: number;
+        }
+      | null
+      | undefined
+  ) => flywire?.matchCount ?? flywire?.exactMatchCount ?? 0;
   const selectedSiteWorkbenchDocument = useMemo(
     () => siteWorkbench?.documents.find((document) => document.importedFileId === siteWorkbenchDocumentId) ?? null,
     [siteWorkbench, siteWorkbenchDocumentId]
@@ -298,7 +447,9 @@ export default function ViewImagesScreen() {
         return;
       }
       setData(response.data);
-      setPhase("review");
+      if (!reviewModeRequestedRef.current) {
+        setPhase("matched");
+      }
       setSearchParams({ day: inputDate }, { replace: true });
     } catch (loadError) {
       if (requestId !== loadRequestRef.current) {
@@ -313,8 +464,8 @@ export default function ViewImagesScreen() {
     }
   }
 
-  async function refreshMatches() {
-    const normalizedDate = isoDateToDisplay(postingDate);
+  async function refreshMatches(nextDate = postingDate) {
+    const normalizedDate = isoDateToDisplay(nextDate);
     if (!normalizedDate) {
       setError("Enter a date first.");
       return;
@@ -325,7 +476,9 @@ export default function ViewImagesScreen() {
     try {
       const response = await refreshImagingBalsheetAssociations(normalizedDate);
       setData(response.data);
-      setPhase("matched");
+      if (!reviewModeRequestedRef.current) {
+        setPhase("matched");
+      }
       setSearchParams({ day: normalizedDate }, { replace: true });
       setActionDetail(`Image index refreshed. Recalculated ${response.data.rowCount} row${response.data.rowCount === 1 ? "" : "s"} from ${response.data.indexCount} indexed file${response.data.indexCount === 1 ? "" : "s"}.`);
     } catch (refreshError) {
@@ -406,6 +559,12 @@ export default function ViewImagesScreen() {
     }
   }
 
+  function openPhase1() {
+    reviewModeRequestedRef.current = false;
+    setPhase("matched");
+    void refreshMatches(postingDate);
+  }
+
   async function findLockboxMatches() {
     const normalizedDate = isoDateToDisplay(data?.postingDate ?? postingDate);
     if (!normalizedDate) {
@@ -419,7 +578,8 @@ export default function ViewImagesScreen() {
       const response = await findImagingLockboxMatches(normalizedDate);
       setData(response.data);
       setPhase("lockbox");
-      setSearchParams({ day: normalizedDate }, { replace: true });
+      const nextSearchDate = displayDateToIso(normalizedDate) || normalizedDate;
+      setSearchParams({ day: nextSearchDate }, { replace: true });
       const firstRecommendedRow = response.data.rows.find(
         (row) => row.type.trim().toLowerCase() === "lockbox" && row.recommendations.length > 0
       );
@@ -585,17 +745,46 @@ export default function ViewImagesScreen() {
     }
   }
 
+  async function disassociateLinkedFile(row: ImagingBalsheetAssociationRow) {
+    const linked = row.linkedFiles[0];
+    if (!linked) {
+      setError("This row does not have a confirmed association to remove.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      await deleteImagingBalsheetLink(linked.linkId);
+      await loadDate(displayDateToIso(data?.postingDate ?? isoDateToDisplay(postingDate)));
+      setPhase(phase === "site" ? "site" : "review");
+      setActionDetail(`Removed the confirmed file link for ${row.checkNumber || row.payer || "the selected row"}.`);
+    } catch (disassociateError) {
+      setError(
+        formatImagingError(
+          disassociateError,
+          "DELETE",
+          `${API_BASE}/imaging/balsheet-links/${encodeURIComponent(linked.linkId)}`
+        )
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
   function setPreviewDocument(filePath: string, fileName: string, page = 0) {
     setPreviewPath(filePath);
     setPreviewDirectUrl("");
     setPreviewKeyproof(null);
     setPreviewPageImageUrl("");
+    setPreviewPageImageBaseUrl("");
     setPreviewMarker(null);
     setPreviewMarkerStatus("post");
     setPreviewMarkerLabel("");
     setPreviewItemDetails(null);
     setPreviewTitle(fileName);
     setPreviewPage(page);
+    setPreviewRefreshToken((token) => token + 1);
   }
 
   function openDocument(filePath: string, fileName: string, page = 0, nextPhase: ImagingPhase = "review") {
@@ -608,15 +797,81 @@ export default function ViewImagesScreen() {
     setPreviewPath(file.filePath ?? "");
     setPreviewDirectUrl(file.openUrl ?? "");
     setPreviewKeyproof(file.keyproof ?? null);
-    setPreviewPageImageUrl(file.pageImageUrl ?? "");
+    setPreviewPageImageBaseUrl(file.pageImageUrl ?? "");
+    setPreviewPageImageUrl(file.pageImageUrl ? appendCacheToken(file.pageImageUrl, previewRefreshToken + 1) : "");
     setPreviewMarker(file.marker ?? null);
     setPreviewMarkerStatus(file.markerStatus ?? "post");
     setPreviewMarkerLabel(file.markerLabel ?? "");
     setPreviewItemDetails(file.itemDetails ?? null);
     setPreviewTitle(file.fileName);
     setPreviewPage(file.bookmarkPage ?? 0);
+    setPreviewRefreshToken((token) => token + 1);
     setIsPreviewOpen(true);
     setPhase("review");
+  }
+
+  useEffect(() => {
+    if (!previewPageImageBaseUrl) {
+      return;
+    }
+
+    setPreviewPageImageUrl(appendCacheToken(previewPageImageBaseUrl, previewRefreshToken));
+  }, [previewPageImageBaseUrl, previewRefreshToken]);
+
+  function startReplaceScan(file: ImagingReviewFile) {
+    if (!file.filePath) {
+      setError("This image does not expose a replaceable file path.");
+      return;
+    }
+
+    setError(null);
+    setReplacementTarget(file);
+    replacementTargetRef.current = file;
+    if (typeof replaceFileInputRef.current?.showPicker === "function") {
+      replaceFileInputRef.current.showPicker();
+      return;
+    }
+    replaceFileInputRef.current?.click();
+  }
+
+  async function handleReplaceFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) {
+      setReplacementTarget(null);
+      return;
+    }
+
+    const target = replacementTargetRef.current ?? replacementTarget;
+    if (!target?.filePath) {
+      setReplacementTarget(null);
+      setError("No replacement target is selected.");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await replaceImagingFile(target.filePath, file);
+      await loadDate(data?.postingDate ?? postingDate);
+      setPreviewRefreshToken((token) => token + 1);
+      setActionDetail(
+        `Replaced ${target.fileName} with ${file.name}. Refreshed the review image snapshot and ${response.indexCount} indexed file${response.indexCount === 1 ? "" : "s"}.`
+      );
+    } catch (replaceError) {
+      setError(
+        formatImagingError(
+          replaceError,
+          "POST",
+          `${API_BASE}/imaging/files/replace -> ${target.filePath}`
+        )
+      );
+    } finally {
+      setReplacementTarget(null);
+      replacementTargetRef.current = null;
+      setLoading(false);
+    }
   }
 
   async function openFlywireDetails(row: ImagingBalsheetAssociationRow) {
@@ -639,6 +894,7 @@ export default function ViewImagesScreen() {
     if (!item) return;
     setSiteWorkbenchEntryId(entryId);
     setSiteWorkbenchNote(item.association?.note ?? "");
+    setSiteWorkbenchNotesOpen(Boolean(item.association?.note));
     setSiteMarker(markerFromAssociation(item.association));
     setSiteMarkerStatus(item.association?.markerStatus ?? "post");
     setSiteMarkerDrawing(false);
@@ -666,6 +922,7 @@ export default function ViewImagesScreen() {
       setSiteWorkbenchEntryId(selectedItem?.entryId ?? "");
       setSiteWorkbenchPage(selectedItem?.association?.pageStart ?? 1);
       setSiteWorkbenchNote(selectedItem?.association?.note ?? "");
+      setSiteWorkbenchNotesOpen(Boolean(selectedItem?.association?.note));
       setSiteMarker(markerFromAssociation(selectedItem?.association ?? null));
       setSiteMarkerStatus(selectedItem?.association?.markerStatus ?? "post");
       setSiteMarkerDrawing(false);
@@ -702,6 +959,7 @@ export default function ViewImagesScreen() {
       if (nextPending) {
         setSiteWorkbenchEntryId(nextPending.entryId);
         setSiteWorkbenchNote("");
+        setSiteWorkbenchNotesOpen(false);
         setSiteMarker(null);
         setSiteMarkerStatus("post");
         setSiteMarkerDrawing(false);
@@ -808,7 +1066,7 @@ export default function ViewImagesScreen() {
         pageImageUrl: buildImagingSitePageUrl(siteAssociation.importedFileId, siteAssociation.pageStart),
         marker: markerFromAssociation(siteAssociation),
         markerStatus: siteAssociation.markerStatus,
-        markerLabel: `${siteAssociation.markerStatus === "do_not_post" ? "DO NOT POST" : "POST"} · ${formatCurrency(row.amount)}`,
+        markerLabel: `${formatSiteMarkerStatus(siteAssociation.markerStatus).toUpperCase()} · ${formatCurrency(row.amount)}`,
         itemDetails: {
           site: row.type,
           postingDate: row.postingDate,
@@ -837,6 +1095,24 @@ export default function ViewImagesScreen() {
     return null;
   }
 
+  useEffect(() => {
+    if (phase !== "review" || !data?.rows.length || !selectedReviewEntryId) {
+      return;
+    }
+
+    const selectedRow = data.rows.find((row) => row.entryId === selectedReviewEntryId);
+    if (!selectedRow) {
+      return;
+    }
+
+    const reviewFile = getReviewFile(selectedRow);
+    if (reviewFile && autoOpenedReviewEntryIdRef.current !== selectedRow.entryId) {
+      autoOpenedReviewEntryIdRef.current = selectedRow.entryId;
+      openReviewDocument(reviewFile);
+      return;
+    }
+  }, [data, phase, selectedReviewEntryId]);
+
   const sidebarControls = (
     <div style={viewImagesStyles.sidebarStack}>
       <label style={viewImagesStyles.sidebarDateField}>
@@ -862,14 +1138,14 @@ export default function ViewImagesScreen() {
 
       <button
         type="button"
-        onClick={() => void refreshMatches()}
+        onClick={() => openPhase1()}
         style={{
           ...adminStyles.navButton,
           ...(phase === "matched" ? adminStyles.navButtonBack : null),
         }}
         disabled={loading}
       >
-        <span style={adminStyles.navButtonLabel}>Phase 1 - 835</span>
+        <span style={adminStyles.navButtonLabel}>Phase 1 - Balsheet</span>
         <span style={adminStyles.navButtonGlyph}>&gt;</span>
       </button>
 
@@ -903,20 +1179,10 @@ export default function ViewImagesScreen() {
 
       <button
         type="button"
-        onClick={() => void refreshMatches()}
-        style={{
-          ...adminStyles.navButton,
-          ...(phase === "matched" ? adminStyles.navButtonBack : null),
+        onClick={() => {
+          reviewModeRequestedRef.current = true;
+          setPhase("review");
         }}
-        disabled={loading || !postingDate.trim()}
-      >
-        <span style={adminStyles.navButtonLabel}>Update</span>
-        <span style={adminStyles.navButtonGlyph}>&gt;</span>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setPhase("review")}
         style={{
           ...adminStyles.navButton,
           ...(phase === "review" ? adminStyles.navButtonBack : null),
@@ -966,7 +1232,11 @@ export default function ViewImagesScreen() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [selectedSiteWorkbenchDocument?.pageCount, siteWorkbench]);
 
-  const previewUrl = previewDirectUrl || (previewPath ? buildImagingFileOpenUrl(previewPath, previewPage) : "");
+  const previewUrl = previewDirectUrl
+    ? appendCacheToken(previewDirectUrl, previewRefreshToken)
+    : previewPath
+      ? appendCacheToken(buildImagingFileOpenUrl(previewPath, previewPage), previewRefreshToken)
+      : "";
 
   return (
     <AdminShell
@@ -976,6 +1246,22 @@ export default function ViewImagesScreen() {
       useGlobalMenuFallback
       sidebarTopCard={sidebarControls}
     >
+      <input
+        ref={replaceFileInputRef}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff"
+        style={{
+          position: "fixed",
+          left: "-9999px",
+          top: 0,
+          width: "1px",
+          height: "1px",
+          opacity: 0,
+          pointerEvents: "none",
+        }}
+        onChange={handleReplaceFileChange}
+      />
+
       <section style={viewImagesStyles.content}>
         <section style={viewImagesStyles.heroShell}>
           <div style={viewImagesStyles.heroCopy}>
@@ -1069,8 +1355,15 @@ export default function ViewImagesScreen() {
                         {group.rows.map((row) => {
                           const reviewFile = getReviewFile(row);
                           const isPaymentPlan = row.eob.trim().toUpperCase() === "P";
+                          const isSelectedRow = row.entryId === selectedReviewEntryId;
                           return (
-                            <div key={row.entryId} style={viewImagesStyles.reviewTableRow}>
+                            <div
+                              key={row.entryId}
+                              style={{
+                                ...viewImagesStyles.reviewTableRow,
+                                ...(isSelectedRow ? viewImagesStyles.reviewTableRowSelected : null),
+                              }}
+                            >
                               <div style={viewImagesStyles.reviewColumnType}>{row.type || group.type}</div>
                               <div style={viewImagesStyles.reviewColumnAmount}>{formatCurrency(row.amount)}</div>
                               <div style={viewImagesStyles.reviewColumnPayer}>{row.payer || "Untitled payer"}</div>
@@ -1086,6 +1379,14 @@ export default function ViewImagesScreen() {
                                           onClick={() => openReviewDocument(reviewFile)}
                                         >
                                           View Image
+                                        </button>
+                                        <button
+                                          type="button"
+                                          style={viewImagesStyles.smallButtonSecondary}
+                                          onClick={() => startReplaceScan(reviewFile)}
+                                          disabled={loading}
+                                        >
+                                          Replace
                                         </button>
                                         <span style={viewImagesStyles.reviewImageMeta}>
                                           {typeof reviewFile.confidence === "number"
@@ -1104,8 +1405,8 @@ export default function ViewImagesScreen() {
                                           View Fly Wire
                                         </button>
                                         <span style={viewImagesStyles.reviewImageMeta}>
-                                          {row.flywire?.exactMatchCount
-                                            ? `${Math.round(row.flywire.confidence * 100)}% Fly Wire${row.flywire.ambiguous ? ` · ${row.flywire.exactMatchCount} candidates` : ""}`
+                                          {getFlywireMatchCount(row.flywire)
+                                            ? `${Math.round((row.flywire?.confidence ?? 0) * 100)}% Fly Wire${row.flywire?.ambiguous ? ` · ${getFlywireMatchCount(row.flywire)} candidates` : ""}`
                                             : row.flywire?.available
                                               ? "Fly Wire found · no amount match"
                                               : "Fly Wire missing"}
@@ -1341,7 +1642,7 @@ export default function ViewImagesScreen() {
                               )}
                               <span style={viewImagesStyles.rowBadge}>
                                 {phase === "site" && row.eob.trim().toUpperCase() === "P"
-                                  ? row.flywire?.exactMatchCount
+                                  ? getFlywireMatchCount(row.flywire)
                                     ? "Fly Wire 100%"
                                     : "Fly Wire"
                                   : phase === "site" && row.siteAssociation
@@ -1377,13 +1678,21 @@ export default function ViewImagesScreen() {
                                         View PDF
                                       </button>
                                       <a
-                                        href={buildImagingFileOpenUrl(file.filePath)}
+                                        href={appendCacheToken(buildImagingFileOpenUrl(file.filePath), previewRefreshToken)}
                                         target="_blank"
                                         rel="noreferrer"
                                         style={viewImagesStyles.smallLink}
                                       >
                                         Open
                                       </a>
+                                      <button
+                                        type="button"
+                                        style={viewImagesStyles.smallButtonSecondary}
+                                        onClick={() => void disassociateLinkedFile(row)}
+                                        disabled={loading}
+                                      >
+                                        Disassociate
+                                      </button>
                                     </div>
                                   </div>
                                 ))}
@@ -1483,9 +1792,7 @@ export default function ViewImagesScreen() {
                               <div
                                 style={{
                                   ...viewImagesStyles.sitePostingMarker,
-                                  ...(previewMarkerStatus === "do_not_post"
-                                    ? viewImagesStyles.sitePostingMarkerStop
-                                    : viewImagesStyles.sitePostingMarkerPost),
+                                  ...siteMarkerStatusFillStyle(previewMarkerStatus),
                                   left: `${previewMarker.x * 100}%`,
                                   top: `${previewMarker.y * 100}%`,
                                   width: `${previewMarker.width * 100}%`,
@@ -1493,7 +1800,7 @@ export default function ViewImagesScreen() {
                                 }}
                               >
                                 <span style={viewImagesStyles.sitePostingMarkerLabel}>
-                                  {previewMarkerLabel || (previewMarkerStatus === "do_not_post" ? "DO NOT POST" : "POST")}
+                                  {previewMarkerLabel || formatSiteMarkerStatus(previewMarkerStatus).toUpperCase()}
                                 </span>
                               </div>
                             )}
@@ -1518,55 +1825,14 @@ export default function ViewImagesScreen() {
                     <div style={viewImagesStyles.siteWorkbenchModal}>
                       <div style={viewImagesStyles.siteWorkbenchTopbar}>
                         <div>
-                          <div style={adminStyles.sectionKicker}>Site image association workbench</div>
-                          <div style={viewImagesStyles.siteWorkbenchTitleRow}>
-                            <h2 style={adminStyles.sectionTitle}>{siteWorkbench?.site || "Loading site queue"}</h2>
-                            {selectedSiteWorkbenchItem && (
-                              <div style={viewImagesStyles.siteMarkerControls}>
-                                <button
-                                  type="button"
-                                  style={{
-                                    ...viewImagesStyles.siteMarkerChoice,
-                                    ...viewImagesStyles.siteMarkerChoicePost,
-                                    ...(siteMarkerStatus === "post" ? viewImagesStyles.siteMarkerChoiceActive : null),
-                                  }}
-                                  onClick={() => setSiteMarkerStatus("post")}
-                                >
-                                  Post
-                                </button>
-                                <button
-                                  type="button"
-                                  style={{
-                                    ...viewImagesStyles.siteMarkerChoice,
-                                    ...viewImagesStyles.siteMarkerChoiceStop,
-                                    ...(siteMarkerStatus === "do_not_post" ? viewImagesStyles.siteMarkerChoiceActive : null),
-                                  }}
-                                  onClick={() => setSiteMarkerStatus("do_not_post")}
-                                >
-                                  Do Not Post
-                                </button>
-                                <button
-                                  type="button"
-                                  style={viewImagesStyles.smallButtonSecondary}
-                                  onClick={() => {
-                                    setSiteMarker(null);
-                                    setSiteMarkerDrawing(true);
-                                  }}
-                                >
-                                  {siteMarker ? "Redraw Marker" : "Draw Marker"}
-                                </button>
-                                {siteMarker && (
-                                  <button type="button" style={viewImagesStyles.siteMarkerClear} onClick={() => setSiteMarker(null)}>
-                                    Clear
-                                  </button>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <div style={viewImagesStyles.previewMeta}>
-                            {siteWorkbench
-                              ? `${siteWorkbench.postingDate} · ${siteWorkbench.associatedCount} of ${siteWorkbench.queueCount} associated · ${formatCurrency(siteWorkbench.queueTotal)}`
-                              : "Finding accepted Site Review paperwork..."}
+                          <div style={viewImagesStyles.siteWorkbenchSummaryRow}>
+                            <span style={viewImagesStyles.siteWorkbenchKicker}>Site image association workbench</span>
+                            <div style={viewImagesStyles.siteWorkbenchSummary}>
+                              {siteWorkbench
+                                ? `${siteWorkbench.postingDate} · ${siteWorkbench.associatedCount} of ${siteWorkbench.queueCount} associated · ${formatCurrency(siteWorkbench.queueTotal)}`
+                                : "Finding accepted Site Review paperwork..."}
+                            </div>
+                            <h2 style={viewImagesStyles.siteWorkbenchInlineTitle}>{siteWorkbench?.site || "Loading site queue"}</h2>
                           </div>
                         </div>
                         <div style={viewImagesStyles.previewHeaderActions}>
@@ -1650,19 +1916,69 @@ export default function ViewImagesScreen() {
                                 >
                                   Next
                                 </button>
+                              </div>
+                              <div style={viewImagesStyles.siteMarkerControls}>
                                 <button
                                   type="button"
-                                  style={viewImagesStyles.siteAssociateButton}
-                                  onClick={() => void bookmarkAndAssociateSitePage()}
-                                  disabled={siteWorkbenchSaving || !selectedSiteWorkbenchDocument || !selectedSiteWorkbenchItem}
+                                  style={{
+                                    ...viewImagesStyles.siteMarkerChoice,
+                                    ...viewImagesStyles.siteMarkerChoicePost,
+                                    ...(siteMarkerStatus === "post" ? viewImagesStyles.siteMarkerChoiceActive : null),
+                                  }}
+                                  onClick={() => setSiteMarkerStatus("post")}
                                 >
-                                  {siteWorkbenchSaving
-                                    ? "Saving..."
-                                    : selectedSiteWorkbenchItem
-                                      ? `Associate Page ${siteWorkbenchPage} to Item #${selectedSiteWorkbenchItem.queueNumber}`
-                                      : "Select a Queue Item"}
+                                  Post
                                 </button>
+                                <button
+                                  type="button"
+                                  style={{
+                                    ...viewImagesStyles.siteMarkerChoice,
+                                    ...viewImagesStyles.siteMarkerChoiceStop,
+                                    ...(siteMarkerStatus === "do_not_post" ? viewImagesStyles.siteMarkerChoiceActive : null),
+                                  }}
+                                  onClick={() => setSiteMarkerStatus("do_not_post")}
+                                >
+                                  Do Not Post
+                                </button>
+                                <button
+                                  type="button"
+                                  style={{
+                                    ...viewImagesStyles.siteMarkerChoice,
+                                    ...viewImagesStyles.siteMarkerChoiceMisc,
+                                    ...(siteMarkerStatus === "misc" ? viewImagesStyles.siteMarkerChoiceActive : null),
+                                  }}
+                                  onClick={() => setSiteMarkerStatus("misc")}
+                                >
+                                  Misc
+                                </button>
+                                <button
+                                  type="button"
+                                  style={viewImagesStyles.smallButtonSecondary}
+                                  onClick={() => {
+                                    setSiteMarker(null);
+                                    setSiteMarkerDrawing(true);
+                                  }}
+                                >
+                                  {siteMarker ? "Redraw Marker" : "Draw Marker"}
+                                </button>
+                                {siteMarker && (
+                                  <button type="button" style={viewImagesStyles.siteMarkerClear} onClick={() => setSiteMarker(null)}>
+                                    Clear
+                                  </button>
+                                )}
                               </div>
+                              <button
+                                type="button"
+                                style={viewImagesStyles.siteAssociateButton}
+                                onClick={() => void bookmarkAndAssociateSitePage()}
+                                disabled={siteWorkbenchSaving || !selectedSiteWorkbenchDocument || !selectedSiteWorkbenchItem}
+                              >
+                                {siteWorkbenchSaving
+                                  ? "Saving..."
+                                  : selectedSiteWorkbenchItem
+                                    ? `Associate Page ${siteWorkbenchPage} to Item #${selectedSiteWorkbenchItem.queueNumber}`
+                                    : "Select a Queue Item"}
+                              </button>
                             </div>
 
                             {selectedSiteWorkbenchItem && (
@@ -1677,6 +1993,12 @@ export default function ViewImagesScreen() {
                                   note: siteWorkbenchNote,
                                   markerStatus: siteMarkerStatus,
                                 }}
+                                note={siteWorkbenchNote}
+                                onNoteChange={setSiteWorkbenchNote}
+                                drawing={siteMarkerDrawing}
+                                queueNumber={selectedSiteWorkbenchItem.queueNumber}
+                                notesOpen={siteWorkbenchNotesOpen}
+                                onToggleNotes={() => setSiteWorkbenchNotesOpen((current) => !current)}
                               />
                             )}
 
@@ -1693,8 +2015,11 @@ export default function ViewImagesScreen() {
                                   onPointerCancel={finishSiteMarker}
                                 >
                                   <img
-                                    key={`${selectedSiteWorkbenchDocument.importedFileId}-${siteWorkbenchPage}`}
-                                    src={buildImagingSitePageUrl(selectedSiteWorkbenchDocument.importedFileId, siteWorkbenchPage)}
+                                    key={`${selectedSiteWorkbenchDocument.importedFileId}-${siteWorkbenchPage}-${previewRefreshToken}`}
+                                    src={appendCacheToken(
+                                      buildImagingSitePageUrl(selectedSiteWorkbenchDocument.importedFileId, siteWorkbenchPage),
+                                      previewRefreshToken
+                                    )}
                                     alt={`${selectedSiteWorkbenchDocument.fileName}, page ${siteWorkbenchPage}`}
                                     style={viewImagesStyles.sitePageImage}
                                     draggable={false}
@@ -1703,9 +2028,7 @@ export default function ViewImagesScreen() {
                                     <div
                                       style={{
                                         ...viewImagesStyles.sitePostingMarker,
-                                        ...(siteMarkerStatus === "do_not_post"
-                                          ? viewImagesStyles.sitePostingMarkerStop
-                                          : viewImagesStyles.sitePostingMarkerPost),
+                                        ...siteMarkerStatusFillStyle(siteMarkerStatus),
                                         left: `${siteMarker.x * 100}%`,
                                         top: `${siteMarker.y * 100}%`,
                                         width: `${siteMarker.width * 100}%`,
@@ -1713,7 +2036,7 @@ export default function ViewImagesScreen() {
                                       }}
                                     >
                                       <span style={viewImagesStyles.sitePostingMarkerLabel}>
-                                        #{selectedSiteWorkbenchItem?.queueNumber || "?"} · {siteMarkerStatus === "do_not_post" ? "DO NOT POST" : "POST"}
+                                        #{selectedSiteWorkbenchItem?.queueNumber || "?"} · {formatSiteMarkerStatus(siteMarkerStatus).toUpperCase()}
                                       </span>
                                     </div>
                                   )}
@@ -1723,28 +2046,6 @@ export default function ViewImagesScreen() {
                               <div style={viewImagesStyles.emptyState}>No accepted Site Review PDF matches this site and date.</div>
                             )}
 
-                            {selectedSiteWorkbenchItem && (
-                              <div style={viewImagesStyles.siteBookmarkBar}>
-                                <div style={viewImagesStyles.siteBookmarkIdentity}>
-                                  <span style={viewImagesStyles.siteQueueNumber}>{selectedSiteWorkbenchItem.queueNumber}</span>
-                                  <div>
-                                    <strong>{formatCurrency(selectedSiteWorkbenchItem.amount)}</strong>
-                                    <span>{selectedSiteWorkbenchItem.payer || "Untitled payer"}</span>
-                                  </div>
-                                </div>
-                                <input
-                                  value={siteWorkbenchNote}
-                                  onChange={(event) => setSiteWorkbenchNote(event.target.value)}
-                                  placeholder="Optional breadcrumb note"
-                                  style={viewImagesStyles.siteBookmarkNote}
-                                />
-                                <span style={viewImagesStyles.siteBookmarkHint}>
-                                  {siteMarkerDrawing
-                                    ? "Drag a box over the details on the page."
-                                    : "Save with the green association button."}
-                                </span>
-                              </div>
-                            )}
                           </section>
 
                           <aside style={viewImagesStyles.siteQueuePanel}>
@@ -1777,7 +2078,7 @@ export default function ViewImagesScreen() {
                                     </span>
                                     <span style={viewImagesStyles.siteQueueStatus}>
                                       {item.association
-                                        ? `${item.association.markerWidth ? (item.association.markerStatus === "do_not_post" ? "Do Not Post" : "Post") + " · " : ""}Page ${item.association.pageStart}`
+                                        ? `${item.association.markerWidth ? `${formatSiteMarkerStatus(item.association.markerStatus)} · ` : ""}Page ${item.association.pageStart}`
                                         : "Pending"}
                                     </span>
                                     {item.association && (
@@ -1848,13 +2149,15 @@ export default function ViewImagesScreen() {
                           <>
                             <div style={viewImagesStyles.flywireMatchSummary}>
                               <strong>
-                                {flywireDetails.exactMatchCount} exact amount match
-                                {flywireDetails.exactMatchCount === 1 ? "" : "es"}
+                                {getFlywireMatchCount(flywireDetails)} matching row
+                                {getFlywireMatchCount(flywireDetails) === 1 ? "" : "s"}
                               </strong>
                               <span>
-                                {flywireDetails.ambiguous
-                                  ? "More than one Fly Wire row has this amount. Review the highlighted candidates."
-                                  : "The highlighted row matches the Balsheet posting date and amount."}
+                                {flywireDetails.checkMatchCount && flywireDetails.checkMatchCount > 0
+                                  ? "The highlighted row also matches the Balsheet check number."
+                                  : flywireDetails.ambiguous
+                                    ? "More than one Fly Wire row has this amount. Review the highlighted candidates."
+                                    : "The highlighted row matches the Balsheet posting date and amount."}
                               </span>
                             </div>
 
@@ -1959,7 +2262,7 @@ function formatFlywireRawJson(value: string | null | undefined) {
 }
 
 function isoDateToDisplay(value: string | null | undefined) {
-  const raw = String(value ?? "").trim();
+  const raw = String(value ?? "").trim().replace(/[,\s]+$/g, "");
   if (!raw) {
     return "";
   }
@@ -1981,7 +2284,7 @@ function isoDateToDisplay(value: string | null | undefined) {
 }
 
 function displayDateToIso(value: string | null | undefined) {
-  const raw = String(value ?? "").trim();
+  const raw = String(value ?? "").trim().replace(/[,\s]+$/g, "");
   if (!raw) {
     return "";
   }
@@ -2214,6 +2517,11 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     borderRadius: "14px",
     background: "rgba(250, 252, 255, 0.96)",
     border: "1px solid rgba(140, 160, 184, 0.12)",
+  },
+  reviewTableRowSelected: {
+    borderColor: "rgba(45, 111, 176, 0.35)",
+    boxShadow: "0 0 0 2px rgba(45, 111, 176, 0.10) inset",
+    background: "linear-gradient(135deg, rgba(244, 249, 255, 0.98) 0%, rgba(236, 245, 255, 0.98) 100%)",
   },
   reviewColumnType: {
     fontSize: "13px",
@@ -2569,6 +2877,38 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     gap: "16px",
     flexWrap: "wrap",
   },
+  siteWorkbenchSummary: {
+    color: "#1a5f4d",
+    fontSize: "10px",
+    fontWeight: 900,
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
+  },
+  siteWorkbenchSummaryRow: {
+    display: "flex",
+    alignItems: "baseline",
+    gap: "10px",
+    flexWrap: "nowrap",
+    minWidth: 0,
+  },
+  siteWorkbenchKicker: {
+    color: "#187054",
+    fontSize: "9px",
+    fontWeight: 900,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  },
+  siteWorkbenchInlineTitle: {
+    margin: 0,
+    color: "#183f35",
+    fontSize: "18px",
+    fontWeight: 900,
+    lineHeight: 1.05,
+    letterSpacing: "-0.02em",
+  },
   siteWorkbenchTitleRow: {
     display: "flex",
     alignItems: "center",
@@ -2603,20 +2943,22 @@ const viewImagesStyles: Record<string, CSSProperties> = {
   siteWorkbenchControls: {
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    flexWrap: "wrap",
+    justifyContent: "flex-start",
+    gap: "8px",
+    flexWrap: "nowrap",
+    minWidth: 0,
   },
   siteWorkbenchSelect: {
-    minWidth: "min(420px, 100%)",
+    flex: "1 1 360px",
+    minWidth: "260px",
     maxWidth: "100%",
-    height: "40px",
-    borderRadius: "13px",
+    height: "36px",
+    borderRadius: "11px",
     border: "1px solid rgba(85, 127, 115, 0.22)",
     background: "#ffffff",
     color: "#183f35",
     padding: "0 10px",
-    fontSize: "12px",
+    fontSize: "11px",
     fontWeight: 800,
   },
   keyproofBanner: {
@@ -2688,54 +3030,90 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     display: "flex",
     alignItems: "center",
     gap: "14px",
-    flexWrap: "wrap",
-    padding: "11px 13px",
+    flexWrap: "nowrap",
+    padding: "9px 12px",
     borderRadius: "14px",
     border: "1px solid rgba(24, 92, 72, 0.20)",
     background: "linear-gradient(135deg, #edf8f2 0%, #fff9df 100%)",
     color: "#183f35",
     boxShadow: "0 8px 22px rgba(28, 80, 64, 0.07)",
+    minWidth: 0,
+    overflow: "hidden",
   },
   associatedItemLead: {
-    minWidth: "220px",
-    display: "grid",
-    gap: "2px",
+    minWidth: "200px",
+    display: "flex",
+    alignItems: "baseline",
+    gap: "6px",
+    flexWrap: "nowrap",
     color: "#537168",
-    fontSize: "11px",
+    fontSize: "10px",
+    lineHeight: 1.1,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   associatedItemAmount: {
     color: "#173f34",
-    fontSize: "22px",
+    fontSize: "18px",
     fontWeight: 950,
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   associatedItemFacts: {
     display: "flex",
     alignItems: "center",
-    gap: "8px 14px",
-    flex: "1 1 440px",
-    flexWrap: "wrap",
+    gap: "8px",
+    flex: "1 1 auto",
+    flexWrap: "nowrap",
     color: "#5a716a",
-    fontSize: "10px",
+    fontSize: "9px",
     fontWeight: 800,
+    whiteSpace: "nowrap",
+    overflow: "hidden",
+  },
+  associatedItemControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    flex: "0 0 auto",
+    flexWrap: "nowrap",
+    whiteSpace: "nowrap",
+    minWidth: 0,
+  },
+  siteNotesButton: {
+    minHeight: "28px",
+    border: "1px solid rgba(85, 127, 115, 0.22)",
+    borderRadius: "999px",
+    padding: "0 9px",
+    background: "#ffffff",
+    color: "#17483c",
+    fontSize: "9px",
+    fontWeight: 900,
+    cursor: "pointer",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   sitePageControls: {
     display: "flex",
     alignItems: "center",
-    gap: "8px",
-    flexWrap: "wrap",
+    gap: "6px",
+    flexWrap: "nowrap",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   sitePageField: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
+    gap: "4px",
     color: "#4f6c63",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 800,
+    whiteSpace: "nowrap",
   },
   sitePageInput: {
-    width: "62px",
-    height: "34px",
-    borderRadius: "10px",
+    width: "52px",
+    height: "30px",
+    borderRadius: "9px",
     border: "1px solid rgba(85, 127, 115, 0.22)",
     textAlign: "center",
     color: "#173f34",
@@ -2788,6 +3166,11 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     background: "rgba(225, 53, 57, 0.20)",
     boxShadow: "0 0 0 2px rgba(255,255,255,0.72), 0 8px 20px rgba(92,14,17,0.24)",
   },
+  sitePostingMarkerMisc: {
+    border: "3px solid #8c6a19",
+    background: "rgba(205, 163, 62, 0.22)",
+    boxShadow: "0 0 0 2px rgba(255,255,255,0.72), 0 8px 20px rgba(90,68,18,0.22)",
+  },
   sitePostingMarkerLabel: {
     position: "absolute",
     left: "-3px",
@@ -2818,34 +3201,44 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     minWidth: "220px",
   },
   siteBookmarkNote: {
-    flex: "1 1 220px",
-    height: "40px",
-    borderRadius: "12px",
+    flex: "0 0 150px",
+    width: "150px",
+    height: "28px",
+    borderRadius: "9px",
     border: "1px solid rgba(70, 125, 108, 0.22)",
     padding: "0 11px",
     color: "#173f34",
-    fontSize: "12px",
+    fontSize: "9px",
     fontWeight: 700,
   },
   siteBookmarkHint: {
     color: "#54736a",
-    fontSize: "11px",
+    fontSize: "9px",
     fontWeight: 800,
     lineHeight: 1.35,
+    whiteSpace: "nowrap",
   },
   siteMarkerControls: {
     display: "flex",
     alignItems: "center",
-    gap: "6px",
-    flexWrap: "wrap",
+    gap: "4px",
+    flexWrap: "nowrap",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
+  },
+  siteMarkerChoiceMisc: {
+    border: "1px solid #b5922c",
+    background: "#f7df87",
+    color: "#5c4610",
   },
   siteMarkerChoice: {
-    minHeight: "36px",
-    borderRadius: "10px",
-    padding: "0 11px",
-    fontSize: "11px",
+    minHeight: "30px",
+    borderRadius: "9px",
+    padding: "0 8px",
+    fontSize: "10px",
     fontWeight: 900,
     cursor: "pointer",
+    whiteSpace: "nowrap",
   },
   siteMarkerChoicePost: {
     border: "1px solid #d9a400",
@@ -2862,26 +3255,29 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     transform: "translateY(-1px)",
   },
   siteMarkerClear: {
-    minHeight: "34px",
+    minHeight: "30px",
     border: 0,
     background: "transparent",
     color: "#875052",
-    fontSize: "11px",
+    fontSize: "10px",
     fontWeight: 900,
     cursor: "pointer",
     textDecoration: "underline",
+    whiteSpace: "nowrap",
   },
   siteAssociateButton: {
-    minHeight: "42px",
+    minHeight: "32px",
     border: 0,
-    borderRadius: "13px",
-    padding: "0 16px",
+    borderRadius: "11px",
+    padding: "0 12px",
     background: "linear-gradient(135deg, #156247 0%, #238b67 100%)",
     color: "#ffffff",
-    fontSize: "12px",
+    fontSize: "10px",
     fontWeight: 900,
     cursor: "pointer",
     boxShadow: "0 14px 28px rgba(21, 98, 71, 0.20)",
+    whiteSpace: "nowrap",
+    flexShrink: 0,
   },
   siteQueuePanel: {
     minWidth: "280px",

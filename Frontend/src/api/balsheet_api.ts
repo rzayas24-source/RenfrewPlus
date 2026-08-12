@@ -80,6 +80,7 @@ export interface BalsheetKeyproofReviewRow {
   itemizationBalsheetTotal: number;
   itemizationStatus: "matched" | "partial" | "no_itemization";
   balsheetActualTotal: number;
+  borrowedTransferTotal?: number;
   balsheetDifference: number;
   balsheetStatus: "matched" | "partial" | "missing" | "not_applicable";
   balsheetRowCount: number;
@@ -160,6 +161,8 @@ export interface ImagingBalsheetAssociationRow {
     available: boolean;
     documentCount: number;
     exactMatchCount: number;
+    matchCount?: number;
+    checkMatchCount?: number;
     ambiguous: boolean;
     confidence: number;
   } | null;
@@ -181,7 +184,10 @@ export interface ImagingFlywireDetailsResponse {
   available: boolean;
   documentCount: number;
   exactMatchCount: number;
+  matchCount?: number;
+  checkMatchCount?: number;
   ambiguous: boolean;
+  checkNumber?: string;
   documents: ImagingFlywireDocument[];
 }
 
@@ -197,7 +203,7 @@ export interface ImagingSitePageAssociation {
   markerY: number | null;
   markerWidth: number | null;
   markerHeight: number | null;
-  markerStatus: "post" | "do_not_post";
+  markerStatus: "post" | "do_not_post" | "misc";
   keyproof: ImagingKeyproofSummary;
 }
 
@@ -309,12 +315,29 @@ export interface ImagingLockboxRecommendation {
   openUrl?: string;
 }
 
+export interface ImagingFileReplaceResponse {
+  status: string;
+  filePath: string;
+  fileName: string;
+  indexCount: number;
+}
+
 export interface ImagingBulkCommitExactResponse {
   status: string;
   postingDate: string;
   committedCount: number;
   skippedCount: number;
   data: ImagingBalsheetAssociationResponse;
+}
+
+export interface BalsheetTransferPayload {
+  source_date: string;
+  target_date: string;
+  site: string;
+  amount: number;
+  source_entry_id?: string;
+  source_filename?: string;
+  notes?: string;
 }
 
 export function getBalsheet(postingDate?: string) {
@@ -398,6 +421,13 @@ export function saveBalsheetEntries(entries: BalsheetEntry[], postingDate?: stri
   });
 }
 
+export function createBalsheetTransfer(payload: BalsheetTransferPayload) {
+  return axios.post<{ status: string; transfer_id: string; source_date: string; target_date: string; site: string; amount: number }>(
+    `${API_BASE}/balsheet/transfers`,
+    payload
+  );
+}
+
 export function updateBalsheetEntry(entryId: string, entry: BalsheetEntry) {
   return axios.put<BalsheetEntry>(`${API_BASE}/balsheet/${entryId}`, entry);
 }
@@ -467,6 +497,24 @@ export function buildImagingFileOpenUrl(filePath: string, page?: number) {
   return `${API_BASE}/imaging/files/open?path=${encodeURIComponent(filePath)}${pageFragment}`;
 }
 
+export async function replaceImagingFile(filePath: string, file: File): Promise<ImagingFileReplaceResponse> {
+  const formData = new FormData();
+  formData.append("path", filePath);
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE}/imaging/files/replace`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "Failed to replace imaging file");
+  }
+
+  return await response.json();
+}
+
 export function buildImagingLinkOpenUrl(linkId: string, page?: number) {
   const pageFragment = page && page > 0 ? `#page=${page}` : "";
   return `${API_BASE}/imaging/balsheet-links/${encodeURIComponent(linkId)}/open${pageFragment}`;
@@ -503,7 +551,7 @@ export function saveImagingSitePageAssociation(payload: {
   pageNumber: number;
   note?: string;
   marker?: { x: number; y: number; width: number; height: number } | null;
-  markerStatus?: "post" | "do_not_post";
+  markerStatus?: "post" | "do_not_post" | "misc";
 }) {
   return axios.post<ImagingSiteWorkbenchResponse>(`${API_BASE}/imaging/site-page-associations`, {
     entry_id: payload.entryId,

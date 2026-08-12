@@ -151,7 +151,7 @@ export default function CashScreen() {
 
       <section style={styles.buttonGrid}>
         <button type="button" style={styles.menuButton} onClick={() => navigate("/835-match")}>
-          <span style={styles.menuButtonTitle}>835 Match</span>
+          <span style={styles.menuButtonTitle}>Phase 1 Match</span>
           <span style={styles.menuButtonGlyph}>&gt;</span>
         </button>
         <button type="button" style={styles.menuButton} onClick={() => navigate("/balsheet")}>

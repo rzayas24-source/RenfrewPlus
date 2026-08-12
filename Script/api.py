@@ -155,6 +155,7 @@ def _ensure_source_table_columns_on_startup():
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
+        ensure_balsheet_transfer_table(conn)
         ensure_imaging_tables(conn)
         ensure_misc_table(conn)
         ensure_tasks_table(conn)
@@ -582,6 +583,24 @@ def _normalize_flywire_text(value):
         return ""
     text = str(value).strip()
     return text
+
+
+def _normalize_flywire_name(value):
+    return " ".join(_normalize_flywire_text(value).replace(",", " ").split()).casefold()
+
+
+def _imaging_flywire_row_name_matches(payer: str, patient_name: str, billing_name: str) -> bool:
+    normalized_payer = _normalize_flywire_name(payer)
+    if not normalized_payer:
+        return False
+
+    normalized_patient = _normalize_flywire_name(patient_name)
+    normalized_billing = _normalize_flywire_name(billing_name)
+    if normalized_patient and normalized_patient in normalized_payer:
+        return True
+    if normalized_billing and normalized_billing in normalized_payer:
+        return True
+    return False
 
 
 def _normalize_flywire_amount(value):
@@ -1183,6 +1202,43 @@ def ensure_balsheet_table(conn=None):
     cur = conn.cursor()
     column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in BALSHEET_TABLE_COLUMNS)
     cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Balsheet")} ({column_defs})')
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+BALSHEET_TRANSFER_TABLE_COLUMNS = [
+    ("transfer_id", "TEXT PRIMARY KEY"),
+    ("source_date", "TEXT NOT NULL"),
+    ("target_date", "TEXT NOT NULL"),
+    ("site", "TEXT NOT NULL"),
+    ("amount", "REAL NOT NULL DEFAULT 0"),
+    ("source_entry_id", "TEXT NOT NULL DEFAULT ''"),
+    ("source_filename", "TEXT NOT NULL DEFAULT ''"),
+    ("notes", "TEXT NOT NULL DEFAULT ''"),
+    ("created_at", "TEXT NOT NULL"),
+]
+
+
+def ensure_balsheet_transfer_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in BALSHEET_TRANSFER_TABLE_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Balsheet_transfers")} ({column_defs})')
+
+    existing_columns = [row[1] for row in cur.execute(f'PRAGMA table_info({_quote_identifier("Balsheet_transfers")})').fetchall()]
+    existing_columns_lower = {column.lower() for column in existing_columns}
+    for column_name, definition in BALSHEET_TRANSFER_TABLE_COLUMNS:
+        if column_name.lower() not in existing_columns_lower:
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier("Balsheet_transfers")} ADD COLUMN {_quote_identifier(column_name)} {definition}'
+            )
+
     conn.commit()
 
     if close_conn:
@@ -2265,12 +2321,13 @@ def _imaging_match_score(entry_check: str, posting_date: str, document_row) -> t
     return 0.0, "none"
 
 
-def _imaging_flywire_match_summary(conn, posting_date: str, amount: float) -> dict:
+def _imaging_flywire_match_summary(conn, posting_date: str, amount: float, check_number: str = "") -> dict:
     normalized_posting_date = normalize_mmddyyyy(posting_date)
     try:
         batch_date = datetime.strptime(normalized_posting_date, "%m/%d/%Y").strftime("%Y-%m-%d")
     except (TypeError, ValueError):
         batch_date = ""
+    normalized_check = _normalize_imaging_check_number(check_number)
 
     document_rows = conn.execute(
         f'''
@@ -2284,7 +2341,23 @@ def _imaging_flywire_match_summary(conn, posting_date: str, amount: float) -> di
 
     seen_documents = set()
     document_count = 0
-    exact_match_count = 0
+    amount_match_count = 0
+    check_match_count = 0
+    name_match_count = 0
+    selected_match_count = 0
+    payer_row = conn.execute(
+        f'''
+        SELECT {_quote_identifier("payer")}
+        FROM {_quote_identifier("Balsheet")}
+        WHERE {_quote_identifier("PostingDate")} = ?
+          AND ABS(COALESCE({_quote_identifier("Amount")}, 0) - ?) < 0.005
+          AND {_quote_identifier("Check Number")} = ?
+        ORDER BY {_quote_identifier("EntryID")} ASC
+        LIMIT 1
+        ''',
+        (posting_date, float(amount or 0), check_number),
+    ).fetchone()
+    payer_text = str(payer_row["payer"] or "") if payer_row else ""
     for document_row in document_rows:
         document_key = (
             str(document_row["source_filename"] or "").casefold(),
@@ -2295,22 +2368,50 @@ def _imaging_flywire_match_summary(conn, posting_date: str, amount: float) -> di
             continue
         seen_documents.add(document_key)
         document_count += 1
-        exact_match_count += conn.execute(
+        matched_rows = conn.execute(
             f'''
-            SELECT COUNT(*)
+            SELECT
+                {_quote_identifier("amount")},
+                {_quote_identifier("account_number")},
+                {_quote_identifier("patient_name")},
+                {_quote_identifier("billing_name")}
             FROM {_quote_identifier("Import_FlywireRows")}
             WHERE {_quote_identifier("document_id")} = ?
-              AND ABS(COALESCE({_quote_identifier("amount")}, 0) - ?) < 0.005
             ''',
-            (document_row["id"], float(amount or 0)),
-        ).fetchone()[0]
+            (document_row["id"],),
+        ).fetchall()
+        amount_row_count = 0
+        check_row_count = 0
+        name_row_count = 0
+        for matched_row in matched_rows:
+            if abs(float(matched_row["amount"] or 0) - float(amount or 0)) >= 0.005:
+                continue
+            amount_match_count += 1
+            amount_row_count += 1
+            row_name_matches = _imaging_flywire_row_name_matches(
+                payer_text,
+                matched_row["patient_name"],
+                matched_row["billing_name"],
+            )
+            if row_name_matches:
+                name_match_count += 1
+                name_row_count += 1
+            if not normalized_check or not row_name_matches:
+                continue
+            if _normalize_imaging_check_number(matched_row["account_number"]) == normalized_check:
+                check_match_count += 1
+                check_row_count += 1
+        selected_match_count += check_row_count if normalized_check and check_row_count > 0 else (name_row_count if name_row_count > 0 else amount_row_count)
 
     return {
         "available": document_count > 0,
         "documentCount": document_count,
-        "exactMatchCount": exact_match_count,
-        "ambiguous": exact_match_count > 1,
-        "confidence": 1.0 if exact_match_count > 0 else 0.0,
+        "exactMatchCount": amount_match_count,
+        "matchCount": selected_match_count,
+        "checkMatchCount": check_match_count,
+        "nameMatchCount": name_match_count,
+        "ambiguous": selected_match_count > 1,
+        "confidence": 1.0 if selected_match_count > 0 else 0.0,
     }
 
 
@@ -2402,7 +2503,12 @@ def _build_imaging_association_payload(conn, posting_date: str):
         site_association = site_associations_by_entry.get(entry_id)
         is_payment_plan = str(balsheet_row.get("eob") or "").strip().upper() == "P"
         flywire_summary = (
-            _imaging_flywire_match_summary(conn, posting_date, float(balsheet_row.get("amount") or 0))
+            _imaging_flywire_match_summary(
+                conn,
+                posting_date,
+                float(balsheet_row.get("amount") or 0),
+                str(balsheet_row.get("check_number") or ""),
+            )
             if is_payment_plan
             else None
         )
@@ -2497,7 +2603,45 @@ def _safe_imaging_file_response(file_path: str):
     if not resolved.exists():
         raise HTTPException(status_code=404, detail="File not found")
 
-    return FileResponse(str(resolved))
+    return FileResponse(
+        str(resolved),
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+def _replace_imaging_file(file_path: str, uploaded_bytes: bytes) -> dict:
+    root = _imaging_root_folder()
+    current_path = _rebase_imaging_file_path(file_path)
+    if not _is_within_root(current_path, root):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    target_path = Path(current_path).resolve()
+    if not target_path.exists() or not target_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(delete=False, dir=str(target_path.parent), suffix=target_path.suffix) as handle:
+        handle.write(uploaded_bytes)
+        staged_path = handle.name
+
+    try:
+        os.replace(staged_path, target_path)
+    except Exception as exc:
+        try:
+            if os.path.exists(staged_path):
+                os.unlink(staged_path)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Failed to replace file: {exc}") from exc
+
+    return {
+        "status": "ok",
+        "filePath": str(target_path),
+        "fileName": target_path.name,
+    }
 
 
 TASK_TABLE_COLUMNS = [
@@ -3434,6 +3578,65 @@ def _live_balsheet_total_for_site(balsheet_rows, site_name):
     return round(total, 2)
 
 
+def _balsheet_transfer_row_to_payload(row):
+    return {
+        "transfer_id": str(row["transfer_id"] or ""),
+        "source_date": normalize_mmddyyyy(row["source_date"]) or str(row["source_date"] or ""),
+        "target_date": normalize_mmddyyyy(row["target_date"]) or str(row["target_date"] or ""),
+        "site": str(row["site"] or ""),
+        "amount": _normalize_balsheet_amount(row["amount"]),
+        "source_entry_id": str(row["source_entry_id"] or ""),
+        "source_filename": str(row["source_filename"] or ""),
+        "notes": str(row["notes"] or ""),
+        "created_at": str(row["created_at"] or ""),
+    }
+
+
+def _normalize_balsheet_transfer_payload(payload: dict, transfer_id: str | None = None):
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Transfer payload must be an object")
+
+    source_date = normalize_mmddyyyy(payload.get("source_date")) or ""
+    target_date = normalize_mmddyyyy(payload.get("target_date")) or ""
+    if not source_date:
+        raise HTTPException(status_code=400, detail="source_date is required")
+    if not target_date:
+        raise HTTPException(status_code=400, detail="target_date is required")
+
+    site = str(payload.get("site") or "").strip()
+    if not site:
+        raise HTTPException(status_code=400, detail="site is required")
+
+    return {
+        "transfer_id": transfer_id or str(payload.get("transfer_id") or "").strip() or f"TRF-{datetime.now().strftime('%m%d%Y-%H%M%S%f')}",
+        "source_date": source_date,
+        "target_date": target_date,
+        "site": site,
+        "amount": _normalize_balsheet_amount(payload.get("amount")),
+        "source_entry_id": str(payload.get("source_entry_id") or "").strip(),
+        "source_filename": str(payload.get("source_filename") or "").strip(),
+        "notes": str(payload.get("notes") or "").strip(),
+        "created_at": str(payload.get("created_at") or "").strip() or datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def _balsheet_transfer_total_for_site(conn, target_date: str, site_name: str):
+    normalized_site = _normalize_review_site_key(site_name)
+    if not normalized_site:
+        return 0.0
+
+    rows = conn.execute(
+        f'''
+        SELECT amount
+        FROM {_quote_identifier("Balsheet_transfers")}
+        WHERE {_quote_identifier("target_date")} = ?
+          AND lower(trim({_quote_identifier("site")})) = ?
+        ''',
+        (target_date, normalized_site),
+    ).fetchall()
+    return round(sum(_normalize_balsheet_amount(row["amount"]) for row in rows), 2)
+
+
 def _is_close_to_zero(value: float, tolerance: float = 0.005) -> bool:
     return abs(round(value, 2)) < tolerance
 
@@ -3444,6 +3647,7 @@ def get_balsheet_keyproof_review(posting_date: str | None = None):
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     ensure_balsheet_table(conn)
+    ensure_balsheet_transfer_table(conn)
     ensure_keyproof_table(conn)
     ensure_itemization_table(conn)
 
@@ -3505,9 +3709,10 @@ def get_balsheet_keyproof_review(posting_date: str | None = None):
                     lockbox_balsheet_total += _normalize_balsheet_amount(row.get("amount"))
 
             balsheet_total = _live_balsheet_total_for_site(balsheet_rows, candidate["site"])
-            balsheet_difference = round(keyproof_total - balsheet_total, 2)
+            transfer_total = _balsheet_transfer_total_for_site(conn, normalized_posting_date, candidate["site"])
+            balsheet_difference = round(keyproof_total - balsheet_total + transfer_total, 2)
             balsheet_needed = not (_is_close_to_zero(keyproof_total) and _is_close_to_zero(balsheet_total))
-            if not balsheet_needed:
+            if not balsheet_needed and _is_close_to_zero(transfer_total):
                 balsheet_status = "not_applicable"
             elif _is_close_to_zero(balsheet_difference):
                 balsheet_status = "matched"
@@ -3557,6 +3762,7 @@ def get_balsheet_keyproof_review(posting_date: str | None = None):
                 "itemizationDifference": itemization_difference,
                 "itemizationStatus": itemization_status,
                 "balsheetActualTotal": round(balsheet_total, 2),
+                "borrowedTransferTotal": round(transfer_total, 2),
                 "balsheetDifference": balsheet_difference,
                 "balsheetStatus": balsheet_status,
                 "springLaneExpectedTotal": spring_lane_expected_total,
@@ -3605,6 +3811,7 @@ def get_balsheet_keyproof_review_open():
     conn = get_conn()
     conn.row_factory = sqlite3.Row
     ensure_balsheet_table(conn)
+    ensure_balsheet_transfer_table(conn)
     ensure_keyproof_table(conn)
 
     try:
@@ -3655,7 +3862,8 @@ def get_balsheet_keyproof_review_open():
                 2,
             )
             balsheet_total = _live_balsheet_total_for_site(balsheet_rows, site_name)
-            difference = round(keyproof_subtotal - balsheet_total, 2)
+            transfer_total = _balsheet_transfer_total_for_site(conn, candidate_day, site_name)
+            difference = round(keyproof_subtotal - balsheet_total + transfer_total, 2)
             if _is_close_to_zero(difference):
                 continue
 
@@ -7909,6 +8117,7 @@ def get_imaging_balsheet_associations(posting_date: str):
     init_db()
     conn = get_conn()
     try:
+        conn.row_factory = sqlite3.Row
         ensure_balsheet_table(conn)
         ensure_imaging_tables(conn)
         return _build_imaging_association_payload(conn, normalized_posting_date)
@@ -7926,6 +8135,7 @@ def refresh_imaging_balsheet_associations(payload: dict | None = None):
     init_db()
     conn = get_conn()
     try:
+        conn.row_factory = sqlite3.Row
         ensure_balsheet_table(conn)
         ensure_imaging_tables(conn)
         rebuild_imaging_document_index(conn)
@@ -8219,8 +8429,8 @@ def save_imaging_site_page_association(payload: dict | None = None):
     note = str(payload.get("note") or "").strip()
     marker = payload.get("marker") if isinstance(payload.get("marker"), dict) else None
     marker_status = str(payload.get("marker_status") or "post").strip().lower()
-    if marker_status not in {"post", "do_not_post"}:
-        raise HTTPException(status_code=400, detail="marker_status must be post or do_not_post")
+    if marker_status not in {"post", "do_not_post", "misc"}:
+        raise HTTPException(status_code=400, detail="marker_status must be post, do_not_post, or misc")
     marker_values = None
     if marker:
         try:
@@ -8393,6 +8603,7 @@ def get_imaging_balsheet_flywire(entry_id: str):
             raise HTTPException(status_code=400, detail="Balsheet row is not a Payment Plan")
 
         posting_date = normalize_mmddyyyy(balsheet.get("posting_date"))
+        check_number = str(balsheet.get("check_number") or "")
         try:
             batch_date = datetime.strptime(posting_date, "%m/%d/%Y").strftime("%Y-%m-%d")
         except (TypeError, ValueError):
@@ -8409,9 +8620,14 @@ def get_imaging_balsheet_flywire(entry_id: str):
         ).fetchall()
 
         amount = float(balsheet.get("amount") or 0)
+        payer_text = str(balsheet.get("payer") or "")
         documents = []
         seen_documents = set()
-        exact_match_count = 0
+        amount_match_count = 0
+        check_match_count = 0
+        name_match_count = 0
+        normalized_check = _normalize_imaging_check_number(check_number)
+        selected_match_count = 0
         for document_row in document_rows:
             document_key = (
                 str(document_row["source_filename"] or "").casefold(),
@@ -8432,12 +8648,27 @@ def get_imaging_balsheet_flywire(entry_id: str):
                 (document_row["id"],),
             ).fetchall()
             document_payload = _flywire_document_payload(document_row, flywire_rows)
-            matched_row_ids = [
-                int(row["id"])
-                for row in flywire_rows
-                if abs(float(row["amount"] or 0) - amount) < 0.005
-            ]
-            exact_match_count += len(matched_row_ids)
+            amount_matched_row_ids = []
+            check_matched_row_ids = []
+            name_matched_row_ids = []
+            for row in flywire_rows:
+                if abs(float(row["amount"] or 0) - amount) >= 0.005:
+                    continue
+                amount_match_count += 1
+                amount_matched_row_ids.append(int(row["id"]))
+                row_name_matches = _imaging_flywire_row_name_matches(
+                    payer_text,
+                    row["patient_name"],
+                    row["billing_name"],
+                )
+                if row_name_matches:
+                    name_match_count += 1
+                    name_matched_row_ids.append(int(row["id"]))
+                if normalized_check and row_name_matches and _normalize_imaging_check_number(row["account_number"]) == normalized_check:
+                    check_match_count += 1
+                    check_matched_row_ids.append(int(row["id"]))
+            matched_row_ids = check_matched_row_ids if check_matched_row_ids else (name_matched_row_ids if name_matched_row_ids else amount_matched_row_ids)
+            selected_match_count += len(matched_row_ids)
             document_payload["matched_row_ids"] = matched_row_ids
             documents.append(document_payload)
 
@@ -8446,10 +8677,14 @@ def get_imaging_balsheet_flywire(entry_id: str):
             "postingDate": posting_date or str(balsheet.get("posting_date") or ""),
             "site": str(balsheet.get("type") or ""),
             "amount": amount,
+            "checkNumber": check_number,
             "available": bool(documents),
             "documentCount": len(documents),
-            "exactMatchCount": exact_match_count,
-            "ambiguous": exact_match_count > 1,
+            "exactMatchCount": amount_match_count,
+            "matchCount": selected_match_count,
+            "checkMatchCount": check_match_count,
+            "nameMatchCount": name_match_count,
+            "ambiguous": selected_match_count > 1,
             "documents": documents,
         }
     finally:
@@ -8702,6 +8937,27 @@ def open_imaging_file(path: str):
     if not path:
         raise HTTPException(status_code=400, detail="path is required")
     return _safe_imaging_file_response(path)
+
+
+@app.post("/imaging/files/replace")
+async def replace_imaging_file(path: str = Form(...), file: UploadFile = File(...)):
+    if not path.strip():
+        raise HTTPException(status_code=400, detail="path is required")
+
+    uploaded_bytes = await file.read()
+    if not uploaded_bytes:
+        raise HTTPException(status_code=400, detail="Please upload a replacement file")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_imaging_tables(conn)
+        result = _replace_imaging_file(path, uploaded_bytes)
+        rebuilt_count = rebuild_imaging_document_index(conn)
+        result["indexCount"] = rebuilt_count
+        return result
+    finally:
+        conn.close()
 
 
 @app.post("/balsheet/import-banking")
@@ -9096,6 +9352,78 @@ def post_balsheet_bulk(payload: dict):
             "rowsImported": inserted,
             "sourceAttachmentId": source_attachment_id,
         }
+    finally:
+        conn.close()
+
+
+@app.get("/balsheet/transfers")
+def get_balsheet_transfers(target_date: str | None = None, source_date: str | None = None):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_transfer_table(conn)
+
+    try:
+        conn.row_factory = sqlite3.Row
+        clauses = []
+        params: list[str] = []
+        normalized_target_date = normalize_mmddyyyy(target_date) if target_date else None
+        normalized_source_date = normalize_mmddyyyy(source_date) if source_date else None
+        if normalized_target_date:
+            clauses.append(f'{_quote_identifier("target_date")} = ?')
+            params.append(normalized_target_date)
+        if normalized_source_date:
+            clauses.append(f'{_quote_identifier("source_date")} = ?')
+            params.append(normalized_source_date)
+
+        where_clause = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet_transfers")} {where_clause} ORDER BY {_quote_identifier("target_date")} ASC, {_quote_identifier("created_at")} ASC, {_quote_identifier("transfer_id")} ASC',
+            tuple(params),
+        ).fetchall()
+        return [_balsheet_transfer_row_to_payload(row) for row in rows]
+    finally:
+        conn.close()
+
+
+@app.post("/balsheet/transfers")
+def post_balsheet_transfer(payload: dict):
+    init_db()
+    conn = get_conn()
+    ensure_balsheet_transfer_table(conn)
+
+    try:
+        normalized = _normalize_balsheet_transfer_payload(payload)
+        conn.execute(
+            f'''
+            DELETE FROM {_quote_identifier("Balsheet_transfers")}
+            WHERE {_quote_identifier("source_date")} = ?
+              AND {_quote_identifier("target_date")} = ?
+              AND lower(trim({_quote_identifier("site")})) = lower(trim(?))
+              AND lower(trim({_quote_identifier("source_entry_id")})) = lower(trim(?))
+            ''',
+            (
+                normalized["source_date"],
+                normalized["target_date"],
+                normalized["site"],
+                normalized["source_entry_id"],
+            ),
+        )
+        columns = [name for name, _ in BALSHEET_TRANSFER_TABLE_COLUMNS]
+        quoted_columns = ", ".join(_quote_identifier(name) for name in columns)
+        placeholders = ", ".join(["?"] * len(columns))
+        conn.execute(
+            f'INSERT OR REPLACE INTO {_quote_identifier("Balsheet_transfers")} ({quoted_columns}) VALUES ({placeholders})',
+            tuple(normalized[column] for column in columns),
+        )
+        conn.commit()
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet_transfers")} WHERE {_quote_identifier("transfer_id")} = ?',
+            (normalized["transfer_id"],),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=500, detail="Failed to save Balsheet transfer")
+        return _balsheet_transfer_row_to_payload(row)
     finally:
         conn.close()
 

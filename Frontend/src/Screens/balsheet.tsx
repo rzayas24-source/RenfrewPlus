@@ -2,13 +2,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
+import { API_BASE } from "../config/apiBase";
 import {
   clearBalsheet,
   createBalsheetEntry,
+  createBalsheetTransfer,
   deleteBalsheetEntry,
   getBalsheet,
   getBalsheetKeyproofReview,
   getBalsheetNotes,
+  getImagingBalsheetAssociations,
   getMisc,
   getBalsheetWorkday,
   importBalsheetFromBanking,
@@ -18,11 +21,14 @@ import {
   upsertBalsheetNoteMessage,
   getBalsheetKeyproofIssues,
   type BalsheetKeyproofReviewResponse,
+  type BalsheetKeyproofReviewRow,
   type BalsheetKeyproofIssueResponse,
   type BalsheetEntry,
+  type ImagingBalsheetAssociationRow,
   type MiscEntry,
 } from "../api/balsheet_api";
 import { lookupCalendarBankDay } from "../api/calendar_api";
+import { deleteKeyproof } from "../api/keyproof_api";
 
 const weekendHeroMessage = "Weekend";
 
@@ -46,9 +52,12 @@ const columns: Array<{ key: keyof BalsheetEntry; label: string; numeric?: boolea
   { key: "to_date", label: "To" },
 ];
 
-const sheetColumns: Array<{ key: "entry_id" | keyof BalsheetEntry; label: string; numeric?: boolean }> = [
+type SheetColumnKey = "entry_id" | keyof BalsheetEntry | "images";
+
+const sheetColumns: Array<{ key: SheetColumnKey; label: string; numeric?: boolean; sortable?: boolean }> = [
   { key: "entry_id", label: "EntryID" },
   ...columns,
+  { key: "images", label: "Images", sortable: false },
 ];
 
 const defaultColumnWidths: Record<string, number> = {
@@ -70,11 +79,20 @@ const defaultColumnWidths: Record<string, number> = {
   needs: 140,
   from_date: 120,
   to_date: 120,
+  images: 110,
 };
 
 function parseAmount(value: unknown) {
   const parsed = Number.parseFloat(String(value ?? "").replace(/[$,]/g, ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function isNearZero(value: number) {
+  return Math.abs(value) < 0.005;
+}
+
+function roundToCents(value: number) {
+  return Math.round(value * 100) / 100;
 }
 
 function formatCurrency(value: unknown) {
@@ -234,6 +252,21 @@ function compareGroupedKeys(leftKey: string, rightKey: string, sortField: "entry
   return direction === "asc" ? comparison : -comparison;
 }
 
+function getDisplayedReviewDifference(row: BalsheetKeyproofReviewRow) {
+  const transferAdjustment = parseAmount(row.borrowedTransferTotal ?? 0);
+  const isSpringLaneSite = /spring lane/i.test(`${row.site || ""} ${row.filename || ""}`);
+
+  if (isSpringLaneSite) {
+    return roundToCents((row.springLaneExpectedTotal ?? 0) - (row.springLaneBalsheetTotal ?? 0) + transferAdjustment);
+  }
+
+  return roundToCents((row.keyproofTotal ?? 0) - (row.balsheetActualTotal ?? 0) + transferAdjustment);
+}
+
+function normalizeImageDay(value: string) {
+  return normalizeDisplayDate(value) || value || "";
+}
+
 export default function Balsheet() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -255,11 +288,21 @@ export default function Balsheet() {
   const [sheetLocked, setSheetLocked] = useState(true);
   const [heroMenuOpen, setHeroMenuOpen] = useState(false);
   const [keyproofWorksheetOpen, setKeyproofWorksheetOpen] = useState(false);
+  const [balanceBorrowOpen, setBalanceBorrowOpen] = useState(false);
+  const [balanceBorrowSourceDate, setBalanceBorrowSourceDate] = useState("");
+  const [balanceBorrowLoading, setBalanceBorrowLoading] = useState(false);
+  const [balanceBorrowSubmitting, setBalanceBorrowSubmitting] = useState(false);
+  const [balanceBorrowError, setBalanceBorrowError] = useState<string | null>(null);
+  const [balanceBorrowReview, setBalanceBorrowReview] = useState<BalsheetKeyproofReviewResponse | null>(null);
+  const [balanceBorrowSelectedRow, setBalanceBorrowSelectedRow] = useState<BalsheetKeyproofReviewRow | null>(null);
   const [keyproofReviewOpen, setKeyproofReviewOpen] = useState(false);
   const [keyproofReviewLoading, setKeyproofReviewLoading] = useState(false);
   const [keyproofReviewError, setKeyproofReviewError] = useState<string | null>(null);
   const [keyproofReview, setKeyproofReview] = useState<BalsheetKeyproofReviewResponse | null>(null);
   const [keyproofReviewIssues, setKeyproofReviewIssues] = useState<BalsheetKeyproofIssueResponse | null>(null);
+  const [documentMarkersEnabled, setDocumentMarkersEnabled] = useState(false);
+  const [documentMarkersLoading, setDocumentMarkersLoading] = useState(false);
+  const [documentAssociations, setDocumentAssociations] = useState<ImagingBalsheetAssociationRow[]>([]);
   const [heroNote, setHeroNote] = useState("");
   const [heroMessage, setHeroMessage] = useState("");
   const resizeStateRef = useRef<{
@@ -351,19 +394,16 @@ export default function Balsheet() {
     [collapsedGroups, groupedRows]
   );
 
+  const documentAssociationMap = useMemo(() => {
+    const map = new Map<string, ImagingBalsheetAssociationRow>();
+    for (const row of documentAssociations) {
+      map.set(row.entryId, row);
+    }
+    return map;
+  }, [documentAssociations]);
+
   const keyproofDifferenceTotal = useMemo(
-    () =>
-      keyproofReview?.rows.reduce((total, row) => {
-        const isSpringLaneSite = /spring lane/i.test(`${row.site || ""} ${row.filename || ""}`);
-        const keyproofSubtotal = isSpringLaneSite
-          ? row.keyproofTotal + row.eftExpectedTotal + row.lockboxExpectedTotal
-          : row.keyproofTotal;
-        const balsheetSubtotal = isSpringLaneSite
-          ? row.itemizationBalsheetTotal + row.eftBalsheetTotal + row.lockboxBalsheetTotal
-          : row.balsheetActualTotal;
-        const displayedDifference = keyproofSubtotal - balsheetSubtotal;
-        return total + displayedDifference;
-      }, 0) ?? 0,
+    () => keyproofReview?.rows.reduce((total, row) => total + getDisplayedReviewDifference(row), 0) ?? 0,
     [keyproofReview]
   );
 
@@ -381,9 +421,11 @@ export default function Balsheet() {
     const rawValue =
       column.key === "entry_id"
         ? row.entry_id
-        : column.numeric
-          ? formatCurrency(row[column.key])
-          : String(row[column.key] ?? "");
+        : column.key === "images"
+          ? "View images"
+          : column.numeric
+            ? formatCurrency(row[column.key as keyof BalsheetEntry])
+            : String(row[column.key as keyof BalsheetEntry] ?? "");
 
     return {
       address: `${columnIndexToLetters(activeCell.columnIndex)}${activeCell.rowIndex + 2}`,
@@ -435,7 +477,7 @@ export default function Balsheet() {
       return;
     }
 
-    if (selectedCell.columnKey === "entry_id") {
+    if (selectedCell.columnKey === "entry_id" || selectedCell.columnKey === "images") {
       return;
     }
 
@@ -476,7 +518,7 @@ export default function Balsheet() {
 
     const row = visibleRows[rowIndex];
     const column = sheetColumns[columnIndex];
-    if (!row || !column || column.key === "entry_id") {
+    if (!row || !column || column.key === "entry_id" || column.key === "images") {
       return;
     }
 
@@ -526,6 +568,12 @@ export default function Balsheet() {
 
   function handleClearSelectedCell() {
     if (!selectedCell) {
+      return;
+    }
+
+    if (selectedCell.columnKey === "entry_id" || selectedCell.columnKey === "images") {
+      setError(null);
+      setMessage("That cell is not editable.");
       return;
     }
 
@@ -670,6 +718,157 @@ export default function Balsheet() {
 
   function closeKeyproofWorksheet() {
     setKeyproofWorksheetOpen(false);
+    setBalanceBorrowOpen(false);
+  }
+
+  function openBalanceBorrowTrial() {
+    const fallbackSourceDate = shiftPostingDate(postingDate || day || "", -1) || postingDate || day || "";
+    setKeyproofWorksheetOpen(false);
+    setBalanceBorrowError(null);
+    setBalanceBorrowReview(null);
+    setBalanceBorrowSelectedRow(null);
+    setBalanceBorrowSourceDate(fallbackSourceDate);
+    setBalanceBorrowOpen(true);
+    void loadBalanceBorrowTrial(fallbackSourceDate);
+  }
+
+  function openWorksheetImages(row: BalsheetKeyproofReviewRow) {
+    const pdfUrl = `${API_BASE}/attachments/${encodeURIComponent(String(row.attachmentId))}/original`;
+    const openedWindow = window.open(pdfUrl, "_blank", "noopener,noreferrer");
+    if (!openedWindow) {
+      setError("Your browser blocked the PDF tab from opening.");
+    }
+  }
+
+  function openBalsheetEntryImages(row: BalsheetEntry) {
+    if (!row.entry_id) {
+      setError("This row does not have an entry ID yet.");
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("day", normalizeImageDay(postingDate));
+    params.set("entryId", String(row.entry_id));
+    const imageUrl = `/view-images?${params.toString()}`;
+    const openedWindow = window.open(imageUrl, "_blank", "noopener,noreferrer");
+    if (!openedWindow) {
+      setError("Your browser blocked the image tab from opening.");
+    }
+  }
+
+  function closeBalanceBorrowTrial() {
+    setBalanceBorrowOpen(false);
+    setBalanceBorrowError(null);
+    setBalanceBorrowLoading(false);
+    setBalanceBorrowSubmitting(false);
+  }
+
+  async function loadBalanceBorrowTrial(sourcePostingDate = balanceBorrowSourceDate) {
+    const normalizedSourceDate = normalizeDisplayDate(sourcePostingDate || "") || sourcePostingDate || "";
+    if (!normalizedSourceDate) {
+      setBalanceBorrowReview(null);
+      setBalanceBorrowSelectedRow(null);
+      setBalanceBorrowError("Select a source date to review balances.");
+      return;
+    }
+
+    setBalanceBorrowLoading(true);
+    setBalanceBorrowError(null);
+
+    try {
+      const response = await getBalsheetKeyproofReview(normalizedSourceDate);
+      const rows = [...response.data.rows].sort(
+        (left, right) => Math.abs(getDisplayedReviewDifference(right)) - Math.abs(getDisplayedReviewDifference(left))
+      );
+      const nextSelectedRow = rows.find((row) => !isNearZero(getDisplayedReviewDifference(row))) ?? rows[0] ?? null;
+      setBalanceBorrowReview(response.data);
+      setBalanceBorrowSelectedRow(nextSelectedRow);
+      if (!nextSelectedRow) {
+        setBalanceBorrowError("No open balances were found on that day.");
+      }
+    } catch (error) {
+      setBalanceBorrowReview(null);
+      setBalanceBorrowSelectedRow(null);
+      setBalanceBorrowError(error instanceof Error ? error.message : "Failed to load source day balances.");
+    } finally {
+      setBalanceBorrowLoading(false);
+    }
+  }
+
+  async function acceptBalanceBorrowTrial() {
+    if (!postingDate) {
+      setBalanceBorrowError("No target posting day is selected.");
+      return;
+    }
+
+    if (!balanceBorrowReview || !balanceBorrowSelectedRow) {
+      setBalanceBorrowError("Select a source day balance first.");
+      return;
+    }
+
+    const sourceAmount = getDisplayedReviewDifference(balanceBorrowSelectedRow);
+    if (isNearZero(sourceAmount)) {
+      setBalanceBorrowError("The selected balance is already at zero.");
+      return;
+    }
+
+    const appliedAmount = roundToCents(-Math.abs(sourceAmount));
+
+    const confirmed = window.confirm(
+      `Apply ${formatCurrency(appliedAmount)} from ${balanceBorrowReview.postingDate} (${balanceBorrowSelectedRow.site}) to ${postingDate}?`
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setBalanceBorrowSubmitting(true);
+    setMessage(null);
+    try {
+      await createBalsheetTransfer({
+        source_date: balanceBorrowReview.postingDate,
+        target_date: postingDate,
+        site: balanceBorrowSelectedRow.site,
+        amount: appliedAmount,
+        source_entry_id: String(balanceBorrowSelectedRow.attachmentId),
+        source_filename: balanceBorrowSelectedRow.filename,
+        notes: `Borrowed from ${balanceBorrowReview.postingDate} / ${balanceBorrowSelectedRow.site}`,
+      });
+      await loadRows(postingDate);
+      setBalanceBorrowOpen(false);
+      setError(null);
+      setMessage(`Applied ${formatCurrency(appliedAmount)} from ${balanceBorrowReview.postingDate} to ${postingDate}.`);
+    } catch (error) {
+      setBalanceBorrowError(error instanceof Error ? error.message : "Failed to apply borrowed balance.");
+    } finally {
+      setBalanceBorrowSubmitting(false);
+    }
+  }
+
+  async function deleteWorksheetKeyproof(row: BalsheetKeyproofReviewRow) {
+    const writtenConfirmation = window.prompt(
+      `Type DELETE KEYPROOF to remove ${row.filename} from the worksheet.`
+    );
+    if (writtenConfirmation?.trim().toUpperCase() !== "DELETE KEYPROOF") {
+      setBalanceBorrowError(null);
+      setMessage("Keyproof delete cancelled.");
+      return;
+    }
+
+    setBalanceBorrowSubmitting(true);
+    setMessage(null);
+    try {
+      await deleteKeyproof(row.attachmentId);
+      await loadKeyproofReview(postingDate);
+      if (keyproofWorksheetOpen) {
+        await loadKeyproofReview(postingDate);
+      }
+      setError(null);
+      setMessage(`Deleted keyproof for ${row.filename}.`);
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Failed to delete keyproof.");
+    } finally {
+      setBalanceBorrowSubmitting(false);
+    }
   }
 
   async function movePostingDay(deltaDays: number) {
@@ -882,17 +1081,41 @@ export default function Balsheet() {
       if (keyproofReviewOpen) {
         void loadKeyproofReviewIssues();
       }
+      if (documentMarkersEnabled) {
+        void loadDocumentMarkers(date);
+      } else {
+        setDocumentAssociations([]);
+      }
       setError(null);
     } catch (err) {
       setRows([]);
       setHeroNote("");
       setHeroMessage("");
+      setDocumentAssociations([]);
       setError(err instanceof Error ? err.message : "Failed to load Balsheet");
     } finally {
       setLoading(false);
     }
 
     return loadedRows;
+  }
+
+  async function loadDocumentMarkers(date = postingDate) {
+    const normalizedDate = normalizeDisplayDate(date) || date || "";
+    if (!normalizedDate) {
+      setDocumentAssociations([]);
+      return;
+    }
+
+    setDocumentMarkersLoading(true);
+    try {
+      const response = await getImagingBalsheetAssociations(normalizedDate);
+      setDocumentAssociations(response.data.rows);
+    } catch {
+      setDocumentAssociations([]);
+    } finally {
+      setDocumentMarkersLoading(false);
+    }
   }
 
   async function importBankingRows() {
@@ -1357,9 +1580,14 @@ export default function Balsheet() {
                     Selected posting day: {keyproofReview?.postingDate || postingDate}
                   </div>
                 </div>
-                <button type="button" style={styles.keyproofReviewCloseButton} onClick={closeKeyproofWorksheet}>
-                  Close
-                </button>
+                <div style={styles.keyproofWorksheetHeaderActions}>
+                  <button type="button" style={styles.keyproofReviewSecondaryButton} onClick={openBalanceBorrowTrial}>
+                    Borrow Balance
+                  </button>
+                  <button type="button" style={styles.keyproofReviewCloseButton} onClick={closeKeyproofWorksheet}>
+                    Close
+                  </button>
+                </div>
               </div>
 
               {keyproofReviewLoading ? (
@@ -1382,6 +1610,14 @@ export default function Balsheet() {
                     <div style={styles.keyproofReviewSummaryCard}>
                       <div style={styles.keyproofReviewSummaryLabel}>Spring Lane matched</div>
                       <div style={styles.keyproofReviewSummaryValue}>{keyproofReview.springLaneMatchedCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Borrowed balance</div>
+                      <div style={styles.keyproofReviewSummaryValue}>
+                        {formatCurrency(
+                          keyproofReview.rows.reduce((total, row) => total + parseAmount(row.borrowedTransferTotal ?? 0), 0)
+                        )}
+                      </div>
                     </div>
                     <div style={styles.keyproofReviewSummaryCard}>
                       <div style={styles.keyproofReviewSummaryLabel}>Total difference</div>
@@ -1426,6 +1662,24 @@ export default function Balsheet() {
                               >
                                 {formatCurrency(difference)}
                               </div>
+                            </div>
+
+                            <div style={styles.keyproofReviewTableActions}>
+                              <button
+                                type="button"
+                                style={styles.keyproofReviewSecondaryButton}
+                                onClick={() => openWorksheetImages(row)}
+                              >
+                                View images
+                              </button>
+                              <button
+                                type="button"
+                                style={styles.keyproofReviewOpenButton}
+                                onClick={() => void deleteWorksheetKeyproof(row)}
+                                disabled={balanceBorrowSubmitting}
+                              >
+                                Delete keyproof
+                              </button>
                             </div>
 
                             {isSpringLaneSite ? (
@@ -1474,12 +1728,180 @@ export default function Balsheet() {
                                     {formatCurrency(row.lockboxExpectedTotal - row.lockboxBalsheetTotal)}
                                   </div>
                                 </div>
+                                {Math.abs(parseAmount(row.borrowedTransferTotal ?? 0)) > 0.005 ? (
+                                  <div style={styles.keyproofReviewTableDetailRow}>
+                                    <div style={styles.keyproofReviewTableDetailLabel}>Borrowed balance</div>
+                                    <div style={styles.keyproofReviewTableDetailValue}>
+                                      {formatCurrency(row.borrowedTransferTotal ?? 0)}
+                                    </div>
+                                    <div style={styles.keyproofReviewTableDetailValue} />
+                                    <div
+                                      style={{
+                                        ...styles.keyproofReviewTableDetailValue,
+                                        ...(Math.abs(getDisplayedReviewDifference(row)) < 0.005
+                                          ? styles.keyproofReviewTableDifferenceGood
+                                          : styles.keyproofReviewTableDifferenceWarn),
+                                      }}
+                                    >
+                                      {formatCurrency(getDisplayedReviewDifference(row))}
+                                    </div>
+                                  </div>
+                                ) : null}
                               </>
                             ) : null}
                           </div>
                         );
                       })
                     )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        {balanceBorrowOpen ? (
+          <div style={styles.keyproofReviewOverlay} aria-hidden="false">
+            <div style={styles.balanceBorrowPanel} role="dialog" aria-label="Borrow balance trial">
+              <div style={styles.keyproofReviewHeader}>
+                <div style={styles.keyproofReviewHeaderCopy}>
+                  <div style={styles.keyproofReviewKicker}>Trial</div>
+                  <div style={styles.keyproofReviewTitle}>Borrow a balance from another day</div>
+                  <div style={styles.keyproofReviewMeta}>
+                    Apply a source-day site balance to the current posting day before committing it to the worksheet.
+                  </div>
+                </div>
+                <button type="button" style={styles.keyproofReviewCloseButton} onClick={closeBalanceBorrowTrial}>
+                  Close
+                </button>
+              </div>
+
+              <div style={styles.balanceBorrowControls}>
+                <label style={styles.balanceBorrowField}>
+                  <span style={styles.balanceBorrowFieldLabel}>Source date</span>
+                  <input
+                    type="date"
+                    value={displayDateToIso(balanceBorrowSourceDate)}
+                    style={styles.balanceBorrowDateInput}
+                    onChange={(event) => {
+                      const nextSourceDate = normalizeDisplayDate(event.target.value);
+                      setBalanceBorrowSourceDate(nextSourceDate);
+                      void loadBalanceBorrowTrial(nextSourceDate);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  style={styles.keyproofReviewSecondaryButton}
+                  onClick={() => void loadBalanceBorrowTrial(balanceBorrowSourceDate)}
+                  disabled={balanceBorrowLoading || balanceBorrowSubmitting}
+                >
+                  {balanceBorrowLoading ? "Loading..." : "Load day"}
+                </button>
+              </div>
+
+              {balanceBorrowLoading ? (
+                <div style={styles.keyproofReviewLoading}>Loading source balances...</div>
+              ) : balanceBorrowError ? (
+                <div style={styles.keyproofReviewError}>{balanceBorrowError}</div>
+              ) : !balanceBorrowReview ? (
+                <div style={styles.keyproofReviewEmpty}>Pick a source date to review its open balances.</div>
+              ) : (
+                <>
+                  <div style={styles.keyproofReviewSummaryGrid}>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Source date</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{balanceBorrowReview.postingDate}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Open balances</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{balanceBorrowReview.keyproofCount}</div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Selected amount</div>
+                      <div style={styles.keyproofReviewSummaryValue}>
+                        {formatCurrency(balanceBorrowSelectedRow ? getDisplayedReviewDifference(balanceBorrowSelectedRow) : 0)}
+                      </div>
+                    </div>
+                    <div style={styles.keyproofReviewSummaryCard}>
+                      <div style={styles.keyproofReviewSummaryLabel}>Target day</div>
+                      <div style={styles.keyproofReviewSummaryValue}>{postingDate}</div>
+                    </div>
+                  </div>
+
+                  <div style={styles.balanceBorrowPreview}>
+                    <div style={styles.balanceBorrowPreviewLine}>
+                      <span style={styles.balanceBorrowPreviewLabel}>Current worksheet difference</span>
+                      <span style={styles.balanceBorrowPreviewValue}>{formatCurrency(keyproofDifferenceTotal)}</span>
+                    </div>
+                    <div style={styles.balanceBorrowPreviewLine}>
+                      <span style={styles.balanceBorrowPreviewLabel}>Projected worksheet difference</span>
+                      <span style={styles.balanceBorrowPreviewValue}>
+                        {formatCurrency(
+                          roundToCents(
+                            keyproofDifferenceTotal +
+                              (balanceBorrowSelectedRow ? -Math.abs(getDisplayedReviewDifference(balanceBorrowSelectedRow)) : 0)
+                          )
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={styles.keyproofReviewTableWrap}>
+                    {balanceBorrowReview.rows.length === 0 ? (
+                      <div style={styles.keyproofReviewEmpty}>No open balances were found on that day.</div>
+                    ) : (
+                      balanceBorrowReview.rows.map((row) => {
+                        const isSelected = balanceBorrowSelectedRow?.attachmentId === row.attachmentId;
+                        const displayedDifference = getDisplayedReviewDifference(row);
+
+                        return (
+                          <button
+                            key={row.attachmentId}
+                            type="button"
+                            style={{
+                              ...styles.balanceBorrowRowButton,
+                              ...(isSelected ? styles.balanceBorrowRowButtonSelected : null),
+                            }}
+                            onClick={() => setBalanceBorrowSelectedRow(row)}
+                          >
+                            <div style={styles.keyproofReviewTableSummaryRow}>
+                              <div style={styles.keyproofReviewTableSiteCell}>
+                                <div style={styles.keyproofReviewTableSiteTitle}>{row.site}</div>
+                                <div style={styles.keyproofReviewTableSiteMeta}>
+                                  {row.filename}
+                                  <br />
+                                  {row.batchDate}
+                                </div>
+                              </div>
+                              <div style={styles.keyproofReviewTableCellRight}>{formatCurrency(row.keyproofTotal)}</div>
+                              <div style={styles.keyproofReviewTableCellRight}>{formatCurrency(row.balsheetActualTotal)}</div>
+                              <div
+                                style={{
+                                  ...styles.keyproofReviewTableCellRight,
+                                  ...(Math.abs(displayedDifference) < 0.005
+                                    ? styles.keyproofReviewTableDifferenceGood
+                                    : styles.keyproofReviewTableDifferenceWarn),
+                                }}
+                              >
+                                {formatCurrency(displayedDifference)}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div style={styles.balanceBorrowFooter}>
+                    <button
+                      type="button"
+                      style={styles.selectionActionRowDeleteButton}
+                      onClick={() => void acceptBalanceBorrowTrial()}
+                      disabled={balanceBorrowSubmitting || !balanceBorrowSelectedRow}
+                    >
+                      {balanceBorrowSubmitting ? "Applying..." : "Accept Trial"}
+                    </button>
                   </div>
                 </>
               )}
@@ -1625,6 +2047,30 @@ export default function Balsheet() {
             </span>
             <span style={styles.selectionLockText}>Lock Sheet</span>
           </button>
+          <button
+            type="button"
+            style={{
+              ...styles.selectionDocsButton,
+              ...(documentMarkersEnabled ? styles.selectionDocsButtonActive : styles.selectionDocsButtonInactive),
+            }}
+            onClick={() => {
+              setDocumentMarkersEnabled((current) => {
+                const next = !current;
+                if (next && !documentAssociations.length && !documentMarkersLoading) {
+                  void loadDocumentMarkers();
+                }
+                if (!next) {
+                  setDocumentAssociations([]);
+                }
+                return next;
+              });
+            }}
+            aria-pressed={documentMarkersEnabled}
+            aria-label={documentMarkersEnabled ? "Hide document markers" : "Show document markers"}
+            title={documentMarkersEnabled ? "Hide document markers" : "Show document markers"}
+          >
+            {documentMarkersLoading ? "Docs..." : documentMarkersEnabled ? "Docs On" : "Docs"}
+          </button>
           <div style={styles.selectionInputWrap}>
             <div style={styles.selectionInputLabel}>{selectedCell?.label ?? "Active cell"}</div>
             <div style={styles.selectionInputRow}>
@@ -1683,7 +2129,12 @@ export default function Balsheet() {
           </div>
         </div>
 
-        <div style={styles.tableWrap}>
+        <div
+          style={{
+            ...styles.tableWrap,
+            ...(sheetLocked ? null : styles.tableWrapUnlocked),
+          }}
+        >
           <table style={styles.table}>
             <colgroup>
               {sheetColumns.map((column) => (
@@ -1694,10 +2145,18 @@ export default function Balsheet() {
               <tr>
                 {sheetColumns.map((column) => (
                   <th key={column.key} style={{ ...styles.th, width: columnWidths[column.key] ?? defaultColumnWidths[column.key] ?? 140 }}>
-                    <button type="button" style={styles.headerButton} onClick={() => toggleSort(column.key)}>
+                    {column.sortable === false ? (
                       <span style={styles.thLabel}>{column.label}</span>
-                      <span style={styles.sortIndicator}>{getSortIndicator(column.key)}</span>
-                    </button>
+                    ) : (
+                      <button
+                        type="button"
+                        style={styles.headerButton}
+                        onClick={() => toggleSort(column.key as "entry_id" | keyof BalsheetEntry)}
+                      >
+                        <span style={styles.thLabel}>{column.label}</span>
+                        <span style={styles.sortIndicator}>{getSortIndicator(column.key as "entry_id" | keyof BalsheetEntry)}</span>
+                      </button>
+                    )}
                     <div
                       aria-hidden="true"
                       style={styles.resizeHandle}
@@ -1821,6 +2280,32 @@ export default function Balsheet() {
                                       )
                                   ) : column.key === "entry_id" ? (
                                     row.entry_id
+                                  ) : column.key === "images" ? (
+                                    <button
+                                      type="button"
+                                      style={styles.sheetImageButton}
+                                      onClick={() => openBalsheetEntryImages(row)}
+                                      title="Open PDF in a new tab"
+                                    >
+                                      Open PDF
+                                    </button>
+                                  ) : column.key === "eob" ? (
+                                    <div style={styles.eobCellStack}>
+                                      <span>{String(row.eob ?? "")}</span>
+                                      {documentMarkersEnabled ? (
+                                        (() => {
+                                          const association = documentAssociationMap.get(String(row.entry_id ?? ""));
+                                          const hasConfirmedDocument =
+                                            !!association &&
+                                            (association.linkedFiles.length > 0 || Boolean(association.siteAssociation));
+                                          return hasConfirmedDocument ? (
+                                            <span style={styles.eobDocumentMarker} title="Associated image or PDF">
+                                              D
+                                            </span>
+                                          ) : null;
+                                        })()
+                                      ) : null}
+                                    </div>
                                   ) : column.numeric ? (
                                     formatCurrency(row[column.key])
                                   ) : (
@@ -2323,6 +2808,120 @@ const styles: Record<string, CSSProperties> = {
     boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
     flex: "0 0 auto",
   },
+  keyproofReviewSecondaryButton: {
+    height: "36px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#3f4a57",
+    fontSize: "12px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
+  },
+  keyproofWorksheetHeaderActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+    flexWrap: "wrap",
+  },
+  balanceBorrowPanel: {
+    width: "min(980px, 100%)",
+    maxHeight: "calc(100vh - 126px)",
+    overflow: "hidden",
+    display: "flex",
+    flexDirection: "column",
+    gap: "14px",
+    borderRadius: "28px",
+    padding: "18px",
+    background: "rgba(255,255,255,0.98)",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    boxShadow: "0 32px 68px rgba(15, 25, 38, 0.24)",
+    position: "relative",
+    zIndex: 1,
+    pointerEvents: "auto",
+  },
+  balanceBorrowControls: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  balanceBorrowField: {
+    display: "grid",
+    gap: "6px",
+    minWidth: "240px",
+  },
+  balanceBorrowFieldLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: "#6d7f93",
+    fontWeight: 800,
+  },
+  balanceBorrowDateInput: {
+    height: "36px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid rgba(188, 193, 203, 0.55)",
+    background: "rgba(255,255,255,0.96)",
+    color: "#3f4a57",
+    fontSize: "12px",
+    fontWeight: 800,
+    boxShadow: "0 10px 18px rgba(52, 84, 120, 0.08)",
+  },
+  balanceBorrowPreview: {
+    display: "grid",
+    gap: "8px",
+    padding: "14px",
+    borderRadius: "18px",
+    background: "rgba(246, 249, 252, 0.88)",
+    border: "1px solid rgba(140, 160, 184, 0.16)",
+  },
+  balanceBorrowPreviewLine: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+    flexWrap: "wrap",
+  },
+  balanceBorrowPreviewLabel: {
+    fontSize: "11px",
+    textTransform: "uppercase",
+    letterSpacing: "0.1em",
+    color: "#6d7f93",
+    fontWeight: 800,
+  },
+  balanceBorrowPreviewValue: {
+    fontSize: "18px",
+    fontWeight: 900,
+    color: "#16304d",
+  },
+  balanceBorrowRowButton: {
+    width: "100%",
+    display: "block",
+    textAlign: "left",
+    border: "1px solid rgba(176, 194, 218, 0.22)",
+    borderRadius: "18px",
+    background: "rgba(255,255,255,0.96)",
+    boxShadow: "0 12px 20px rgba(52, 84, 120, 0.06)",
+    cursor: "pointer",
+    padding: "14px 16px",
+    marginBottom: "10px",
+    color: "#16304d",
+  },
+  balanceBorrowRowButtonSelected: {
+    border: "1px solid rgba(57, 114, 189, 0.42)",
+    boxShadow: "0 12px 24px rgba(57, 114, 189, 0.12)",
+    background: "linear-gradient(135deg, rgba(235, 245, 255, 0.98) 0%, rgba(255,255,255,0.98) 100%)",
+  },
+  balanceBorrowFooter: {
+    display: "flex",
+    justifyContent: "flex-end",
+  },
   keyproofReviewLoading: {
     minHeight: "120px",
     display: "grid",
@@ -2763,6 +3362,27 @@ const styles: Record<string, CSSProperties> = {
   selectionLockText: {
     display: "none",
   },
+  selectionDocsButton: {
+    minHeight: "40px",
+    minWidth: "68px",
+    padding: "0 12px",
+    borderRadius: "12px",
+    border: "1px solid rgba(140, 160, 184, 0.22)",
+    background: "rgba(255,255,255,0.92)",
+    color: "#36526f",
+    fontSize: "13px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
+    flex: "0 0 auto",
+  },
+  selectionDocsButtonInactive: {
+    background: "rgba(255,255,255,0.92)",
+  },
+  selectionDocsButtonActive: {
+    background: "linear-gradient(135deg, rgba(235, 245, 255, 0.98) 0%, rgba(220, 236, 255, 0.98) 100%)",
+    color: "#2f5f89",
+  },
   selectionInputWrap: {
     display: "grid",
     gap: "6px",
@@ -2903,6 +3523,40 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
     boxShadow: "0 10px 18px rgba(188, 84, 116, 0.12)",
   },
+  sheetImageButton: {
+    minWidth: "88px",
+    padding: "0 12px",
+    borderRadius: "999px",
+    border: "1px solid rgba(92, 120, 158, 0.32)",
+    background: "linear-gradient(135deg, rgba(243, 249, 255, 0.98) 0%, rgba(228, 240, 255, 0.98) 100%)",
+    color: "#27527d",
+    fontSize: "12px",
+    fontWeight: 800,
+    cursor: "pointer",
+    boxShadow: "0 8px 16px rgba(52, 84, 120, 0.08)",
+    height: "30px",
+  },
+  eobCellStack: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    gap: "2px",
+    lineHeight: 1.05,
+  },
+  eobDocumentMarker: {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: "16px",
+    padding: "1px 5px",
+    borderRadius: "999px",
+    background: "rgba(220, 236, 255, 0.95)",
+    border: "1px solid rgba(94, 138, 186, 0.24)",
+    color: "#2f5f89",
+    fontSize: "11px",
+    fontWeight: 900,
+    letterSpacing: "0.03em",
+  },
   sidebarQuickActionsCard: {
     padding: "12px",
     borderRadius: "20px",
@@ -2998,6 +3652,16 @@ const styles: Record<string, CSSProperties> = {
     background: "rgba(255,255,255,0.9)",
     boxShadow: "0 18px 36px rgba(52, 84, 120, 0.06)",
   },
+  tableWrapUnlocked: {
+    position: "fixed",
+    top: "184px",
+    left: "282px",
+    right: "16px",
+    zIndex: 14,
+    height: "calc(100vh - 200px)",
+    maxHeight: "calc(100vh - 200px)",
+    overflow: "auto",
+  },
   table: {
     width: "100%",
     borderCollapse: "collapse",
@@ -3007,7 +3671,7 @@ const styles: Record<string, CSSProperties> = {
   th: {
     position: "sticky",
     top: 0,
-    zIndex: 1,
+    zIndex: 2,
     background: "#f3f7fc",
     padding: "12px 12px 12px 10px",
     fontSize: "12px",
