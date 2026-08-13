@@ -84,7 +84,11 @@ If you prefer PowerShell on Windows, you can still run:
 
 The screens that show source folders now read from config instead of hardcoding machine-specific absolute paths.
 The snapshot helper also prefers configured or bundled tool paths before falling back to local defaults.
-The repo-level portability playbook lives in [PORTABILITY_PLAYBOOK.md](PORTABILITY_PLAYBOOK.md).
+The portability playbook now lives in the app at `/admin/portability`.
+
+## Incident History
+
+The app-side incident history lives in the Crashlogs screen at `/admin/crashlogs`.
 
 ## Windows-Only Pieces
 

@@ -104,6 +104,8 @@ const SCREEN_REGISTRY: Record<string, FavoriteScreen> = {
   "/admin": { path: "/admin", label: "Admin", meta: "Admin console" },
   "/profile": { path: "/profile", label: "Profile", meta: "User profile" },
   "/admin/config": { path: "/admin/config", label: "Config", meta: "App config editor" },
+  "/admin/crashlogs": { path: "/admin/crashlogs", label: "Crashlogs", meta: "Incident history" },
+  "/admin/dev-notes": { path: "/admin/dev-notes", label: "Dev Notes", meta: "Admin scratchpad" },
   "/admin/tables": { path: "/admin/tables", label: "Tables", meta: "Database browser" },
   "/admin/users": { path: "/admin/users", label: "Users", meta: "Access control" },
   "/admin/roles": { path: "/admin/roles", label: "Roles", meta: "Screen access control" },

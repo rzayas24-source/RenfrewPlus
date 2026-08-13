@@ -2300,7 +2300,7 @@ export default function Balsheet() {
                                             (association.linkedFiles.length > 0 || Boolean(association.siteAssociation));
                                           return hasConfirmedDocument ? (
                                             <span style={styles.eobDocumentMarker} title="Associated image or PDF">
-                                              D
+                                              ✓
                                             </span>
                                           ) : null;
                                         })()

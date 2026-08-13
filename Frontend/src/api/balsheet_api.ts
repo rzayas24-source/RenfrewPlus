@@ -322,6 +322,15 @@ export interface ImagingFileReplaceResponse {
   indexCount: number;
 }
 
+export interface ImagingFileAssociateResponse {
+  status: string;
+  linkId: string;
+  entryId: string;
+  filePath: string;
+  fileName: string;
+  indexCount: number;
+}
+
 export interface ImagingBulkCommitExactResponse {
   status: string;
   postingDate: string;
@@ -510,6 +519,25 @@ export async function replaceImagingFile(filePath: string, file: File): Promise<
   if (!response.ok) {
     const detail = await response.text();
     throw new Error(detail || "Failed to replace imaging file");
+  }
+
+  return await response.json();
+}
+
+export async function uploadAndAssociateImagingFile(entryId: string, postingDate: string, file: File): Promise<ImagingFileAssociateResponse> {
+  const formData = new FormData();
+  formData.append("entry_id", entryId);
+  formData.append("posting_date", postingDate);
+  formData.append("file", file);
+
+  const response = await fetch(`${API_BASE}/imaging/balsheet-links/upload`, {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(detail || "Failed to upload and associate imaging file");
   }
 
   return await response.json();

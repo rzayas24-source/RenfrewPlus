@@ -155,9 +155,11 @@ def _ensure_source_table_columns_on_startup():
         ensure_eft_tables(conn)
         ensure_match_indexes(conn)
         ensure_balsheet_notes_table(conn)
+        ensure_devnotes_table(conn)
         ensure_balsheet_transfer_table(conn)
         ensure_imaging_tables(conn)
         ensure_misc_table(conn)
+        ensure_crashlogs_table(conn)
         ensure_tasks_table(conn)
         ensure_auth_tables(conn)
         ensure_menu_table(conn)
@@ -1324,6 +1326,70 @@ def ensure_misc_table(conn=None):
         conn.close()
 
 
+def ensure_crashlogs_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = """
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT NOT NULL,
+        incident_at TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Open',
+        severity TEXT NOT NULL DEFAULT 'Info',
+        screen TEXT NOT NULL DEFAULT '',
+        summary TEXT NOT NULL,
+        details TEXT NOT NULL,
+        frontend_health TEXT NOT NULL DEFAULT '',
+        backend_health TEXT NOT NULL DEFAULT '',
+        browser_health TEXT NOT NULL DEFAULT '',
+        created_by TEXT NOT NULL DEFAULT '',
+        resolved_at TEXT
+    """
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("Crashlogs")} ({column_defs})')
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
+DEVNOTES_TABLE_COLUMNS = [
+    ("id", "INTEGER PRIMARY KEY AUTOINCREMENT"),
+    ("created_at", "TEXT NOT NULL"),
+    ("updated_at", "TEXT NOT NULL"),
+    ("category", "TEXT NOT NULL DEFAULT 'Todo'"),
+    ("title", "TEXT NOT NULL DEFAULT ''"),
+    ("notes", "TEXT NOT NULL DEFAULT ''"),
+    ("is_done", "INTEGER NOT NULL DEFAULT 0"),
+]
+
+
+def ensure_devnotes_table(conn=None):
+    close_conn = False
+    if conn is None:
+        conn = get_conn()
+        close_conn = True
+
+    cur = conn.cursor()
+    column_defs = ", ".join(f'{_quote_identifier(name)} {definition}' for name, definition in DEVNOTES_TABLE_COLUMNS)
+    cur.execute(f'CREATE TABLE IF NOT EXISTS {_quote_identifier("DevNotes")} ({column_defs})')
+
+    existing_columns = [row[1] for row in cur.execute(f'PRAGMA table_info({_quote_identifier("DevNotes")})').fetchall()]
+    existing_columns_lower = {column.lower() for column in existing_columns}
+    for column_name, definition in DEVNOTES_TABLE_COLUMNS:
+        if column_name.lower() not in existing_columns_lower:
+            cur.execute(
+                f'ALTER TABLE {_quote_identifier("DevNotes")} ADD COLUMN {_quote_identifier(column_name)} {definition}'
+            )
+
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+
 IMAGING_DOCUMENT_INDEX_COLUMNS = [
     ("file_path", "TEXT PRIMARY KEY"),
     ("file_name", "TEXT NOT NULL"),
@@ -2142,6 +2208,8 @@ def rebuild_imaging_document_index(conn=None):
     root = _imaging_root_folder()
     scanned_at = datetime.now().isoformat(timespec="seconds")
     rows: list[tuple] = []
+    # Phase 1 cache PNGs are temporary render artifacts and do not need indexing.
+    supported_suffixes = {".pdf", ".html", ".htm", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".gif", ".webp"}
 
     cur.execute(f'DELETE FROM {_quote_identifier("Imaging_DocumentFileIndex")}')
 
@@ -2151,7 +2219,7 @@ def rebuild_imaging_document_index(conn=None):
                 continue
 
             suffix = path.suffix.lower()
-            if suffix not in {".pdf", ".html", ".htm"}:
+            if suffix not in supported_suffixes:
                 continue
 
             try:
@@ -2170,9 +2238,13 @@ def rebuild_imaging_document_index(conn=None):
 
             if suffix == ".pdf":
                 text_content, page_count, outline_json = _extract_pdf_search_bundle(resolved_path, stat.st_mtime)
-            else:
+            elif suffix in {".html", ".htm"}:
                 text_content = _extract_html_text(path)
                 page_count = 1 if text_content else 0
+                outline_json = "[]"
+            else:
+                text_content = ""
+                page_count = 1
                 outline_json = "[]"
 
             rows.append(
@@ -2243,6 +2315,8 @@ def _load_imaging_document_index(conn):
         f'''
         SELECT *
         FROM {_quote_identifier("Imaging_DocumentFileIndex")}
+        WHERE lower(COALESCE({_quote_identifier("file_ext")}, '')) != 'png'
+          AND lower(COALESCE({_quote_identifier("file_name")}, '')) NOT LIKE '%.png'
         ORDER BY {_quote_identifier("is_archived")} ASC, {_quote_identifier("file_name")} ASC
         '''
     ).fetchall()
@@ -2482,6 +2556,10 @@ def _build_imaging_association_payload(conn, posting_date: str):
         entry_check = _normalize_imaging_check_number(balsheet_row.get("check_number"))
         matches = []
         for document_row in index_rows:
+            file_ext = str(document_row["file_ext"] or "").lower()
+            file_name = str(document_row["file_name"] or "").lower()
+            if file_ext in {".png", "png", ".jpg", "jpg"} or file_name.endswith((".png", ".jpg")):
+                continue
             score, match_method = _imaging_match_score(entry_check, posting_date, document_row)
             if score <= 0:
                 continue
@@ -2612,6 +2690,52 @@ def _safe_imaging_file_response(file_path: str):
     )
 
 
+def _sanitize_imaging_filename(filename: str) -> str:
+    name = Path(str(filename or "")).name.strip()
+    if not name:
+        return "upload.bin"
+
+    suffix = Path(name).suffix.lower()
+    stem = Path(name).stem
+    safe_stem = re.sub(r"[^A-Za-z0-9._-]+", "_", stem).strip("._-") or "upload"
+    safe_suffix = re.sub(r"[^A-Za-z0-9.]+", "", suffix)
+    if not safe_suffix:
+        safe_suffix = ".bin"
+
+    return f"{safe_stem}{safe_suffix}"
+
+
+def _sanitize_imaging_filename_component(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value or "").strip())
+    return cleaned.strip("._-") or "unknown"
+
+
+def _build_archived_imaging_path(posting_date: str, check_number: str, file_name: str) -> Path:
+    root = _imaging_root_folder()
+    archive_dir = root / "Renamed" / "Archived"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        date_prefix = datetime.strptime(normalize_mmddyyyy(posting_date) or posting_date, "%m/%d/%Y").strftime("%m.%d.%y")
+    except ValueError:
+        date_prefix = _sanitize_imaging_filename_component(posting_date.replace("/", "."))
+
+    check_part = _sanitize_imaging_filename_component(check_number)
+    source_name = Path(str(file_name or "")).name
+    suffix = Path(source_name).suffix.lower() or ".bin"
+    base_name = f"{date_prefix}-{check_part}{suffix}"
+    target_path = (archive_dir / base_name).resolve()
+    if not target_path.exists():
+        return target_path
+
+    for index in range(2, 1000):
+        candidate = (archive_dir / f"{date_prefix}-{check_part}-{index}{suffix}").resolve()
+        if not candidate.exists():
+            return candidate
+
+    raise HTTPException(status_code=500, detail="Unable to allocate a storage path for the uploaded file")
+
+
 def _replace_imaging_file(file_path: str, uploaded_bytes: bytes) -> dict:
     root = _imaging_root_folder()
     current_path = _rebase_imaging_file_path(file_path)
@@ -2642,6 +2766,23 @@ def _replace_imaging_file(file_path: str, uploaded_bytes: bytes) -> dict:
         "filePath": str(target_path),
         "fileName": target_path.name,
     }
+
+
+def _write_imaging_upload(target_path: Path, uploaded_bytes: bytes) -> None:
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(delete=False, dir=str(target_path.parent), suffix=target_path.suffix) as handle:
+        handle.write(uploaded_bytes)
+        staged_path = handle.name
+
+    try:
+        os.replace(staged_path, target_path)
+    except Exception as exc:
+        try:
+            if os.path.exists(staged_path):
+                os.unlink(staged_path)
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {exc}") from exc
 
 
 TASK_TABLE_COLUMNS = [
@@ -5082,6 +5223,276 @@ def get_admin_table_rows(table_name: str, limit: int = 250, offset: int = 0, sor
         "columns": columns,
         "rows": payload_rows,
     }
+
+
+@app.get("/admin/crashlogs")
+def get_admin_crashlogs(limit: int = 100, offset: int = 0):
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_crashlogs_table(conn)
+        safe_limit = max(1, min(int(limit or 100), 250))
+        safe_offset = max(0, int(offset or 0))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("Crashlogs")}
+            ORDER BY {_quote_identifier("created_at")} DESC, {_quote_identifier("id")} DESC
+            LIMIT ? OFFSET ?
+            ''',
+            (safe_limit, safe_offset),
+        ).fetchall()
+        total_rows = int(
+            conn.execute(f'SELECT COUNT(*) FROM {_quote_identifier("Crashlogs")}').fetchone()[0] or 0
+        )
+        return {
+            "table": "Crashlogs",
+            "rowCount": total_rows,
+            "rows": [dict(row) for row in rows],
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/admin/crashlogs")
+def create_admin_crashlog(payload: dict | None = None):
+    payload = payload or {}
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_crashlogs_table(conn)
+        created_at = datetime.now().isoformat(timespec="seconds")
+        incident_at = str(payload.get("incident_at") or created_at).strip() or created_at
+        status = str(payload.get("status") or "Open").strip() or "Open"
+        severity = str(payload.get("severity") or "Info").strip() or "Info"
+        screen = str(payload.get("screen") or "").strip()
+        summary = str(payload.get("summary") or "").strip()
+        details = str(payload.get("details") or "").strip()
+        frontend_health = str(payload.get("frontend_health") or "").strip()
+        backend_health = str(payload.get("backend_health") or "").strip()
+        browser_health = str(payload.get("browser_health") or "").strip()
+        created_by = str(payload.get("created_by") or "").strip()
+        resolved_at = str(payload.get("resolved_at") or "").strip() or None
+
+        if not summary:
+            raise HTTPException(status_code=400, detail="summary is required")
+        if not details:
+            raise HTTPException(status_code=400, detail="details is required")
+
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO {_quote_identifier("Crashlogs")} (
+                {_quote_identifier("created_at")},
+                {_quote_identifier("incident_at")},
+                {_quote_identifier("status")},
+                {_quote_identifier("severity")},
+                {_quote_identifier("screen")},
+                {_quote_identifier("summary")},
+                {_quote_identifier("details")},
+                {_quote_identifier("frontend_health")},
+                {_quote_identifier("backend_health")},
+                {_quote_identifier("browser_health")},
+                {_quote_identifier("created_by")},
+                {_quote_identifier("resolved_at")}
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                created_at,
+                incident_at,
+                status,
+                severity,
+                screen,
+                summary,
+                details,
+                frontend_health,
+                backend_health,
+                browser_health,
+                created_by,
+                resolved_at,
+            ),
+        )
+        conn.commit()
+        row_id = int(cur.lastrowid)
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Crashlogs")} WHERE {_quote_identifier("id")} = ?',
+            (row_id,),
+        ).fetchone()
+        return {"status": "ok", "row": dict(row) if row else None}
+    finally:
+        conn.close()
+
+
+def _devnote_row_to_payload(row):
+    return {
+        "id": row["id"],
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+        "category": str(row["category"] or ""),
+        "title": str(row["title"] or ""),
+        "notes": str(row["notes"] or ""),
+        "is_done": bool(row["is_done"]),
+    }
+
+
+def _normalize_devnote_payload(payload: dict, note_id: int | None = None):
+    category = str(payload.get("category") or "Todo").strip() or "Todo"
+    title = str(payload.get("title") or "").strip()
+    notes = str(payload.get("notes") or "").strip()
+    is_done_value = payload.get("is_done", payload.get("done", False))
+    is_done = bool(is_done_value)
+
+    if not title:
+        raise HTTPException(status_code=400, detail="title is required")
+    if not notes:
+        raise HTTPException(status_code=400, detail="notes is required")
+
+    now = _utc_now_iso()
+    return {
+        "id": note_id,
+        "created_at": str(payload.get("created_at") or now).strip() or now,
+        "updated_at": now,
+        "category": category,
+        "title": title,
+        "notes": notes,
+        "is_done": 1 if is_done else 0,
+    }
+
+
+@app.get("/admin/dev-notes")
+def get_admin_dev_notes(limit: int = 50, offset: int = 0):
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_devnotes_table(conn)
+        safe_limit = max(1, min(int(limit or 50), 250))
+        safe_offset = max(0, int(offset or 0))
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            f'''
+            SELECT *
+            FROM {_quote_identifier("DevNotes")}
+            ORDER BY {_quote_identifier("is_done")} ASC, {_quote_identifier("updated_at")} DESC, {_quote_identifier("id")} DESC
+            LIMIT ? OFFSET ?
+            ''',
+            (safe_limit, safe_offset),
+        ).fetchall()
+        total_rows = int(conn.execute(f'SELECT COUNT(*) FROM {_quote_identifier("DevNotes")}').fetchone()[0] or 0)
+        return {
+            "table": "DevNotes",
+            "rowCount": total_rows,
+            "rows": [_devnote_row_to_payload(row) for row in rows],
+        }
+    finally:
+        conn.close()
+
+
+@app.post("/admin/dev-notes")
+def create_admin_dev_note(payload: dict | None = None):
+    payload = payload or {}
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_devnotes_table(conn)
+        normalized = _normalize_devnote_payload(payload)
+        cur = conn.cursor()
+        cur.execute(
+            f"""
+            INSERT INTO {_quote_identifier("DevNotes")} (
+                {_quote_identifier("created_at")},
+                {_quote_identifier("updated_at")},
+                {_quote_identifier("category")},
+                {_quote_identifier("title")},
+                {_quote_identifier("notes")},
+                {_quote_identifier("is_done")}
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (
+                normalized["created_at"],
+                normalized["updated_at"],
+                normalized["category"],
+                normalized["title"],
+                normalized["notes"],
+                normalized["is_done"],
+            ),
+        )
+        conn.commit()
+        row_id = int(cur.lastrowid)
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("DevNotes")} WHERE {_quote_identifier("id")} = ?',
+            (row_id,),
+        ).fetchone()
+        return {"status": "ok", "row": _devnote_row_to_payload(row) if row else None}
+    finally:
+        conn.close()
+
+
+@app.put("/admin/dev-notes/{note_id}")
+def update_admin_dev_note(note_id: int, payload: dict | None = None):
+    payload = payload or {}
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_devnotes_table(conn)
+        conn.row_factory = sqlite3.Row
+        existing = conn.execute(
+            f'SELECT * FROM {_quote_identifier("DevNotes")} WHERE {_quote_identifier("id")} = ?',
+            (note_id,),
+        ).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="Dev note not found")
+
+        normalized = _normalize_devnote_payload({**dict(existing), **payload}, note_id=note_id)
+        conn.execute(
+            f"""
+            UPDATE {_quote_identifier("DevNotes")}
+            SET
+                {_quote_identifier("updated_at")} = ?,
+                {_quote_identifier("category")} = ?,
+                {_quote_identifier("title")} = ?,
+                {_quote_identifier("notes")} = ?,
+                {_quote_identifier("is_done")} = ?
+            WHERE {_quote_identifier("id")} = ?
+            """,
+            (
+                normalized["updated_at"],
+                normalized["category"],
+                normalized["title"],
+                normalized["notes"],
+                normalized["is_done"],
+                note_id,
+            ),
+        )
+        conn.commit()
+        row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("DevNotes")} WHERE {_quote_identifier("id")} = ?',
+            (note_id,),
+        ).fetchone()
+        return {"status": "ok", "row": _devnote_row_to_payload(row) if row else None}
+    finally:
+        conn.close()
+
+
+@app.delete("/admin/dev-notes/{note_id}")
+def delete_admin_dev_note(note_id: int):
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_devnotes_table(conn)
+        cur = conn.cursor()
+        cur.execute(
+            f'DELETE FROM {_quote_identifier("DevNotes")} WHERE {_quote_identifier("id")} = ?',
+            (note_id,),
+        )
+        if cur.rowcount == 0:
+            raise HTTPException(status_code=404, detail="Dev note not found")
+        conn.commit()
+        return {"status": "ok", "id": note_id}
+    finally:
+        conn.close()
 
 
 # ------------------------------------------------------------
@@ -8956,6 +9367,70 @@ async def replace_imaging_file(path: str = Form(...), file: UploadFile = File(..
         rebuilt_count = rebuild_imaging_document_index(conn)
         result["indexCount"] = rebuilt_count
         return result
+    finally:
+        conn.close()
+
+
+@app.post("/imaging/balsheet-links/upload")
+async def upload_and_confirm_imaging_balsheet_link(
+    entry_id: str = Form(...),
+    posting_date: str = Form(...),
+    file: UploadFile = File(...),
+):
+    entry_id = str(entry_id or "").strip()
+    normalized_posting_date = normalize_mmddyyyy(posting_date)
+    if not entry_id:
+        raise HTTPException(status_code=400, detail="entry_id is required")
+    if not normalized_posting_date:
+        raise HTTPException(status_code=400, detail="posting_date is required")
+
+    uploaded_bytes = await file.read()
+    if not uploaded_bytes:
+        raise HTTPException(status_code=400, detail="Please upload a file")
+
+    init_db()
+    conn = get_conn()
+    try:
+        ensure_balsheet_table(conn)
+        ensure_imaging_tables(conn)
+        conn.row_factory = sqlite3.Row
+
+        balsheet_row = conn.execute(
+            f'SELECT * FROM {_quote_identifier("Balsheet")} WHERE {_quote_identifier("EntryID")} = ?',
+            (entry_id,),
+        ).fetchone()
+        if not balsheet_row:
+            raise HTTPException(status_code=404, detail="Balsheet row not found")
+
+        target_name = file.filename or f"{entry_id}.bin"
+        target_path = _build_archived_imaging_path(
+            normalized_posting_date,
+            str(balsheet_row["Check Number"] or ""),
+            target_name,
+        )
+        _write_imaging_upload(target_path, uploaded_bytes)
+        rebuilt_count = rebuild_imaging_document_index(conn)
+
+        result = _upsert_imaging_balsheet_link(
+            conn=conn,
+            entry_id=entry_id,
+            file_path=str(target_path),
+            link_id=f"IML-{uuid.uuid4().hex[:12].upper()}",
+            check_number=str(balsheet_row["Check Number"] or ""),
+            match_method="manual-upload",
+            confidence=1.0,
+            source_query="manual upload",
+            lockbox_image_date=normalized_posting_date,
+        )
+        conn.commit()
+        return {
+            "status": "ok",
+            "linkId": result["linkId"],
+            "entryId": entry_id,
+            "filePath": result["filePath"],
+            "fileName": result["documentFileName"],
+            "indexCount": rebuilt_count,
+        }
     finally:
         conn.close()
 

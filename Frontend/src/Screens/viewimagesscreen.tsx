@@ -19,6 +19,7 @@ import {
   getImagingBalsheetAssociations,
   refreshImagingBalsheetAssociations,
   replaceImagingFile,
+  uploadAndAssociateImagingFile,
   saveImagingSitePageAssociation,
   type ImagingBalsheetAssociationResponse,
   type ImagingBalsheetAssociationRow,
@@ -247,6 +248,7 @@ export default function ViewImagesScreen() {
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [replacementTarget, setReplacementTarget] = useState<ImagingReviewFile | null>(null);
+  const [associateTargetRow, setAssociateTargetRow] = useState<ImagingBalsheetAssociationRow | null>(null);
   const [lockboxRowId, setLockboxRowId] = useState("");
   const [lockboxError, setLockboxError] = useState<string | null>(null);
   const [actionDetail, setActionDetail] = useState<string | null>(null);
@@ -272,6 +274,7 @@ export default function ViewImagesScreen() {
   const initial835RefreshDoneRef = useRef(false);
   const reviewModeRequestedRef = useRef(false);
   const replacementTargetRef = useRef<ImagingReviewFile | null>(null);
+  const associateTargetRowRef = useRef<ImagingBalsheetAssociationRow | null>(null);
 
   useEffect(() => {
     if (!initialDate) {
@@ -825,8 +828,23 @@ export default function ViewImagesScreen() {
     }
 
     setError(null);
+    setAssociateTargetRow(null);
+    associateTargetRowRef.current = null;
     setReplacementTarget(file);
     replacementTargetRef.current = file;
+    if (typeof replaceFileInputRef.current?.showPicker === "function") {
+      replaceFileInputRef.current.showPicker();
+      return;
+    }
+    replaceFileInputRef.current?.click();
+  }
+
+  function startAssociateScan(row: ImagingBalsheetAssociationRow) {
+    setError(null);
+    setReplacementTarget(null);
+    replacementTargetRef.current = null;
+    setAssociateTargetRow(row);
+    associateTargetRowRef.current = row;
     if (typeof replaceFileInputRef.current?.showPicker === "function") {
       replaceFileInputRef.current.showPicker();
       return;
@@ -840,12 +858,15 @@ export default function ViewImagesScreen() {
 
     if (!file) {
       setReplacementTarget(null);
+      setAssociateTargetRow(null);
       return;
     }
 
     const target = replacementTargetRef.current ?? replacementTarget;
-    if (!target?.filePath) {
+    const associateTarget = associateTargetRowRef.current ?? associateTargetRow;
+    if (!target?.filePath && !associateTarget) {
       setReplacementTarget(null);
+      setAssociateTargetRow(null);
       setError("No replacement target is selected.");
       return;
     }
@@ -853,23 +874,41 @@ export default function ViewImagesScreen() {
     setLoading(true);
     setError(null);
     try {
-      const response = await replaceImagingFile(target.filePath, file);
-      await loadDate(data?.postingDate ?? postingDate);
-      setPreviewRefreshToken((token) => token + 1);
-      setActionDetail(
-        `Replaced ${target.fileName} with ${file.name}. Refreshed the review image snapshot and ${response.indexCount} indexed file${response.indexCount === 1 ? "" : "s"}.`
-      );
+      if (target?.filePath) {
+        const response = await replaceImagingFile(target.filePath, file);
+        await loadDate(data?.postingDate ?? postingDate);
+        setPreviewRefreshToken((token) => token + 1);
+        setActionDetail(
+          `Replaced ${target.fileName} with ${file.name}. Refreshed the review image snapshot and ${response.indexCount} indexed file${response.indexCount === 1 ? "" : "s"}.`
+        );
+      } else if (associateTarget) {
+        const postingDay = data?.postingDate ?? isoDateToDisplay(postingDate);
+        if (!postingDay) {
+          throw new Error("No posting date is available for this association.");
+        }
+
+        const response = await uploadAndAssociateImagingFile(associateTarget.entryId, postingDay, file);
+        await loadDate(displayDateToIso(postingDay));
+        setPreviewRefreshToken((token) => token + 1);
+        setActionDetail(
+          `Uploaded ${file.name} and associated it to ${associateTarget.checkNumber || associateTarget.payer || associateTarget.entryId}. Refreshed ${response.indexCount} indexed file${response.indexCount === 1 ? "" : "s"}.`
+        );
+      }
     } catch (replaceError) {
       setError(
         formatImagingError(
           replaceError,
           "POST",
-          `${API_BASE}/imaging/files/replace -> ${target.filePath}`
+          target?.filePath
+            ? `${API_BASE}/imaging/files/replace -> ${target.filePath}`
+            : `${API_BASE}/imaging/balsheet-links/upload -> ${associateTarget?.entryId || "unknown"}`
         )
       );
     } finally {
       setReplacementTarget(null);
       replacementTargetRef.current = null;
+      setAssociateTargetRow(null);
+      associateTargetRowRef.current = null;
       setLoading(false);
     }
   }
@@ -1189,7 +1228,7 @@ export default function ViewImagesScreen() {
         }}
         disabled={!data}
       >
-        <span style={adminStyles.navButtonLabel}>View</span>
+        <span style={adminStyles.navButtonLabel}>Add-Replace</span>
         <span style={adminStyles.navButtonGlyph}>&gt;</span>
       </button>
 
@@ -1280,7 +1319,7 @@ export default function ViewImagesScreen() {
               <div style={viewImagesStyles.heroStatusTitle}>{phaseTitle}</div>
               <div style={viewImagesStyles.heroStatusText}>
                 {data
-                  ? `${data.rows.length} Balsheet row${data.rows.length === 1 ? "" : "s"} returned for ${data.postingDate}.`
+                  ? `Results: ${data.rows.length} Balsheet row${data.rows.length === 1 ? "" : "s"} returned for ${data.postingDate}.`
                   : "No date has been loaded yet. Start with the date field on the left."}
               </div>
             </div>
@@ -1293,7 +1332,8 @@ export default function ViewImagesScreen() {
         {data && (
           <section style={viewImagesStyles.workspaceShell}>
             <div style={viewImagesStyles.sectionHeader}>
-              <div>
+              <div style={viewImagesStyles.phaseTitleStack}>
+                {phase === "matched" && <div style={viewImagesStyles.sectionPhaseLabel}>Phase 1 · Balsheet Match</div>}
                 <div style={adminStyles.sectionKicker}>Matched rows</div>
                 <h2 style={adminStyles.sectionTitle}>Balsheet rows and suggested documents</h2>
                 <div style={viewImagesStyles.sectionDate}>
@@ -1414,9 +1454,20 @@ export default function ViewImagesScreen() {
                                       </>
                                     )}
                                   </div>
-                                ) : (
-                                  <span style={viewImagesStyles.reviewImageMeta}>No image matched</span>
-                                )}
+                                  ) : (
+                                    <div style={viewImagesStyles.reviewImageInline}>
+                                      <span style={viewImagesStyles.reviewImageMeta}>No image matched</span>
+                                      <button
+                                        type="button"
+                                        style={viewImagesStyles.smallButtonSecondary}
+                                        onClick={() => void startAssociateScan(row)}
+                                        disabled={loading}
+                                        title="Upload a new file, archive it, and associate it with this row"
+                                      >
+                                        Add
+                                      </button>
+                                    </div>
+                                  )}
                               </div>
                             </div>
                           );
@@ -1432,9 +1483,10 @@ export default function ViewImagesScreen() {
             {phase !== "review" && (
               <div style={nonReviewGridStyle}>
                 {phase === "lockbox" && (
-                  <article style={viewImagesStyles.lockboxPanel}>
-                    <div style={viewImagesStyles.lockboxPanelTop}>
-                      <div>
+                    <article style={viewImagesStyles.lockboxPanel}>
+                      <div style={viewImagesStyles.lockboxPanelTop}>
+                      <div style={viewImagesStyles.phaseTitleStack}>
+                        <div style={viewImagesStyles.sectionPhaseLabel}>Phase 2 · Lockbox Images</div>
                         <div style={adminStyles.sectionKicker}>Lockbox images</div>
                         <h3 style={adminStyles.sectionTitle}>Lockbox</h3>
                       </div>
@@ -1588,7 +1640,8 @@ export default function ViewImagesScreen() {
                   <div style={viewImagesStyles.rowsColumn}>
                     {phase === "site" && (
                       <div style={viewImagesStyles.siteImagesHeader}>
-                        <div>
+                        <div style={viewImagesStyles.phaseTitleStack}>
+                          <div style={viewImagesStyles.sectionPhaseLabel}>Phase 3 · Site Images</div>
                           <div style={adminStyles.sectionKicker}>Site images</div>
                           <h3 style={adminStyles.sectionTitle}>Scanned paperwork by site</h3>
                         </div>
@@ -2441,6 +2494,27 @@ const viewImagesStyles: Record<string, CSSProperties> = {
     justifyContent: "space-between",
     gap: "16px",
     flexWrap: "wrap",
+  },
+  phaseTitleStack: {
+    display: "grid",
+    gap: "4px",
+    justifyItems: "start",
+  },
+  sectionPhaseLabel: {
+    display: "inline-flex",
+    alignItems: "center",
+    width: "fit-content",
+    marginBottom: "8px",
+    padding: "8px 12px",
+    borderRadius: "999px",
+    color: "#0f5f46",
+    fontSize: "12px",
+    fontWeight: 1000,
+    letterSpacing: "0.12em",
+    textTransform: "uppercase",
+    background: "linear-gradient(180deg, rgba(228, 248, 240, 0.98), rgba(214, 243, 231, 0.96))",
+    border: "1px solid rgba(24, 112, 84, 0.18)",
+    boxShadow: "0 10px 20px rgba(24, 112, 84, 0.08)",
   },
   sectionDate: {
     marginTop: "8px",

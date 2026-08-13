@@ -32,9 +32,11 @@ import SnapshotGeneratorScreen from "./Screens/snapshotgeneratorscreen";
 import MainScreen from "./Screens/mainscreen";
 import SignInScreen from "./Screens/signinscreen";
 import AdminScreen from "./Screens/adminscreen";
+import DevNoteScreen from "./Screens/devnotescreen";
 import AdminRolesScreen from "./Screens/adminrolescreen";
 import AdminMenuScreen from "./Screens/adminmenusscreen";
 import AdminTableScreen from "./Screens/admintablescreen";
+import CrashLogScreen from "./Screens/crashlogscreen";
 import AdminUserScreen from "./Screens/adminuserscreen";
 import AdminConfigScreen from "./Screens/adminconfigscreen";
 import ProfileScreen from "./Screens/profilescreen";
@@ -203,6 +205,7 @@ export default function ScreenManager() {
           <Route path="/" element={<MainScreen />} />
           <Route path="/home" element={<MainScreen />} />
           <Route path="/admin" element={<AdminScreen />} />
+          <Route path="/admin/dev-notes" element={<DevNoteScreen />} />
           <Route path="/admin/config" element={<AdminConfigScreen />} />
           <Route path="/admin/hipaa" element={<HipaaScreen />} />
           <Route path="/admin/security" element={<SecurityScreen />} />
@@ -213,6 +216,7 @@ export default function ScreenManager() {
           <Route path="/admin/roles" element={<AdminRolesScreen />} />
           <Route path="/admin/menus" element={<AdminMenuScreen />} />
           <Route path="/admin/tables" element={<AdminTableScreen />} />
+          <Route path="/admin/crashlogs" element={<CrashLogScreen />} />
           <Route path="/admin/users" element={<AdminUserScreen />} />
           <Route path="/profile" element={<ProfileScreen />} />
           <Route path="/calendar" element={<CalendarScreen />} />

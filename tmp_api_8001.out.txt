@@ -1,2 +1,0 @@
-[startup] pid=20932 db_path=C:\Renfrew\Workflow\database.db workflow_root=C:\Renfrew\Workflow
-INFO:     127.0.0.1:58209 - "GET /imaging/balsheet-associations?posting_date=2026-07-20 HTTP/1.1" 500 Internal Server Error

@@ -61,6 +61,8 @@ export const ALL_MENU_OPTIONS: MenuOption[] = [
   { id: "/admin", label: "Admin", meta: "Admin console.", kind: "screen", path: "/admin" },
   { id: "/profile", label: "Profile", meta: "User profile.", kind: "screen", path: "/profile" },
   { id: "/admin/config", label: "Config", meta: "App config editor.", kind: "screen", path: "/admin/config" },
+  { id: "/admin/crashlogs", label: "Crashlogs", meta: "Incident history.", kind: "screen", path: "/admin/crashlogs" },
+  { id: "/admin/dev-notes", label: "Dev Notes", meta: "Admin scratchpad.", kind: "screen", path: "/admin/dev-notes" },
   { id: "/admin/hipaa", label: "HIPAA", meta: "HIPAA readiness review.", kind: "screen", path: "/admin/hipaa" },
   { id: "/admin/security", label: "Security", meta: "Auth-side security notes.", kind: "screen", path: "/admin/security" },
   { id: "/admin/portability", label: "Portability", meta: "Server migration plan.", kind: "screen", path: "/admin/portability" },

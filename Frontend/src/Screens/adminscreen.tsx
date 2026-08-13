@@ -73,6 +73,11 @@ const adminCoverageItems: AdminCoverageItem[] = [
     status: "Done",
   },
   {
+    area: "Dev Notes",
+    detail: "A built-in scratchpad is available for reminders, ideas, and to-dos.",
+    status: "Done",
+  },
+  {
     area: "Daily worklist",
     detail: "The work queue editor is surfaced from the admin launch area.",
     status: "Partial",
@@ -91,6 +96,7 @@ const adminCoverageItems: AdminCoverageItem[] = [
 
 export default function AdminScreen() {
   const navigate = useNavigate();
+
   const score = useMemo(() => {
     const totals = { done: 0, partial: 0, need: 0 };
     for (const item of adminCoverageItems) {
@@ -145,6 +151,10 @@ export default function AdminScreen() {
           <span style={styles.actionTitle}>Config</span>
           <span style={styles.actionMeta}>Edit live app config</span>
         </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/crashlogs")}>
+          <span style={styles.actionTitle}>Crashlogs</span>
+          <span style={styles.actionMeta}>Track app incidents and browser crashes</span>
+        </button>
         <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/hipaa")}>
           <span style={styles.actionTitle}>HIPAA</span>
           <span style={styles.actionMeta}>Review readiness gaps and controls</span>
@@ -168,6 +178,10 @@ export default function AdminScreen() {
         <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/auditors")}>
           <span style={styles.actionTitle}>Auditors</span>
           <span style={styles.actionMeta}>Open technical data sheets</span>
+        </button>
+        <button type="button" style={styles.actionButton} onClick={() => navigate("/admin/dev-notes")}>
+          <span style={styles.actionTitle}>Dev Notes</span>
+          <span style={styles.actionMeta}>Capture reminders, feature ideas, and todo items</span>
         </button>
         <button type="button" style={styles.actionButton} onClick={() => navigate("/worklist-editor")}>
           <span style={styles.actionTitle}>Daily Worklist</span>
